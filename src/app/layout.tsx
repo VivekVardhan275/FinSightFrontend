@@ -9,12 +9,6 @@ import React, { useEffect } from 'react'; // Import useEffect
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
-// Static metadata generation (can still be used)
-export const metadata: Metadata = {
-  title: 'FinSight Finance',
-  description: 'Personal Finance Tracker with Forecasting',
-};
-
 // Font size and compact mode constants
 const FONT_SIZE_CLASSES = {
   small: "font-size-small",
