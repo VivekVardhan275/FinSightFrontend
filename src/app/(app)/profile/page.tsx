@@ -6,10 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuthState } from "@/hooks/use-auth-state";
-import { User as UserIcon, Mail, Edit3, BellRing, Palette, Save, XCircle, CalendarDays, Phone } from "lucide-react";
+import { User as UserIconLucide, Mail, Edit3, Save, XCircle } from "lucide-react"; // Renamed UserIcon to UserIconLucide
 import { motion } from "framer-motion";
 import React, { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -37,26 +36,21 @@ export default function ProfilePage() {
   const [initialDateOfBirthForEdit, setInitialDateOfBirthForEdit] = useState("");
   const [initialGenderForEdit, setInitialGenderForEdit] = useState("");
 
-  const [budgetAlerts, setBudgetAlerts] = useState(true);
-  const [weeklySummary, setWeeklySummary] = useState(false);
-  const [billReminders, setBillReminders] = useState(true);
-
   useEffect(() => {
     if (user) {
       const initialName = user.name || "";
       setDisplayName(initialName);
       setInitialDisplayNameForEdit(initialName); 
       
-      // Assuming these are not part of the initial user object from useAuthState
-      const initialPhone = ""; // Load from user profile data if available
+      const initialPhone = ""; 
       setPhoneNumber(initialPhone); 
       setInitialPhoneNumberForEdit(initialPhone);
 
-      const initialDob = ""; // Load from user profile data if available
+      const initialDob = ""; 
       setDateOfBirth(initialDob);
       setInitialDateOfBirthForEdit(initialDob);
 
-      const initialGen = ""; // Load from user profile data if available
+      const initialGen = ""; 
       setGender(initialGen);
       setInitialGenderForEdit(initialGen);
     }
@@ -105,27 +99,16 @@ export default function ProfilePage() {
   };
 
   const handleSaveChanges = () => {
-    // In a real app, you would save these to a backend.
     console.log("Saving profile:", { displayName, phoneNumber, dateOfBirth, gender });
     toast({
       title: "Profile Updated",
       description: "Your personal information has been (simulated) saved.",
     });
     setIsEditingPersonalInfo(false);
-    // Update initial values for next edit session
     setInitialDisplayNameForEdit(displayName);
     setInitialPhoneNumberForEdit(phoneNumber);
     setInitialDateOfBirthForEdit(dateOfBirth);
     setInitialGenderForEdit(gender);
-  };
-
-  const handleSavePreferences = () => {
-    // In a real app, you would save these to a backend.
-    console.log("Saving preferences:", { budgetAlerts, weeklySummary, billReminders });
-    toast({
-      title: "Preferences Updated",
-      description: "Your application preferences have been (simulated) saved.",
-    });
   };
   
   const handleEmailClick = () => {
@@ -151,7 +134,7 @@ export default function ProfilePage() {
           Profile
         </h1>
         <p className="text-muted-foreground">
-          Manage your personal information and preferences.
+          Manage your personal information. For other preferences, visit the Settings page.
         </p>
       </motion.div>
 
@@ -174,7 +157,7 @@ export default function ProfilePage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">
-            <Button variant="outline" disabled> {/* Kept disabled as per previous behavior */}
+            <Button variant="outline" disabled>
               <Edit3 className="mr-2 h-4 w-4" /> Edit Profile Picture
             </Button>
           </CardContent>
@@ -183,7 +166,7 @@ export default function ProfilePage() {
         <Card className="md:col-span-2 shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center font-headline">
-              <UserIcon className="mr-2 h-6 w-6 text-primary" />
+              <UserIconLucide className="mr-2 h-6 w-6 text-primary" />
               Personal Information
             </CardTitle>
             <CardDescription>
@@ -243,7 +226,7 @@ export default function ProfilePage() {
                   onChange={(e) => setDateOfBirth(e.target.value)} 
                 />
               ) : (
-                 <ReadOnlyFieldDisplay value={dateOfBirth ? new Date(dateOfBirth + 'T00:00:00').toLocaleDateString('en-CA') : null} placeholder="Select date of birth" />
+                 <ReadOnlyFieldDisplay value={dateOfBirth ? new Date(dateOfBirth + 'T00:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : null} placeholder="Select date of birth" />
               )}
             </div>
             
@@ -288,63 +271,6 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
       </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.3 }}
-      >
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="flex items-center font-headline">
-              <BellRing className="mr-2 h-6 w-6 text-primary" />
-              Preferences
-            </CardTitle>
-            <CardDescription>
-              Customize your application experience.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-3">
-              <h4 className="text-md font-medium">Notification Settings</h4>
-              <div className="flex items-center justify-between rounded-lg border p-4">
-                <div>
-                  <Label htmlFor="budget-alerts" className="font-medium">Budget Alerts</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Receive alerts when you're nearing or over budget.
-                  </p>
-                </div>
-                <Switch id="budget-alerts" aria-label="Toggle budget alerts" checked={budgetAlerts} onCheckedChange={setBudgetAlerts} />
-              </div>
-              <div className="flex items-center justify-between rounded-lg border p-4">
-                <div>
-                  <Label htmlFor="weekly-summary" className="font-medium">Weekly Summary Email</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Get a summary of your finances every week.
-                  </p>
-                </div>
-                <Switch id="weekly-summary" aria-label="Toggle weekly summary email" checked={weeklySummary} onCheckedChange={setWeeklySummary} />
-              </div>
-               <div className="flex items-center justify-between rounded-lg border p-4">
-                <div>
-                  <Label htmlFor="bill-reminders" className="font-medium">Bill Reminders</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Get reminders for upcoming bill payments.
-                  </p>
-                </div>
-                <Switch id="bill-reminders" aria-label="Toggle bill reminders" checked={billReminders} onCheckedChange={setBillReminders} />
-              </div>
-            </div>
-            
-            <div className="flex justify-end pt-4">
-              <Button onClick={handleSavePreferences}>
-                <Edit3 className="mr-2 h-4 w-4" /> Save Preferences
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
     </div>
   );
 }
-
