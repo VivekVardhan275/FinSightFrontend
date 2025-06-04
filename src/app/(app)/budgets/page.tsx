@@ -4,7 +4,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Target } from "lucide-react";
-import { sampleBudgets } from "@/lib/placeholder-data";
 import type { Budget } from "@/types";
 import { BudgetCard } from '@/components/budgets/budget-card';
 import { BudgetFormDialog } from '@/components/budgets/budget-form-dialog';
@@ -20,9 +19,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { motion } from "framer-motion";
-import { useCurrency } from '@/contexts/currency-context';
-import { formatCurrency } from '@/lib/utils';
-import { v4 as uuidv4 } from 'uuid';
+import { useBudgetContext } from '@/contexts/budget-context';
+import { useTransactionContext } from '@/contexts/transaction-context';
 
 const listVariants = {
   hidden: { opacity: 0 },
@@ -48,76 +46,22 @@ const itemVariants = {
 };
 
 export default function BudgetsPage() {
-  const [budgets, setBudgets] = useState<Budget[]>(sampleBudgets);
+  const { budgets, addBudget, updateBudget, deleteBudget: deleteBudgetFromContext, updateBudgetSpentAmount } = useBudgetContext();
+  const { transactions } = useTransactionContext();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
   const [budgetToDeleteId, setBudgetToDeleteId] = useState<string | null>(null);
-  const [notifiedBudgets, setNotifiedBudgets] = useState<Set<string>>(new Set());
-
+  
   const { addNotification } = useNotification();
-  const { selectedCurrency, convertAmount } = useCurrency();
 
-  const checkAndNotifyBudgets = (budgetsToCheck: Budget[]) => {
-    budgetsToCheck.forEach(budget => {
-      const percentageSpent = budget.allocated > 0 ? (budget.spent / budget.allocated) * 100 : 0;
-      const budgetId = budget.id;
-
-      const displaySpent = convertAmount(budget.spent, selectedCurrency);
-      const displayAllocated = convertAmount(budget.allocated, selectedCurrency);
-
-      const exceededKey = `${budgetId}-exceeded`;
-      const nearingKey = `${budgetId}-nearing`;
-
-      if (budget.spent > budget.allocated) {
-        if (!notifiedBudgets.has(exceededKey)) {
-          addNotification({
-            title: "Budget Exceeded!",
-            description: `You've exceeded budget for ${budget.category} (${budget.month}). Spent: ${formatCurrency(displaySpent, selectedCurrency)}, Allocated: ${formatCurrency(displayAllocated, selectedCurrency)}.`,
-            type: "error",
-            href: "/budgets"
-          });
-          setNotifiedBudgets(prev => {
-            const newSet = new Set(prev);
-            newSet.add(exceededKey);
-            newSet.delete(nearingKey);
-            return newSet;
-          });
-        }
-      } else if (percentageSpent >= 85) {
-        if (!notifiedBudgets.has(nearingKey) && !notifiedBudgets.has(exceededKey)) {
-          addNotification({
-            title: "Budget Nearing Limit",
-            description: `Spent ${percentageSpent.toFixed(0)}% of budget for ${budget.category} (${budget.month}). Spent: ${formatCurrency(displaySpent, selectedCurrency)}, Allocated: ${formatCurrency(displayAllocated, selectedCurrency)}.`,
-            type: "warning",
-            href: "/budgets"
-          });
-          setNotifiedBudgets(prev => new Set(prev).add(nearingKey));
-        }
-      } else {
-        let changed = false;
-        const newSet = new Set(notifiedBudgets);
-        if (newSet.has(nearingKey)) {
-          newSet.delete(nearingKey);
-          changed = true;
-        }
-        if (newSet.has(exceededKey)) {
-          newSet.delete(exceededKey);
-          changed = true;
-        }
-        if (changed) {
-          setNotifiedBudgets(newSet);
-        }
-      }
-    });
-  };
-
+  // Recalculate spent amounts for all budgets whenever transactions or budgets change
   useEffect(() => {
-    if (budgets.length > 0) {
-      checkAndNotifyBudgets(budgets);
-    }
+    budgets.forEach(budget => {
+      updateBudgetSpentAmount(budget.id, transactions);
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [budgets, selectedCurrency, addNotification]);
+  }, [transactions, budgets]); // updateBudgetSpentAmount is stable
 
 
   const handleAddBudget = () => {
@@ -137,17 +81,11 @@ export default function BudgetsPage() {
 
   const handleDeleteBudget = () => {
      if (budgetToDeleteId) {
-      setBudgets(prev => prev.filter(b => b.id !== budgetToDeleteId));
+      deleteBudgetFromContext(budgetToDeleteId);
       addNotification({
         title: "Budget Deleted",
         description: `The budget has been successfully deleted.`,
         type: "info",
-      });
-      setNotifiedBudgets(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(`${budgetToDeleteId}-nearing`);
-        newSet.delete(`${budgetToDeleteId}-exceeded`);
-        return newSet;
       });
       setBudgetToDeleteId(null);
     }
@@ -157,19 +95,26 @@ export default function BudgetsPage() {
   const handleSaveBudget = (budgetDataFromForm: Omit<Budget, 'id' | 'spent'> | Budget) => {
     let savedCategory = "";
     let isEditing = false;
+    let savedBudget: Budget;
+
     if ('id' in budgetDataFromForm && budgets.some(b => b.id === budgetDataFromForm.id)) {
-      setBudgets(prev => prev.map(b => b.id === budgetDataFromForm.id ? budgetDataFromForm as Budget : b));
-      savedCategory = (budgetDataFromForm as Budget).category;
+      // Ensure 'spent' is preserved if it's an update, or calculated if missing
+      const existingBudget = budgets.find(b => b.id === (budgetDataFromForm as Budget).id);
+      const budgetToUpdate = {
+        ...(budgetDataFromForm as Budget),
+        spent: existingBudget?.spent ?? 0 // Keep existing spent or default to 0
+      };
+      updateBudget(budgetToUpdate);
+      savedBudget = budgetToUpdate;
       isEditing = true;
     } else {
-      const newBudget: Budget = {
-        ...(budgetDataFromForm as Omit<Budget, 'spent'>), // ID is now part of budgetDataFromForm
-        id: (budgetDataFromForm as {id: string}).id || uuidv4(), // Ensure ID is set
-        spent: 0
-      };
-      setBudgets(prev => [newBudget, ...prev]);
-      savedCategory = newBudget.category;
+      savedBudget = addBudget(budgetDataFromForm as Omit<Budget, 'id' | 'spent'>);
     }
+    
+    savedCategory = savedBudget.category;
+    // Recalculate spent amount for the saved budget
+    updateBudgetSpentAmount(savedBudget.id, transactions);
+
     addNotification({
         title: `Budget ${isEditing ? 'Updated' : 'Added'}`,
         description: `Budget for ${savedCategory} successfully ${isEditing ? 'updated' : 'added'}.`,
@@ -177,6 +122,7 @@ export default function BudgetsPage() {
         href: '/budgets'
       });
   };
+
 
   return (
     <div className="space-y-8">

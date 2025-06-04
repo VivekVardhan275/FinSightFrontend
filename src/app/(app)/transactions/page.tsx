@@ -1,12 +1,11 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
 import { DataTable } from "@/components/transactions/data-table";
 import { getColumns } from "@/components/transactions/transaction-table-columns";
-import { sampleTransactions } from "@/lib/placeholder-data";
 import type { Transaction } from "@/types";
 import { TransactionFormDialog } from "@/components/transactions/transaction-form-dialog";
 import { useNotification } from '@/contexts/notification-context';
@@ -20,17 +19,37 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { v4 as uuidv4 } from 'uuid';
+import { useTransactionContext } from '@/contexts/transaction-context';
+import { useBudgetContext } from '@/contexts/budget-context';
 
 
 export default function TransactionsPage() {
-  const [transactions, setTransactions] = useState<Transaction[]>(sampleTransactions);
+  const { transactions, addTransaction, updateTransaction, deleteTransaction: deleteTransactionFromContext } = useTransactionContext();
+  const { budgets, updateBudgetSpentAmount } = useBudgetContext();
+  
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
   const [transactionToDeleteId, setTransactionToDeleteId] = useState<string | null>(null);
 
   const { addNotification } = useNotification();
+
+  const refreshAffectedBudgets = (transaction: Transaction | { category: string; date: string; }) => {
+    const transactionDate = new Date(transaction.date);
+    const year = transactionDate.getFullYear();
+    const month = transactionDate.getMonth() + 1;
+
+    const affectedBudgets = budgets.filter(b => {
+      const budgetMonthYear = b.month.split('-');
+      return b.category === transaction.category && 
+             parseInt(budgetMonthYear[0]) === year &&
+             parseInt(budgetMonthYear[1]) === month;
+    });
+    
+    affectedBudgets.forEach(budget => {
+      updateBudgetSpentAmount(budget.id, transactions);
+    });
+  };
 
 
   const handleAddTransaction = () => {
@@ -50,12 +69,16 @@ export default function TransactionsPage() {
 
   const handleDeleteTransaction = () => {
     if (transactionToDeleteId) {
-      setTransactions(prev => prev.filter(t => t.id !== transactionToDeleteId));
+      const transactionToDelete = transactions.find(t => t.id === transactionToDeleteId);
+      deleteTransactionFromContext(transactionToDeleteId);
       addNotification({
         title: "Transaction Deleted",
         description: "The transaction has been successfully deleted.",
         type: "info",
       });
+      if (transactionToDelete) {
+        refreshAffectedBudgets(transactionToDelete);
+      }
       setTransactionToDeleteId(null);
     }
     setIsConfirmDeleteDialogOpen(false);
@@ -64,15 +87,16 @@ export default function TransactionsPage() {
   const handleSaveTransaction = (transactionData: Omit<Transaction, 'id'> | Transaction) => {
     let isEditing = false;
     let savedDescription = "";
+    let savedTransaction: Transaction;
 
     if ('id' in transactionData && transactions.some(t => t.id === transactionData.id)) { 
-      setTransactions(prev => prev.map(t => t.id === transactionData.id ? transactionData as Transaction : t));
+      updateTransaction(transactionData as Transaction);
       isEditing = true;
       savedDescription = (transactionData as Transaction).description;
+      savedTransaction = transactionData as Transaction;
     } else { 
-      const newTransaction: Transaction = { ...(transactionData as Omit<Transaction, 'id'>), id: (transactionData as {id: string}).id || uuidv4() };
-      setTransactions(prev => [newTransaction, ...prev]);
-      savedDescription = newTransaction.description;
+      savedTransaction = addTransaction(transactionData as Omit<Transaction, 'id'>);
+      savedDescription = savedTransaction.description;
     }
 
     addNotification({
@@ -81,9 +105,20 @@ export default function TransactionsPage() {
       type: "success",
       href: "/transactions"
     });
+    refreshAffectedBudgets(savedTransaction);
   };
+  
+  // Effect to update budget spent amounts if transactions list changes globally
+  // (e.g. due to localStorage sync or another tab)
+  useEffect(() => {
+    budgets.forEach(budget => {
+        updateBudgetSpentAmount(budget.id, transactions);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transactions, budgets]); // updateBudgetSpentAmount is stable
 
-  const columns = useMemo(() => getColumns(handleEditTransaction, confirmDeleteTransaction), [handleEditTransaction, confirmDeleteTransaction]);
+  const columns = useMemo(() => getColumns(handleEditTransaction, confirmDeleteTransaction), [transactions]);
+
 
   return (
     <div className="space-y-8">
