@@ -75,14 +75,14 @@ export function ExpenseBreakdownChart() {
           className="mx-auto aspect-square max-h-[300px]"
         >
           <PieChart>
-            <RechartsTooltip 
+            <RechartsTooltip
               content={
-                <ChartTooltipContent 
-                  nameKey="category" 
-                  hideLabel 
-                  formatter={(value, name) => [formatCurrency(value as number, selectedCurrency), name as string]}
+                <ChartTooltipContent
+                  nameKey="category"
+                  hideLabel
+                  formatter={(value, name) => `${formatCurrency(value as number, selectedCurrency)} ${name as string}`}
                 />
-              } 
+              }
             />
             <Pie
               data={chartData}
@@ -103,3 +103,4 @@ export function ExpenseBreakdownChart() {
     </Card>
   )
 }
+
