@@ -28,7 +28,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
         setBudgets(JSON.parse(storedBudgets));
       } catch (e) {
         console.error("Error parsing budgets from localStorage", e);
-        setBudgets(sampleBudgets); 
+        setBudgets(sampleBudgets);
       }
     } else {
       setBudgets(sampleBudgets);
@@ -85,18 +85,15 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
         })
         .reduce((sum, t) => sum + t.amount, 0);
 
-      // If the spent amount hasn't actually changed, return the previous state
-      // to prevent an unnecessary re-render and potential loop.
       if (targetBudget.spent === newSpent) {
         return prevBudgets;
       }
 
-      // Otherwise, create a new array with the updated budget
       const updatedBudgets = [...prevBudgets];
       updatedBudgets[targetBudgetIndex] = { ...targetBudget, spent: newSpent };
       return updatedBudgets;
     });
-  }, []);
+  }, []); // Added empty dependency array
 
 
   return (
