@@ -26,7 +26,7 @@ export const sampleTransactions: Transaction[] = [
 ];
 
 export const sampleBudgets: Budget[] = [
-  { id: 'b1', category: 'Food', allocated: 500, spent: 0, month: '2024-07' }, 
+  { id: 'b1', category: 'Food', allocated: 500, spent: 0, month: '2024-07' },
   { id: 'b2', category: 'Transport', allocated: 150, spent: 0, month: '2024-07' },
   { id: 'b3', category: 'Entertainment', allocated: 200, spent: 0, month: '2024-07' },
   { id: 'b4', category: 'Utilities', allocated: 300, spent: 0, month: '2024-07' },
@@ -35,14 +35,5 @@ export const sampleBudgets: Budget[] = [
 ];
 
 
-export const expenseCategoriesData = [
-  { category: 'Food', value: 400, fill: 'hsl(var(--chart-1))' },
-  { category: 'Transport', value: 300, fill: 'hsl(var(--chart-2))' },
-  { category: 'Entertainment', value: 200, fill: 'hsl(var(--chart-3))' },
-  { category: 'Utilities', value: 500, fill: 'hsl(var(--chart-4))' },
-  { category: 'Other', value: 475, fill: 'hsl(var(--chart-5))' },
-];
-
-// incomeHistory, expenseHistory, and netSavingsHistory are no longer needed as charts are dynamic.
-// They are removed.
-
+// expenseCategoriesData is no longer needed as the pie chart is dynamic.
+// incomeHistory, expenseHistory, and netSavingsHistory are also no longer needed as charts are dynamic.
