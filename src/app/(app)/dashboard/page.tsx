@@ -42,9 +42,8 @@ const formatTrendText = (percentage: number | null, type: "income" | "expense" |
   if (percentage === null || isNaN(percentage)) return "Data unavailable";
   if (percentage === Infinity) return `Increased (was 0)`;
   if (percentage === -Infinity) return `Decreased (was 0)`;
-  if (percentage === 0) return "No change from last month";
   
-  const prefix = percentage > 0 ? "+" : "";
+  const prefix = percentage >= 0 ? "+" : ""; // Ensure + for 0.0%
   return `${prefix}${percentage.toFixed(1)}% from last month`;
 };
 
@@ -103,8 +102,8 @@ export default function DashboardPage() {
     
     const incomeTrendDirection: 'up' | 'down' = (incomePercentageChange === null || incomePercentageChange >= 0) ? 'up' : 'down';
     
-    // For expenses: if expenses increased (positive change), we want an 'up' arrow icon (which will be colored red by SummaryCard)
-    // If expenses decreased (negative change), we want a 'down' arrow icon (which will be colored green by SummaryCard)
+    // For expenses: if expenses increased (positive change), we want an 'up' arrow icon. The SummaryCard will color it red.
+    // If expenses decreased (negative change), we want a 'down' arrow icon. The SummaryCard will color it green.
     const expenseIconTrendDirection: 'up' | 'down' = (expensePercentageChange === null || expensePercentageChange > 0) ? 'up' : 'down';
     
     const netSavingsTrendDirection: 'up' | 'down' = (netSavingsPercentageChange === null || netSavingsPercentageChange >= 0) ? 'up' : 'down';
@@ -155,7 +154,7 @@ export default function DashboardPage() {
         isCurrency: true,
         icon: React.createElement(PiggyBank, { className: "h-6 w-6 text-accent" }), 
         trend: `${onTrackBudgetsCount} budgets on track`,
-        isSimpleTrend: true, // Use simple bold text, no icon/color
+        isSimpleTrend: true, 
       },
     ] as SummaryCardData[];
 
