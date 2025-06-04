@@ -60,7 +60,7 @@ export default function LoginPage() {
           <Card className="shadow-2xl">
             <CardHeader className="text-center">
               <div className="mb-4 flex items-center justify-center space-x-2">
-                <AppLogo className="h-12 w-12 text-primary" />
+                <AppLogo className="h-12 w-12 text-primary transform -translate-y-1" />
                 <h1 className="font-headline text-4xl font-bold text-primary">FinSight</h1>
               </div>
               <CardTitle className="font-headline text-2xl mb-2">Welcome Back</CardTitle>
