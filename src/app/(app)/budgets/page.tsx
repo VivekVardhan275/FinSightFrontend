@@ -20,11 +20,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useBudgetContext } from '@/contexts/budget-context';
 import { useTransactionContext } from '@/contexts/transaction-context';
+import { useCurrency } from '@/contexts/currency-context';
+import { formatCurrency } from '@/lib/utils';
 
 
 export default function BudgetsPage() {
   const { budgets, addBudget, updateBudget, deleteBudget: deleteBudgetFromContext, updateBudgetSpentAmount } = useBudgetContext();
   const { transactions } = useTransactionContext();
+  const { selectedCurrency, convertAmount } = useCurrency();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
@@ -63,59 +66,64 @@ export default function BudgetsPage() {
   const handleSaveBudget = useCallback((budgetDataFromForm: Omit<Budget, 'id' | 'spent'> | Budget) => {
     const newBudgetCategoryLower = budgetDataFromForm.category.toLowerCase();
     const newBudgetMonth = budgetDataFromForm.month;
+    // budgetDataFromForm.allocated is already in USD from BudgetFormDialog
+    const newBudgetAllocatedUSD = (budgetDataFromForm as Budget).allocated;
 
-    const isDuplicate = budgets.some(existingBudget => {
-      // If we are editing and existingBudget is the one being edited, don't consider it a duplicate of itself.
-      if ('id' in budgetDataFromForm && existingBudget.id === (budgetDataFromForm as Budget).id) {
-        return false; 
+
+    const existingBudgetWithSameCategoryMonth = budgets.find(existingBudget => {
+      // If we are editing, and existingBudget is the one being edited, skip it for this specific check.
+      if ('id' in budgetDataFromForm && (budgetDataFromForm as Budget).id && existingBudget.id === (budgetDataFromForm as Budget).id) {
+        return false;
       }
       return existingBudget.category.toLowerCase() === newBudgetCategoryLower &&
              existingBudget.month === newBudgetMonth;
     });
 
-    if (isDuplicate) {
-      addNotification({
-        title: "Duplicate Budget",
-        description: `A budget for ${budgetDataFromForm.category} in ${newBudgetMonth} already exists or matches another budget.`,
-        type: "error",
-      });
-      setIsFormOpen(false); 
-      return; 
+    if (existingBudgetWithSameCategoryMonth) {
+      // A budget for the same category and month already exists (and it's not the one being edited).
+      // Now check if the allocated amount is also the same.
+      if (existingBudgetWithSameCategoryMonth.allocated === newBudgetAllocatedUSD) {
+        addNotification({
+          title: "Duplicate Budget",
+          description: `A budget for ${budgetDataFromForm.category} in ${newBudgetMonth} with the same allocated amount already exists.`,
+          type: "error",
+        });
+      } else {
+        // Same category/month, but different allocated amount. Suggest updating.
+        const oldAllocatedInSelectedCurrency = convertAmount(existingBudgetWithSameCategoryMonth.allocated, selectedCurrency);
+        const formattedOldAmount = formatCurrency(oldAllocatedInSelectedCurrency, selectedCurrency);
+        addNotification({
+          title: "Update Existing Budget?",
+          description: `A budget for ${budgetDataFromForm.category} in ${newBudgetMonth} already exists with allocated amount ${formattedOldAmount}. If you want to change the allocation, please edit the existing budget.`,
+          type: "warning",
+        });
+      }
+      setIsFormOpen(false);
+      return;
     }
     
     let savedCategory = "";
     let savedBudget: Budget;
     let notificationAction = "Added";
-    let isActuallyAnEditOperationBudget = false;
+    
+    const isActualEditOperation = 'id' in budgetDataFromForm && budgets.some(b => b.id === (budgetDataFromForm as Budget).id);
 
-    if ('id' in budgetDataFromForm && (budgetDataFromForm as Budget).id) {
-        const existingBudget = budgets.find(b => b.id === (budgetDataFromForm as Budget).id);
-        if (existingBudget) {
-            isActuallyAnEditOperationBudget = true;
-        }
-    }
 
-    if (isActuallyAnEditOperationBudget) {
+    if (isActualEditOperation) {
       notificationAction = "Updated";
-      const budgetToUpdate: Budget = {
-        // Ensure we merge with existing context data if some fields aren't on budgetDataFromForm (like 'spent')
+      const budgetToUpdate = {
         ...budgets.find(b => b.id === (budgetDataFromForm as Budget).id)!, 
         ...(budgetDataFromForm as Budget), 
       };
       updateBudget(budgetToUpdate); 
       savedBudget = budgetToUpdate;
     } else {
-      // The budgetDataFromForm for a new budget from dialog already has an ID.
-      // The context's addBudget expects Omit<Budget, 'id' | 'spent'>.
-      const { id, spent, ...newBudgetData } = budgetDataFromForm as Budget; // Remove form-generated id and spent
-      savedBudget = addBudget(newBudgetData); // Context addBudget will assign new ID and spent:0
+      // For a new budget, budgetDataFromForm is Omit<Budget, 'id' | 'spent'>
+      // It already has allocated in USD.
+      savedBudget = addBudget(budgetDataFromForm as Omit<Budget, 'id' | 'spent'>);
     }
     
     savedCategory = savedBudget.category;
-    // Ensure spent amount is updated using *all* transactions, not just the 'transactions' from this page's scope
-    // which might be stale if this is called from a different context or if transactions were updated elsewhere.
-    // The updateBudgetSpentAmount function in the context should ideally use the transactions from its own context.
-    // For now, assuming 'transactions' here is up-to-date enough for this immediate action.
     updateBudgetSpentAmount(savedBudget.id, transactions); 
 
     addNotification({
@@ -124,8 +132,8 @@ export default function BudgetsPage() {
         type: 'success',
         href: '/budgets'
       });
-    setIsFormOpen(false); // Ensure form closes on successful save
-  }, [budgets, transactions, addBudget, updateBudget, updateBudgetSpentAmount, addNotification, setIsFormOpen]);
+    setIsFormOpen(false); 
+  }, [budgets, transactions, addBudget, updateBudget, updateBudgetSpentAmount, addNotification, setIsFormOpen, selectedCurrency, convertAmount]);
 
 
   return (
