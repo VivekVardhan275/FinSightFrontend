@@ -55,13 +55,12 @@ export default function BudgetsPage() {
   
   const { addNotification } = useNotification();
 
-  // Recalculate spent amounts for all budgets whenever transactions or budgets change
-  useEffect(() => {
-    budgets.forEach(budget => {
-      updateBudgetSpentAmount(budget.id, transactions);
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transactions, budgets]); // updateBudgetSpentAmount is stable
+  // Removed the useEffect that recalculated all budget spent amounts on [transactions, budgets] change
+  // as it was potentially causing update loops or race conditions.
+  // Spent amounts are now updated more directly:
+  // 1. In handleSaveBudget for the specific budget being saved/added.
+  // 2. In TransactionsPage when transactions are modified, affecting relevant budgets.
+  // 3. The BudgetNotificationEffect in layout.tsx reads spent amounts but doesn't modify them in context.
 
 
   const handleAddBudget = () => {
@@ -97,31 +96,27 @@ export default function BudgetsPage() {
     let savedBudget: Budget;
     let notificationAction = "Added";
 
-    // Determine if we are editing or adding
     const formHasId = 'id' in budgetDataFromForm && typeof (budgetDataFromForm as Budget).id === 'string';
     const existingBudgetInContext = formHasId ? budgets.find(b => b.id === (budgetDataFromForm as Budget).id) : undefined;
 
     if (formHasId && existingBudgetInContext) {
-      // Editing an existing budget
       notificationAction = "Updated";
       const budgetToUpdate: Budget = {
-        ...existingBudgetInContext, // Base with existing context budget (preserves original spent)
-        ...(budgetDataFromForm as Budget), // Overlay with form data (category, allocated in USD, month)
+        ...existingBudgetInContext,
+        ...(budgetDataFromForm as Budget), 
       };
-      updateBudget(budgetToUpdate); // Update in context
+      updateBudget(budgetToUpdate); 
       savedBudget = budgetToUpdate;
     } else {
-      // Adding a new budget
-      // budgetDataFromForm is Omit<Budget, 'id' | 'spent'>
       savedBudget = addBudget(budgetDataFromForm as Omit<Budget, 'id' | 'spent'>);
-      // addBudget in context assigns a new id and spent: 0, returns the full Budget object
     }
     
     savedCategory = savedBudget.category;
-    // Recalculate spent amount for the saved budget.
-    // For new budgets, this will usually be 0 unless transactions already exist.
-    // For edited budgets, this ensures 'spent' is accurate if category/month changed.
-    updateBudgetSpentAmount(savedBudget.id, transactions);
+    // Crucially, ensure the spent amount for the just-saved/added budget is correct.
+    // For a new budget, its 'spent' is initialized to 0 by addBudget.
+    // Then updateBudgetSpentAmount will calculate based on existing transactions.
+    // For an edited budget, this ensures its spent is recalculated if category/month changed.
+    updateBudgetSpentAmount(savedBudget.id, transactions); 
 
     addNotification({
         title: `Budget ${notificationAction}`,
@@ -129,7 +124,6 @@ export default function BudgetsPage() {
         type: 'success',
         href: '/budgets'
       });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [budgets, transactions, addBudget, updateBudget, updateBudgetSpentAmount, addNotification]);
 
 
@@ -223,3 +217,5 @@ export default function BudgetsPage() {
     </div>
   );
 }
+
+    
