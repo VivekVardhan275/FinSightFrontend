@@ -7,7 +7,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 export const metadata: Metadata = {
-  title: 'Foresight Finance',
+  title: 'FinSight Finance',
   description: 'Personal Finance Tracker with Forecasting',
 };
 

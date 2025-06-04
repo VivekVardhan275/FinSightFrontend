@@ -61,7 +61,7 @@ export default function LoginPage() {
             <CardHeader className="text-center">
               <div className="mb-4 flex items-center justify-center space-x-2">
                 <AppLogo className="h-12 w-12 text-primary" />
-                <h1 className="font-headline text-4xl font-bold text-primary">Foresight Finance</h1>
+                <h1 className="font-headline text-4xl font-bold text-primary">FinSight</h1>
               </div>
               <CardTitle className="font-headline text-2xl mb-2">Welcome Back</CardTitle>
               <CardDescription>Sign in to manage your finances and forecast your financial future.</CardDescription>
@@ -100,7 +100,7 @@ export default function LoginPage() {
         </motion.div>
       </main>
       <footer className="py-8 text-center text-sm text-muted-foreground">
-        &copy; {new Date().getFullYear()} Foresight Finance. All rights reserved.
+        &copy; {new Date().getFullYear()} FinSight. All rights reserved.
       </footer>
     </div>
   );

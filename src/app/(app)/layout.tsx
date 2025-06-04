@@ -53,7 +53,7 @@ export default function AuthenticatedAppLayout({
           <Link href="/dashboard" className="flex items-center gap-2">
             <AppLogo className="h-10 w-10 text-primary" />
             <span className="font-headline text-xl font-semibold group-data-[collapsible=icon]:hidden">
-              Foresight
+              FinSight
             </span>
           </Link>
         </SidebarHeader>
