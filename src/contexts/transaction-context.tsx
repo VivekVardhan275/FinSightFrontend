@@ -60,7 +60,12 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 
   const getTransactionsByCategoryAndMonth = useCallback((category: string, year: number, month: number): Transaction[] => {
     const targetMonthStr = `${year}-${String(month).padStart(2, '0')}`;
-    return transactions.filter(t => t.category === category && t.date.startsWith(targetMonthStr) && t.type === 'expense');
+    const lowerCaseCategory = category.toLowerCase();
+    return transactions.filter(t => 
+      t.category.toLowerCase() === lowerCaseCategory && 
+      t.date.startsWith(targetMonthStr) && 
+      t.type === 'expense'
+    );
   }, [transactions]);
 
 

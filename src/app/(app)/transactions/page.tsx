@@ -38,16 +38,18 @@ export default function TransactionsPage() {
     const transactionDate = new Date(transaction.date);
     const year = transactionDate.getFullYear();
     const month = transactionDate.getMonth() + 1;
+    const transactionCategoryLower = transaction.category.toLowerCase();
 
     const affectedBudgets = budgets.filter(b => {
       const budgetMonthYear = b.month.split('-');
-      return b.category === transaction.category && 
+      return b.category.toLowerCase() === transactionCategoryLower && 
              parseInt(budgetMonthYear[0]) === year &&
              parseInt(budgetMonthYear[1]) === month;
     });
     
     affectedBudgets.forEach(budget => {
-      updateBudgetSpentAmount(budget.id, transactions);
+      // Pass all transactions for recalculation, updateBudgetSpentAmount will filter internally
+      updateBudgetSpentAmount(budget.id, transactions); 
     });
   };
 
@@ -77,7 +79,25 @@ export default function TransactionsPage() {
         type: "info",
       });
       if (transactionToDelete) {
-        refreshAffectedBudgets(transactionToDelete);
+        // Create a temporary list of transactions *without* the deleted one for accurate recalculation
+        const remainingTransactions = transactions.filter(t => t.id !== transactionToDeleteId);
+        
+        // Refresh affected budgets based on the state *after* deletion.
+        const transactionDate = new Date(transactionToDelete.date);
+        const year = transactionDate.getFullYear();
+        const month = transactionDate.getMonth() + 1;
+        const transactionCategoryLower = transactionToDelete.category.toLowerCase();
+
+        const affectedBudgets = budgets.filter(b => {
+          const budgetMonthYear = b.month.split('-');
+          return b.category.toLowerCase() === transactionCategoryLower && 
+                 parseInt(budgetMonthYear[0]) === year &&
+                 parseInt(budgetMonthYear[1]) === month;
+        });
+        
+        affectedBudgets.forEach(budget => {
+          updateBudgetSpentAmount(budget.id, remainingTransactions);
+        });
       }
       setTransactionToDeleteId(null);
     }
@@ -88,8 +108,10 @@ export default function TransactionsPage() {
     let isEditing = false;
     let savedDescription = "";
     let savedTransaction: Transaction;
+    let originalTransactionForEdit: Transaction | undefined = undefined;
 
     if ('id' in transactionData && transactions.some(t => t.id === transactionData.id)) { 
+      originalTransactionForEdit = transactions.find(t => t.id === transactionData.id);
       updateTransaction(transactionData as Transaction);
       isEditing = true;
       savedDescription = (transactionData as Transaction).description;
@@ -105,19 +127,49 @@ export default function TransactionsPage() {
       type: "success",
       href: "/transactions"
     });
-    refreshAffectedBudgets(savedTransaction);
+
+    // For accurate recalculation after save, especially if category/date changed during edit
+    const updatedTransactionsList = isEditing 
+      ? transactions.map(t => t.id === savedTransaction.id ? savedTransaction : t)
+      : [savedTransaction, ...transactions];
+
+    // Refresh budgets potentially affected by the old state of an edited transaction
+    if (isEditing && originalTransactionForEdit && 
+        (originalTransactionForEdit.category.toLowerCase() !== savedTransaction.category.toLowerCase() || 
+         originalTransactionForEdit.date.substring(0,7) !== savedTransaction.date.substring(0,7) ||
+         originalTransactionForEdit.type !== savedTransaction.type )
+       ) {
+      const oldTransactionDate = new Date(originalTransactionForEdit.date);
+      const oldYear = oldTransactionDate.getFullYear();
+      const oldMonth = oldTransactionDate.getMonth() + 1;
+      const oldTransactionCategoryLower = originalTransactionForEdit.category.toLowerCase();
+
+      const previouslyAffectedBudgets = budgets.filter(b => {
+        const budgetMonthYear = b.month.split('-');
+        return b.category.toLowerCase() === oldTransactionCategoryLower && 
+               parseInt(budgetMonthYear[0]) === oldYear &&
+               parseInt(budgetMonthYear[1]) === oldMonth;
+      });
+      previouslyAffectedBudgets.forEach(budget => {
+        updateBudgetSpentAmount(budget.id, updatedTransactionsList);
+      });
+    }
+    
+    // Refresh budgets affected by the new/current state of the transaction
+    refreshAffectedBudgets(savedTransaction); 
   };
   
-  // Effect to update budget spent amounts if transactions list changes globally
-  // (e.g. due to localStorage sync or another tab)
   useEffect(() => {
+    // This effect ensures that if transactions are loaded/changed externally, budgets are updated.
+    // This might be too broad if transactions change very frequently from other sources.
+    // For user-driven changes, refreshAffectedBudgets is more targeted.
     budgets.forEach(budget => {
         updateBudgetSpentAmount(budget.id, transactions);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transactions, budgets]); // updateBudgetSpentAmount is stable
+  }, [transactions]); // Removed budgets and updateBudgetSpentAmount to prevent loops; only react to transactions changing.
 
-  const columns = useMemo(() => getColumns(handleEditTransaction, confirmDeleteTransaction), [transactions]);
+  const columns = useMemo(() => getColumns(handleEditTransaction, confirmDeleteTransaction), [transactions, budgets]);
 
 
   return (

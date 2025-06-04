@@ -67,7 +67,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
       const targetBudgetIndex = prevBudgets.findIndex(b => b.id === budgetId);
 
       if (targetBudgetIndex === -1) {
-        return prevBudgets; // Budget not found, no change
+        return prevBudgets; 
       }
 
       const targetBudget = prevBudgets[targetBudgetIndex];
@@ -78,7 +78,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
       const newSpent = relatedTransactions
         .filter(t => {
           const tDate = new Date(t.date);
-          return t.category === targetBudget.category &&
+          return t.category.toLowerCase() === targetBudget.category.toLowerCase() &&
                  tDate.getFullYear() === budgetYear &&
                  (tDate.getMonth() + 1) === budgetMonth &&
                  t.type === 'expense';
@@ -93,7 +93,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
       updatedBudgets[targetBudgetIndex] = { ...targetBudget, spent: newSpent };
       return updatedBudgets;
     });
-  }, []); // Added empty dependency array
+  }, []);
 
 
   return (

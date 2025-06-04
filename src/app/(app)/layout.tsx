@@ -55,13 +55,17 @@ function BudgetNotificationEffect() {
 
     const currentDate = new Date();
     const currentYear = currentDate.getFullYear();
-    const currentMonth = currentDate.getMonth() + 1; // JavaScript months are 0-indexed
+    const currentMonth = currentDate.getMonth() + 1; 
 
     const currentMonthBudgets = getBudgetsByMonth(currentYear, currentMonth);
 
     currentMonthBudgets.forEach(budget => {
+      // getTransactionsByCategoryAndMonth is now case-insensitive
       const budgetTransactions = getTransactionsByCategoryAndMonth(budget.category, currentYear, currentMonth);
-      const currentSpent = budgetTransactions.reduce((sum, t) => sum + t.amount, 0);
+      // The `budget.spent` amount from context should already reflect case-insensitive aggregation 
+      // due to changes in `updateBudgetSpentAmount` in BudgetContext.
+      // So, we can directly use budget.spent.
+      const currentSpent = budget.spent; 
 
       const percentageSpent = budget.allocated > 0 ? (currentSpent / budget.allocated) * 100 : 0;
       const budgetId = budget.id;
@@ -83,7 +87,7 @@ function BudgetNotificationEffect() {
           setNotifiedLayoutBudgets(prev => {
             const newSet = new Set(prev);
             newSet.add(exceededKey);
-            newSet.delete(nearingKey); // Remove nearing if it was there
+            newSet.delete(nearingKey); 
             return newSet;
           });
         }
@@ -98,7 +102,7 @@ function BudgetNotificationEffect() {
           setNotifiedLayoutBudgets(prev => new Set(prev).add(nearingKey));
         }
       } else {
-        // Budget is okay, clear any previous notifications for it from layout tracking
+        
         let changed = false;
         const newSet = new Set(notifiedLayoutBudgets);
         if (newSet.has(nearingKey)) {
@@ -117,11 +121,12 @@ function BudgetNotificationEffect() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [budgets, transactions, selectedCurrency, addNotification, convertAmount, notifiedLayoutBudgets, getBudgetsByMonth, getTransactionsByCategoryAndMonth]);
 
+
   useEffect(() => {
     checkAndNotifyGlobalBudgets();
   }, [checkAndNotifyGlobalBudgets]);
   
-  return null; // This component doesn't render anything
+  return null; 
 }
 
 

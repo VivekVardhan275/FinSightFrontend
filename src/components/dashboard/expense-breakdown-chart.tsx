@@ -46,15 +46,20 @@ export function ExpenseBreakdownChart() {
              transactionDate.getMonth() === currentMonth;
     });
 
-    const expensesByCategory: { [key: string]: number } = {};
+    const expensesByCategory: { [key: string]: { totalUsdAmount: number; displayCategory: string } } = {};
     currentMonthExpenses.forEach(t => {
-      expensesByCategory[t.category] = (expensesByCategory[t.category] || 0) + t.amount; // Sum USD amounts
+      const categoryKey = t.category.toLowerCase();
+      if (!expensesByCategory[categoryKey]) {
+        // Store the first encountered casing for display
+        expensesByCategory[categoryKey] = { totalUsdAmount: 0, displayCategory: t.category };
+      }
+      expensesByCategory[categoryKey].totalUsdAmount += t.amount; // Sum USD amounts
     });
 
-    return Object.entries(expensesByCategory).map(([category, totalUsdAmount], index) => ({
-      category,
-      value: convertAmount(totalUsdAmount, selectedCurrency), // Convert final sum for display
-      fill: CHART_COLORS[index % CHART_COLORS.length], // Cycle through defined colors
+    return Object.values(expensesByCategory).map((data, index) => ({
+      category: data.displayCategory, // Use original casing for display
+      value: convertAmount(data.totalUsdAmount, selectedCurrency), // Convert final sum for display
+      fill: CHART_COLORS[index % CHART_COLORS.length],
     }));
   }, [transactions, selectedCurrency, convertAmount]);
 
@@ -64,11 +69,10 @@ export function ExpenseBreakdownChart() {
         label: `Expenses (${selectedCurrency})`,
       },
     };
-    // Dynamically add categories to chartConfig for tooltip labels if needed,
-    // but ChartTooltipContent can also use `nameKey` directly.
     chartData.forEach(item => {
-      config[item.category.toLowerCase().replace(/\s+/g, '')] = { // Create a key from category name
-        label: item.category,
+      // Use the display category for the label, but a consistent key (lowercase) for config lookup
+      config[item.category.toLowerCase().replace(/\s+/g, '')] = { 
+        label: item.category, // This is the display category with original casing
         color: item.fill,
       };
     });
@@ -96,8 +100,8 @@ export function ExpenseBreakdownChart() {
               <RechartsTooltip
                 content={
                   <ChartTooltipContent
-                    nameKey="category" // Uses the 'category' field from chartData for the name
-                    hideLabel={false} // Show the label derived from nameKey or chartConfig
+                    nameKey="category" 
+                    hideLabel={false} 
                     formatter={(value) => formatCurrency(value as number, selectedCurrency)}
                   />
                 }
@@ -105,7 +109,7 @@ export function ExpenseBreakdownChart() {
               <Pie
                 data={chartData}
                 dataKey="value"
-                nameKey="category"
+                nameKey="category" // This refers to item.category (displayCategory)
                 innerRadius={60}
                 strokeWidth={5}
                 animationDuration={800}
@@ -136,7 +140,7 @@ export function ExpenseBreakdownChart() {
                     style={{ backgroundColor: entry.fill as string }}
                   />
                   <span className="text-muted-foreground truncate" title={entry.category}>
-                    {entry.category} {/* Display category name directly */}
+                    {entry.category} 
                   </span>
                 </div>
                 <span className="font-semibold ml-3 whitespace-nowrap">
