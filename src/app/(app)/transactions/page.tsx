@@ -21,12 +21,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useTransactionContext } from '@/contexts/transaction-context';
 import { useBudgetContext } from '@/contexts/budget-context';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
+import { useCurrency } from '@/contexts/currency-context';
+import { formatCurrency } from '@/lib/utils';
 
 
 export default function TransactionsPage() {
   const { transactions, addTransaction, updateTransaction, deleteTransaction: deleteTransactionFromContext } = useTransactionContext();
   const { budgets, updateBudgetSpentAmount } = useBudgetContext();
+  const { selectedCurrency, convertAmount } = useCurrency();
   
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -35,20 +38,24 @@ export default function TransactionsPage() {
 
   const { addNotification } = useNotification();
 
-  const refreshAffectedBudgets = (transaction: Transaction | { category: string; date: string; }) => {
-    const transactionDate = new Date(transaction.date);
+  const refreshAffectedBudgets = (transactionDetails: Transaction | { category: string; date: string; type?: 'income' | 'expense' }) => {
+    if (transactionDetails.type && transactionDetails.type !== 'expense') {
+      return; // Only refresh budgets for expense transactions or if type is unknown (e.g., for old category after edit)
+    }
+    const transactionDate = new Date(transactionDetails.date); // Date string YYYY-MM-DD
     const year = transactionDate.getFullYear();
-    const month = transactionDate.getMonth() + 1;
-    const transactionCategoryLower = transaction.category.toLowerCase();
+    const month = transactionDate.getMonth() + 1; // date-fns months are 0-indexed, but we use 1-indexed
+    const transactionCategoryLower = transactionDetails.category.toLowerCase();
 
     const affectedBudgets = budgets.filter(b => {
-      const budgetMonthYear = b.month.split('-');
+      const budgetMonthYear = b.month.split('-'); // YYYY-MM
       return b.category.toLowerCase() === transactionCategoryLower && 
              parseInt(budgetMonthYear[0]) === year &&
              parseInt(budgetMonthYear[1]) === month;
     });
     
     affectedBudgets.forEach(budget => {
+      // Pass the current global transactions list for recalculation
       updateBudgetSpentAmount(budget.id, transactions); 
     });
   };
@@ -78,7 +85,12 @@ export default function TransactionsPage() {
         description: "The transaction has been successfully deleted.",
         type: "info",
       });
-      if (transactionToDelete) {
+
+      if (transactionToDelete && transactionToDelete.type === 'expense') {
+        // After deletion, the `transactions` list in context is updated.
+        // We need to get the updated list to pass to updateBudgetSpentAmount.
+        // However, the `transactions` variable in this scope might be stale.
+        // A robust way is to filter it out from the current stale `transactions` list for immediate calculation.
         const remainingTransactions = transactions.filter(t => t.id !== transactionToDeleteId);
         
         const transactionDate = new Date(transactionToDelete.date);
@@ -94,7 +106,7 @@ export default function TransactionsPage() {
         });
         
         affectedBudgets.forEach(budget => {
-          updateBudgetSpentAmount(budget.id, remainingTransactions);
+          updateBudgetSpentAmount(budget.id, remainingTransactions); 
         });
       }
       setTransactionToDeleteId(null);
@@ -103,113 +115,129 @@ export default function TransactionsPage() {
   };
 
   const handleSaveTransaction = (transactionData: Omit<Transaction, 'id'> | Transaction) => {
-    const formTxDate = transactionData.date; // This is already "yyyy-MM-dd" string from dialog
+    // transactionData.amount is already in USD from TransactionFormDialog
+    // transactionData.date is "yyyy-MM-dd" string
+
+    const isPotentialEdit = 'id' in transactionData;
+    const editingTransactionIdIfEditing = isPotentialEdit ? (transactionData as Transaction).id : null;
+
+    const formTxDate = transactionData.date;
     const formTxDescriptionLower = transactionData.description.toLowerCase();
     const formTxCategoryLower = transactionData.category.toLowerCase();
-    const formTxAmount = transactionData.amount; // This is in USD
+    const formTxAmountUSD = transactionData.amount; // Already in USD
     const formTxType = transactionData.type;
 
-    const isDuplicate = transactions.some(existingTx => {
-      // If we are editing and existingTx is the one being edited, don't consider it a duplicate of itself.
-      if ('id' in transactionData && existingTx.id === (transactionData as Transaction).id) {
-        return false; 
-      }
-      return existingTx.date === formTxDate &&
-             existingTx.description.toLowerCase() === formTxDescriptionLower &&
-             existingTx.category.toLowerCase() === formTxCategoryLower &&
-             existingTx.amount === formTxAmount && 
-             existingTx.type === formTxType;
-    });
+    // Scenario 1: Trying to ADD a new transaction that is very similar to an existing one but differs in amount
+    if (!editingTransactionIdIfEditing) { // This is definitively an ADD operation
+        const similarExistingTx = transactions.find(existingTx =>
+            existingTx.date === formTxDate &&
+            existingTx.description.toLowerCase() === formTxDescriptionLower &&
+            existingTx.category.toLowerCase() === formTxCategoryLower &&
+            existingTx.type === formTxType &&
+            existingTx.amount !== formTxAmountUSD // Compare USD amounts
+        );
 
-    if (isDuplicate) {
-      addNotification({
-        title: "Duplicate Data",
-        description: "This transaction's details match an existing transaction.",
-        type: "error",
-      });
-      setIsFormOpen(false); 
-      return; 
-    }
-
-    let isEditingOperation = false;
-    let savedDescription = "";
-    let savedTransaction: Transaction;
-    let originalTransactionForEdit: Transaction | undefined = undefined;
-
-    if ('id' in transactionData) {
-        const existingTxFromContext = transactions.find(t => t.id === (transactionData as Transaction).id);
-        if (existingTxFromContext) {
-            isEditingOperation = true;
-            originalTransactionForEdit = existingTxFromContext;
+        if (similarExistingTx) {
+            const oldAmountInSelectedCurrency = convertAmount(similarExistingTx.amount, selectedCurrency);
+            const formattedOldAmount = formatCurrency(oldAmountInSelectedCurrency, selectedCurrency);
+            addNotification({
+                title: "Review Transaction",
+                description: `A transaction for '${transactionData.description}' (${transactionData.category}, ${formTxType}) on ${format(parseISO(formTxDate), "PPP")} already exists with amount ${formattedOldAmount}. If this is a correction, please edit the existing one. To add as new, consider altering the description.`,
+                type: "warning",
+            });
+            setIsFormOpen(false);
+            return;
         }
     }
-    
-    if (isEditingOperation) {
-      updateTransaction(transactionData as Transaction);
-      savedDescription = (transactionData as Transaction).description;
-      savedTransaction = transactionData as Transaction;
-    } else { 
-      // The ID is already added in the dialog for new transactions too.
-      // So addTransaction should just take the Transaction object.
-      // However, the context's addTransaction expects Omit<Transaction, 'id'>
-      // Let's ensure the object passed to addTransaction doesn't have an 'id' if it's truly new
-      // or let the context's addTransaction assign it.
-      // For now, assuming transactionData might come with a new ID from dialog.
-      // If addTransaction in context assigns ID, then we might need to adjust dialog or context.
-      // The current TransactionFormDialog generates an ID if it's a new tx.
-      // So, if it's not an edit, we can assume transactionData is a full Transaction object with a *new* ID.
-      // The context's addTransaction should be robust to this, or we use a different pathway.
 
-      // Let's modify the context's addTransaction to accept a full Transaction object with a pre-generated ID
-      // or adjust here. For now, assume addTransaction in context handles it or generates one if not present.
-      // The simplest is that `addTransaction` takes Omit<Transaction, 'id'>.
-      // But our dialog creates an ID. So, we should pass the full object if the ID is indeed new.
-
-      // If it's not an editing operation, it's an add.
-      // The `addTransaction` in context expects `Omit<Transaction, 'id'>` and generates its own ID.
-      // So we need to pass `transactionData` without its pre-generated ID from the form.
-      const { id, ...newTxData } = transactionData as Transaction; // remove the form-generated ID for new TX
-      savedTransaction = addTransaction(newTxData); // context addTransaction will assign a new ID
-      savedDescription = savedTransaction.description;
-
-    }
-
-    addNotification({
-      title: `Transaction ${isEditingOperation ? 'Updated' : 'Added'}`,
-      description: `${savedDescription} successfully ${isEditingOperation ? 'updated' : 'added'}.`,
-      type: "success",
-      href: "/transactions"
+    // Scenario 2: Trying to ADD OR EDIT to an EXACT duplicate of another transaction
+    const exactDuplicateTx = transactions.find(existingTx => {
+        if (editingTransactionIdIfEditing && existingTx.id === editingTransactionIdIfEditing) {
+            return false; // Don't compare with self when editing
+        }
+        return existingTx.date === formTxDate &&
+               existingTx.description.toLowerCase() === formTxDescriptionLower &&
+               existingTx.category.toLowerCase() === formTxCategoryLower &&
+               existingTx.amount === formTxAmountUSD && // Both are USD
+               existingTx.type === formTxType;
     });
-    setIsFormOpen(false); // Ensure form closes on successful save too
 
-    const updatedTransactionsList = transactions.map(t => t.id === savedTransaction.id ? savedTransaction : t);
-    
-    if (isEditingOperation && originalTransactionForEdit && 
-        (originalTransactionForEdit.category.toLowerCase() !== savedTransaction.category.toLowerCase() || 
-         originalTransactionForEdit.date.substring(0,7) !== savedTransaction.date.substring(0,7) ||
-         originalTransactionForEdit.type !== savedTransaction.type ||
-         originalTransactionForEdit.amount !== savedTransaction.amount)
-       ) {
-      const oldTransactionDate = new Date(originalTransactionForEdit.date);
-      const oldYear = oldTransactionDate.getFullYear();
-      const oldMonth = oldTransactionDate.getMonth() + 1;
-      const oldTransactionCategoryLower = originalTransactionForEdit.category.toLowerCase();
-
-      const previouslyAffectedBudgets = budgets.filter(b => {
-        const budgetMonthYear = b.month.split('-');
-        return b.category.toLowerCase() === oldTransactionCategoryLower && 
-               parseInt(budgetMonthYear[0]) === oldYear &&
-               parseInt(budgetMonthYear[1]) === oldMonth;
-      });
-      previouslyAffectedBudgets.forEach(budget => {
-        updateBudgetSpentAmount(budget.id, updatedTransactionsList);
-      });
+    if (exactDuplicateTx) {
+        addNotification({
+            title: "Duplicate Transaction",
+            description: "An identical transaction already exists. The current operation was not saved.",
+            type: "error",
+        });
+        setIsFormOpen(false);
+        return;
     }
     
-    refreshAffectedBudgets(savedTransaction); 
+    // If we reach here, it's safe to add or update
+    let savedDescription = "";
+    let savedTransaction: Transaction;
+    let originalTransactionDetailsForEdit: { category: string; date: string; type: 'income' | 'expense', amount: number } | undefined = undefined;
+
+    const isActualEditOperation = editingTransactionIdIfEditing && transactions.some(t => t.id === editingTransactionIdIfEditing);
+
+    if (isActualEditOperation) {
+        const txToUpdate = transactionData as Transaction;
+        const originalTx = transactions.find(t => t.id === txToUpdate.id);
+        if (originalTx) {
+            originalTransactionDetailsForEdit = { category: originalTx.category, date: originalTx.date, type: originalTx.type, amount: originalTx.amount };
+        }
+        updateTransaction(txToUpdate);
+        savedTransaction = txToUpdate;
+        savedDescription = txToUpdate.description;
+        addNotification({
+            title: `Transaction Updated`,
+            description: `${savedDescription} successfully updated.`,
+            type: "success",
+            href: "/transactions"
+        });
+    } else {
+        const { id, ...newTxDataNoId } = transactionData as Transaction; 
+        savedTransaction = addTransaction(newTxDataNoId); 
+        savedDescription = savedTransaction.description;
+        addNotification({
+            title: `Transaction Added`,
+            description: `${savedDescription} successfully added.`,
+            type: "success",
+            href: "/transactions"
+        });
+    }
+
+    setIsFormOpen(false);
+
+    // After state updates in context, `transactions` list here will be updated in next render.
+    // For immediate budget refresh, we rely on the context's `transactions` list to be up-to-date when `updateBudgetSpentAmount` is called.
+
+    if (isActualEditOperation && originalTransactionDetailsForEdit) {
+        const oldCat = originalTransactionDetailsForEdit.category;
+        const oldDate = originalTransactionDetailsForEdit.date;
+        const oldType = originalTransactionDetailsForEdit.type;
+        const oldAmount = originalTransactionDetailsForEdit.amount;
+
+        const newCat = savedTransaction.category;
+        const newDate = savedTransaction.date;
+        const newType = savedTransaction.type;
+        const newAmount = savedTransaction.amount;
+
+        // Check if the transaction moved out of an expense category/month or its expense-affecting properties changed
+        if (oldType === 'expense' && 
+            (oldCat.toLowerCase() !== newCat.toLowerCase() || 
+             oldDate.substring(0,7) !== newDate.substring(0,7) || 
+             newType !== 'expense' ||
+             oldAmount !== newAmount )) {
+            refreshAffectedBudgets({ category: oldCat, date: oldDate, type: 'expense' });
+        }
+    }
+
+    if (savedTransaction.type === 'expense') {
+        refreshAffectedBudgets(savedTransaction);
+    }
   };
   
-  const columns = useMemo(() => getColumns(handleEditTransaction, confirmDeleteTransaction), [transactions, budgets]); //eslint-disable-line react-hooks/exhaustive-deps
+  const columns = useMemo(() => getColumns(handleEditTransaction, confirmDeleteTransaction), [transactions, budgets, selectedCurrency, convertAmount]); //eslint-disable-line react-hooks/exhaustive-deps
 
 
   return (
@@ -253,3 +281,4 @@ export default function TransactionsPage() {
     </div>
   );
 }
+
