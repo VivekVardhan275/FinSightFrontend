@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useTheme } from "next-themes";
 import { useToast } from "@/hooks/use-toast";
-import { Palette, BellRing, Globe, Save, User as UserIconLucide } from "lucide-react"; 
+import { Palette, Globe, Save, User as UserIconLucide } from "lucide-react"; 
 import { motion } from "framer-motion";
 import { useCurrency, type Currency as AppCurrency } from "@/contexts/currency-context";
 
@@ -65,17 +65,6 @@ export default function SettingsPage() {
       !!FONT_SIZE_CLASSES[v as FontSizeSetting]
     )
   );
-
-  // Notifications
-  const [budgetAlerts, setBudgetAlerts] = useState<boolean>(() =>
-    initializeFromLocalStorage<boolean>("app-budget-alerts", true, undefined, (v) => v === "true")
-  );
-  const [weeklySummary, setWeeklySummary] = useState<boolean>(() =>
-    initializeFromLocalStorage<boolean>("app-weekly-summary", false, undefined, (v) => v === "true")
-  );
-  const [billReminders, setBillReminders] = useState<boolean>(() =>
-    initializeFromLocalStorage<boolean>("app-bill-reminders", true, undefined, (v) => v === "true")
-  );
   
   // Effect to align currentTheme with next-themes' activeTheme if "app-theme" was not initially set from localStorage
   useEffect(() => {
@@ -99,18 +88,6 @@ export default function SettingsPage() {
       htmlElement.classList.add(FONT_SIZE_CLASSES[fontSize]);
     }
   }, [fontSize]);
-
-  useEffect(() => {
-    localStorage.setItem("app-budget-alerts", String(budgetAlerts));
-  }, [budgetAlerts]);
-
-  useEffect(() => {
-    localStorage.setItem("app-weekly-summary", String(weeklySummary));
-  }, [weeklySummary]);
-
-  useEffect(() => {
-    localStorage.setItem("app-bill-reminders", String(billReminders));
-  }, [billReminders]);
 
 
   const handleSaveSettings = () => {
@@ -181,50 +158,8 @@ export default function SettingsPage() {
         </Card>
       </motion.div>
 
-      {/* Notification Settings */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}>
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="flex items-center font-headline">
-              <BellRing className="mr-2 h-6 w-6 text-primary" />
-              Notifications
-            </CardTitle>
-            <CardDescription>Manage your notification preferences.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between rounded-lg border p-4">
-              <div>
-                <Label htmlFor="budget-alerts" className="font-medium">Budget Alerts</Label>
-                <p className="text-xs text-muted-foreground">
-                  Receive alerts when you're nearing or over budget.
-                </p>
-              </div>
-              <Switch id="budget-alerts" checked={budgetAlerts} onCheckedChange={setBudgetAlerts} />
-            </div>
-            <div className="flex items-center justify-between rounded-lg border p-4">
-              <div>
-                <Label htmlFor="weekly-summary" className="font-medium">Weekly Summary Email</Label>
-                <p className="text-xs text-muted-foreground">
-                  Get a summary of your finances every week. (Feature coming soon)
-                </p>
-              </div>
-              <Switch id="weekly-summary" checked={weeklySummary} onCheckedChange={setWeeklySummary} />
-            </div>
-            <div className="flex items-center justify-between rounded-lg border p-4">
-              <div>
-                <Label htmlFor="bill-reminders" className="font-medium">Bill Reminders</Label>
-                <p className="text-xs text-muted-foreground">
-                  Get reminders for upcoming bill payments. (Feature coming soon)
-                </p>
-              </div>
-              <Switch id="bill-reminders" checked={billReminders} onCheckedChange={setBillReminders} />
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
       {/* Regional Preferences */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }}>
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}>
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center font-headline">
@@ -254,7 +189,7 @@ export default function SettingsPage() {
       </motion.div>
       
       {/* Account Settings Placeholder */}
-       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.4 }}>
+       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }}>
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center font-headline">
@@ -273,7 +208,7 @@ export default function SettingsPage() {
       </motion.div>
 
 
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.5 }} className="flex justify-end pt-4">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.4 }} className="flex justify-end pt-4">
         <Button onClick={handleSaveSettings} size="lg">
           <Save className="mr-2 h-5 w-5" />
           Save All Settings
@@ -286,3 +221,4 @@ export default function SettingsPage() {
 const UserIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
 );
+
