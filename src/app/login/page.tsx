@@ -45,7 +45,7 @@ export default function LoginPage() {
             <CardTitle className="font-headline text-2xl">Welcome Back</CardTitle>
             <CardDescription>Sign in to manage your finances and forecast your future.</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="py-12">
             <Button 
               onClick={login} 
               className="w-full transition-all hover:shadow-lg hover:scale-105" 
