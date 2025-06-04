@@ -88,10 +88,10 @@ export function IncomeOverviewChart() {
               tickFormatter={yAxisTickFormatter}
             />
             <RechartsTooltip 
+              cursor={false}
               content={
                 <ChartTooltipContent 
-                  hideIndicator 
-                  formatter={(value, name) => [formatCurrency(value as number, selectedCurrency), name as string]}
+                  formatter={(value) => formatCurrency(value as number, selectedCurrency)}
                 />
               } 
             />

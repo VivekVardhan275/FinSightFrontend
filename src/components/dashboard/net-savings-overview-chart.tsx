@@ -89,10 +89,10 @@ export function NetSavingsOverviewChart() {
             />
             <ReferenceLine y={0} stroke="hsl(var(--border))" strokeDasharray="3 3" />
             <RechartsTooltip 
+              cursor={false}
               content={
                 <ChartTooltipContent 
-                  hideIndicator 
-                  formatter={(value, name) => [formatCurrency(value as number, selectedCurrency), name as string]}
+                  formatter={(value) => formatCurrency(value as number, selectedCurrency)}
                 />
               } 
             />
