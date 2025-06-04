@@ -64,25 +64,37 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 
   const updateBudgetSpentAmount = useCallback((budgetId: string, relatedTransactions: Transaction[]) => {
     setBudgets(prevBudgets => {
-      return prevBudgets.map(budget => {
-        if (budget.id === budgetId) {
-          const budgetMonthYear = budget.month.split('-');
-          const budgetYear = parseInt(budgetMonthYear[0]);
-          const budgetMonth = parseInt(budgetMonthYear[1]);
+      const targetBudgetIndex = prevBudgets.findIndex(b => b.id === budgetId);
 
-          const newSpent = relatedTransactions
-            .filter(t => {
-              const tDate = new Date(t.date);
-              return t.category === budget.category &&
-                     tDate.getFullYear() === budgetYear &&
-                     (tDate.getMonth() + 1) === budgetMonth &&
-                     t.type === 'expense';
-            })
-            .reduce((sum, t) => sum + t.amount, 0);
-          return { ...budget, spent: newSpent };
-        }
-        return budget;
-      });
+      if (targetBudgetIndex === -1) {
+        return prevBudgets; // Budget not found, no change
+      }
+
+      const targetBudget = prevBudgets[targetBudgetIndex];
+      const budgetMonthYear = targetBudget.month.split('-');
+      const budgetYear = parseInt(budgetMonthYear[0]);
+      const budgetMonth = parseInt(budgetMonthYear[1]);
+
+      const newSpent = relatedTransactions
+        .filter(t => {
+          const tDate = new Date(t.date);
+          return t.category === targetBudget.category &&
+                 tDate.getFullYear() === budgetYear &&
+                 (tDate.getMonth() + 1) === budgetMonth &&
+                 t.type === 'expense';
+        })
+        .reduce((sum, t) => sum + t.amount, 0);
+
+      // If the spent amount hasn't actually changed, return the previous state
+      // to prevent an unnecessary re-render and potential loop.
+      if (targetBudget.spent === newSpent) {
+        return prevBudgets;
+      }
+
+      // Otherwise, create a new array with the updated budget
+      const updatedBudgets = [...prevBudgets];
+      updatedBudgets[targetBudgetIndex] = { ...targetBudget, spent: newSpent };
+      return updatedBudgets;
     });
   }, []);
 
