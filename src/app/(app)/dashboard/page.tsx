@@ -1,7 +1,6 @@
 
 "use client";
 
-import { BalanceOverviewChart } from "@/components/dashboard/balance-overview-chart";
 import { ExpenseBreakdownChart } from "@/components/dashboard/expense-breakdown-chart";
 import { IncomeOverviewChart } from "@/components/dashboard/income-overview-chart";
 import { ExpenseOverviewChart } from "@/components/dashboard/expense-overview-chart";
@@ -55,18 +54,15 @@ export default function DashboardPage() {
 
       <div className="grid gap-6 md:grid-cols-2">
         <motion.div custom={summaryCardCount} variants={cardVariants} initial="hidden" animate="visible">
-          <BalanceOverviewChart />
-        </motion.div>
-        <motion.div custom={summaryCardCount + 1} variants={cardVariants} initial="hidden" animate="visible">
-          <ExpenseBreakdownChart />
-        </motion.div>
-        <motion.div custom={summaryCardCount + 2} variants={cardVariants} initial="hidden" animate="visible">
           <IncomeOverviewChart />
         </motion.div>
-        <motion.div custom={summaryCardCount + 3} variants={cardVariants} initial="hidden" animate="visible">
+        <motion.div custom={summaryCardCount + 1} variants={cardVariants} initial="hidden" animate="visible">
           <ExpenseOverviewChart />
         </motion.div>
-         <motion.div custom={summaryCardCount + 4} variants={cardVariants} initial="hidden" animate="visible" className="md:col-span-2 lg:col-span-1">
+        <motion.div custom={summaryCardCount + 2} variants={cardVariants} initial="hidden" animate="visible">
+          <ExpenseBreakdownChart />
+        </motion.div>
+         <motion.div custom={summaryCardCount + 3} variants={cardVariants} initial="hidden" animate="visible" className="md:col-span-2 lg:col-span-1">
           <NetSavingsOverviewChart />
         </motion.div>
       </div>
@@ -85,3 +81,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+

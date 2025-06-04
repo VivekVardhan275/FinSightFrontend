@@ -73,15 +73,6 @@ export const dashboardSummaryData: SummaryCardData[] = [
 ];
 
 // For charts
-export const balanceHistory = [
-  { month: 'Jan', balance: 8000 },
-  { month: 'Feb', balance: 9500 },
-  { month: 'Mar', balance: 9000 },
-  { month: 'Apr', balance: 10500 },
-  { month: 'May', balance: 11000 },
-  { month: 'Jun', balance: 12345 },
-];
-
 export const incomeExpenseData = [
   { name: 'Income', value: 5600, fill: 'hsl(var(--chart-1))' },
   { name: 'Expenses', value: 1875, fill: 'hsl(var(--chart-2))' },
@@ -124,3 +115,4 @@ export const netSavingsHistory = [
   { month: 'May', netSavings: 2700 },
   { month: 'Jun', netSavings: 2800 },
 ];
+
