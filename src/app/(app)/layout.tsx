@@ -49,10 +49,10 @@ export default function AuthenticatedAppLayout({
   return (
     <SidebarProvider defaultOpen>
       <Sidebar variant="sidebar" collapsible="icon" side="left" className="border-r">
-        <SidebarHeader className="p-4 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-2">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <AppLogo className="h-10 w-10 text-primary" />
-            <span className="font-headline text-xl font-semibold group-data-[collapsible=icon]:hidden">
+        <SidebarHeader className="p-4 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-2 transition-all duration-200 ease-linear">
+          <Link href="/dashboard" className="flex items-center gap-2 group-data-[collapsible=icon]:gap-0 transition-all duration-200 ease-linear">
+            <AppLogo className="h-10 w-10 text-primary transition-all duration-200 ease-linear" />
+            <span className="font-headline text-xl font-semibold whitespace-nowrap overflow-hidden transition-all duration-200 ease-linear group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:max-w-0">
               FinSight
             </span>
           </Link>
