@@ -17,15 +17,15 @@ import React, { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { useCurrency } from "@/contexts/currency-context";
+import { v4 as uuidv4 } from 'uuid';
 
 interface BudgetFormDialogProps {
   budget?: Budget | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (budgetData: Omit<Budget, 'id' | 'spent'> | Budget) => void; // spent is handled by parent
+  onSave: (budgetData: Omit<Budget, 'id' | 'spent'> | Budget) => void;
 }
 
 const getDefaultMonth = () => new Date().toISOString().slice(0, 7);
@@ -42,7 +42,6 @@ export function BudgetFormDialog({
   onOpenChange,
   onSave,
 }: BudgetFormDialogProps) {
-  const { toast } = useToast();
   const { selectedCurrency, convertAmount, conversionRates } = useCurrency();
 
   const budgetSchema = getBudgetSchema(selectedCurrency);
@@ -57,7 +56,7 @@ export function BudgetFormDialog({
     resolver: zodResolver(budgetSchema),
     defaultValues: {
       category: "",
-      allocated: 0, // Will be in selectedCurrency
+      allocated: 0,
       month: getDefaultMonth(),
     },
   });
@@ -82,25 +81,20 @@ export function BudgetFormDialog({
   }, [budget, open, reset, selectedCurrency, convertAmount]);
 
   const processSubmit = (data: BudgetFormData) => {
-    // Convert allocated amount from selectedCurrency back to USD for saving
     const allocatedInUSD = data.allocated / (conversionRates[selectedCurrency] || 1);
-    
-    const budgetDataToSaveBase = { 
-      category: data.category, 
-      allocated: allocatedInUSD, 
-      month: data.month 
+
+    const budgetDataToSaveBase = {
+      category: data.category,
+      allocated: allocatedInUSD,
+      month: data.month
     };
 
     const budgetDataToSave: Omit<Budget, 'id' | 'spent'> | Budget = budget
-      ? { ...budget, ...budgetDataToSaveBase } // Preserve spent and ID if editing
-      : budgetDataToSaveBase; // For new budget, parent will add ID and spent
+      ? { ...budget, ...budgetDataToSaveBase } // Preserve ID if editing
+      : { ...budgetDataToSaveBase, id: uuidv4(), spent: 0 }; // Generate ID for new budget
 
     onSave(budgetDataToSave);
     onOpenChange(false);
-    toast({
-      title: `Budget ${budget ? 'Updated' : 'Added'}`,
-      description: `Budget for ${data.category} successfully ${budget ? 'updated' : 'added'}.`,
-    });
   };
 
   return (
@@ -138,9 +132,9 @@ export function BudgetFormDialog({
                 id="allocated"
                 type="number"
                 step="0.01"
-                {...register("allocated", { 
+                {...register("allocated", {
                     valueAsNumber: true,
-                    onChange: (e) => setValue("allocated", parseFloat(parseFloat(e.target.value).toFixed(2))) 
+                    onChange: (e) => setValue("allocated", parseFloat(parseFloat(e.target.value).toFixed(2)))
                 })}
                 className="col-span-3"
               />

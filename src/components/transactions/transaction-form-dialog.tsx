@@ -24,7 +24,6 @@ import React, { useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useToast } from "@/hooks/use-toast";
 import { CalendarIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -32,6 +31,7 @@ import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { useCurrency } from "@/contexts/currency-context";
+import { v4 as uuidv4 } from 'uuid';
 
 interface TransactionFormDialogProps {
   transaction?: Transaction | null;
@@ -40,7 +40,6 @@ interface TransactionFormDialogProps {
   onSave: (transactionData: Omit<Transaction, 'id'> | Transaction) => void;
 }
 
-// Zod schema amount is now for the input value, which will be in selectedCurrency
 const getTransactionSchema = (selectedCurrency: string) => z.object({
   date: z.date({ required_error: "Date is required." }),
   description: z.string().min(1, "Description is required."),
@@ -56,9 +55,8 @@ export function TransactionFormDialog({
   onOpenChange,
   onSave,
 }: TransactionFormDialogProps) {
-  const { toast } = useToast();
   const { selectedCurrency, convertAmount, conversionRates } = useCurrency();
-  
+
   const transactionSchema = getTransactionSchema(selectedCurrency);
 
   const {
@@ -74,7 +72,7 @@ export function TransactionFormDialog({
       date: new Date(),
       description: "",
       category: "",
-      amount: 0, // Will be in selectedCurrency
+      amount: 0,
       type: "expense",
     },
   });
@@ -87,7 +85,7 @@ export function TransactionFormDialog({
           date: parseISO(transaction.date),
           description: transaction.description,
           category: transaction.category,
-          amount: parseFloat(displayAmount.toFixed(2)), // Ensure it's a number with 2 decimal places
+          amount: parseFloat(displayAmount.toFixed(2)),
           type: transaction.type,
         });
       } else {
@@ -103,21 +101,21 @@ export function TransactionFormDialog({
   }, [transaction, open, reset, selectedCurrency, convertAmount]);
 
   const processSubmit = (data: TransactionFormData) => {
-    // Convert amount from selectedCurrency back to USD for saving
     const amountInUSD = data.amount / (conversionRates[selectedCurrency] || 1);
 
-    const transactionDataToSave = {
+    const baseTransactionData = {
       ...data,
-      date: format(data.date, "yyyy-MM-dd"), // Format date back to string for saving
-      amount: amountInUSD, // Save USD amount
+      date: format(data.date, "yyyy-MM-dd"),
+      amount: amountInUSD,
     };
+    
+    const transactionDataToSave = transaction
+        ? { ...baseTransactionData, id: transaction.id } // Preserve ID if editing
+        : { ...baseTransactionData, id: uuidv4() }; // Generate ID for new transaction
 
-    onSave(transaction ? { ...transactionDataToSave, id: transaction.id } : transactionDataToSave);
+
+    onSave(transactionDataToSave);
     onOpenChange(false);
-    toast({
-      title: `Transaction ${transaction ? 'Updated' : 'Added'}`,
-      description: `${data.description} successfully ${transaction ? 'updated' : 'added'}.`,
-    });
   };
 
   return (
@@ -188,7 +186,7 @@ export function TransactionFormDialog({
                 id="amount"
                 type="number"
                 step="0.01"
-                {...register("amount", { 
+                {...register("amount", {
                   valueAsNumber: true,
                   onChange: (e) => setValue("amount", parseFloat(parseFloat(e.target.value).toFixed(2)))
                 })}

@@ -42,6 +42,12 @@ export type BudgetFormData = {
   month: string; // YYYY-MM format
 };
 
-// Note: The source of truth for Currency type is now in currency-context.tsx
-// This is just a comment for general reference.
-// type CurrencySetting = "USD" | "EUR" | "GBP" | "INR"; 
+export interface AppNotification {
+  id: string;
+  title: string;
+  description: string;
+  type: 'info' | 'warning' | 'error' | 'success';
+  timestamp: number;
+  read: boolean;
+  href?: string; // Optional link for the notification
+}

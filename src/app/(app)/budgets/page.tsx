@@ -8,7 +8,7 @@ import { sampleBudgets } from "@/lib/placeholder-data";
 import type { Budget } from "@/types";
 import { BudgetCard } from '@/components/budgets/budget-card';
 import { BudgetFormDialog } from '@/components/budgets/budget-form-dialog';
-import { useToast } from '@/hooks/use-toast';
+import { useNotification } from '@/contexts/notification-context';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,6 +22,7 @@ import {
 import { motion } from "framer-motion";
 import { useCurrency } from '@/contexts/currency-context';
 import { formatCurrency } from '@/lib/utils';
+import { v4 as uuidv4 } from 'uuid';
 
 const listVariants = {
   hidden: { opacity: 0 },
@@ -54,16 +55,14 @@ export default function BudgetsPage() {
   const [budgetToDeleteId, setBudgetToDeleteId] = useState<string | null>(null);
   const [notifiedBudgets, setNotifiedBudgets] = useState<Set<string>>(new Set());
 
-  const { toast } = useToast();
+  const { addNotification } = useNotification();
   const { selectedCurrency, convertAmount } = useCurrency();
 
   const checkAndNotifyBudgets = (budgetsToCheck: Budget[]) => {
     budgetsToCheck.forEach(budget => {
-      // Calculate percentage based on base USD values
       const percentageSpent = budget.allocated > 0 ? (budget.spent / budget.allocated) * 100 : 0;
       const budgetId = budget.id;
 
-      // Convert amounts for display in toasts
       const displaySpent = convertAmount(budget.spent, selectedCurrency);
       const displayAllocated = convertAmount(budget.allocated, selectedCurrency);
 
@@ -72,31 +71,30 @@ export default function BudgetsPage() {
 
       if (budget.spent > budget.allocated) {
         if (!notifiedBudgets.has(exceededKey)) {
-          toast({
+          addNotification({
             title: "Budget Exceeded!",
-            description: `You have exceeded your budget for ${budget.category} (${budget.month}). Spent: ${formatCurrency(displaySpent, selectedCurrency)}, Allocated: ${formatCurrency(displayAllocated, selectedCurrency)}.`,
-            variant: "destructive",
-            duration: 10000,
+            description: `You've exceeded budget for ${budget.category} (${budget.month}). Spent: ${formatCurrency(displaySpent, selectedCurrency)}, Allocated: ${formatCurrency(displayAllocated, selectedCurrency)}.`,
+            type: "error",
+            href: "/budgets"
           });
           setNotifiedBudgets(prev => {
             const newSet = new Set(prev);
             newSet.add(exceededKey);
-            newSet.delete(nearingKey); // Remove nearing if it was previously nearing
+            newSet.delete(nearingKey);
             return newSet;
           });
         }
       } else if (percentageSpent >= 85) {
         if (!notifiedBudgets.has(nearingKey) && !notifiedBudgets.has(exceededKey)) {
-          toast({
+          addNotification({
             title: "Budget Nearing Limit",
-            description: `You have spent ${percentageSpent.toFixed(0)}% of your budget for ${budget.category} (${budget.month}). Spent: ${formatCurrency(displaySpent, selectedCurrency)}, Allocated: ${formatCurrency(displayAllocated, selectedCurrency)}.`,
-            variant: "default",
-            duration: 10000,
+            description: `Spent ${percentageSpent.toFixed(0)}% of budget for ${budget.category} (${budget.month}). Spent: ${formatCurrency(displaySpent, selectedCurrency)}, Allocated: ${formatCurrency(displayAllocated, selectedCurrency)}.`,
+            type: "warning",
+            href: "/budgets"
           });
           setNotifiedBudgets(prev => new Set(prev).add(nearingKey));
         }
       } else {
-        // Budget is okay, remove from notified set so it can be notified again if status changes
         let changed = false;
         const newSet = new Set(notifiedBudgets);
         if (newSet.has(nearingKey)) {
@@ -113,13 +111,13 @@ export default function BudgetsPage() {
       }
     });
   };
-  
+
   useEffect(() => {
     if (budgets.length > 0) {
       checkAndNotifyBudgets(budgets);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [budgets, selectedCurrency]); // Rerun when budgets or currency changes
+  }, [budgets, selectedCurrency, addNotification]);
 
 
   const handleAddBudget = () => {
@@ -140,11 +138,11 @@ export default function BudgetsPage() {
   const handleDeleteBudget = () => {
      if (budgetToDeleteId) {
       setBudgets(prev => prev.filter(b => b.id !== budgetToDeleteId));
-      toast({
+      addNotification({
         title: "Budget Deleted",
-        description: "The budget has been successfully deleted.",
+        description: `The budget has been successfully deleted.`,
+        type: "info",
       });
-      // Clear notification for deleted budget
       setNotifiedBudgets(prev => {
         const newSet = new Set(prev);
         newSet.delete(`${budgetToDeleteId}-nearing`);
@@ -155,35 +153,46 @@ export default function BudgetsPage() {
     }
     setIsConfirmDeleteDialogOpen(false);
   };
-  
+
   const handleSaveBudget = (budgetDataFromForm: Omit<Budget, 'id' | 'spent'> | Budget) => {
-    if ('id' in budgetDataFromForm && 'spent' in budgetDataFromForm) { 
-      setBudgets(prev => prev.map(b => b.id === budgetDataFromForm.id ? budgetDataFromForm : b));
-    } else { 
-      const newBudget: Budget = { 
-        ...(budgetDataFromForm as Omit<Budget, 'id' | 'spent'>), 
-        id: Date.now().toString(), 
-        spent: 0 
+    let savedCategory = "";
+    let isEditing = false;
+    if ('id' in budgetDataFromForm && budgets.some(b => b.id === budgetDataFromForm.id)) {
+      setBudgets(prev => prev.map(b => b.id === budgetDataFromForm.id ? budgetDataFromForm as Budget : b));
+      savedCategory = (budgetDataFromForm as Budget).category;
+      isEditing = true;
+    } else {
+      const newBudget: Budget = {
+        ...(budgetDataFromForm as Omit<Budget, 'spent'>), // ID is now part of budgetDataFromForm
+        id: (budgetDataFromForm as {id: string}).id || uuidv4(), // Ensure ID is set
+        spent: 0
       };
       setBudgets(prev => [newBudget, ...prev]);
+      savedCategory = newBudget.category;
     }
+    addNotification({
+        title: `Budget ${isEditing ? 'Updated' : 'Added'}`,
+        description: `Budget for ${savedCategory} successfully ${isEditing ? 'updated' : 'added'}.`,
+        type: 'success',
+        href: '/budgets'
+      });
   };
 
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <motion.h1 
-            initial={{ opacity: 0, x: -20 }} 
-            animate={{ opacity: 1, x: 0 }} 
+          <motion.h1
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5 }}
             className="font-headline text-3xl font-bold tracking-tight"
           >
             Budgets
           </motion.h1>
-          <motion.p 
-            initial={{ opacity: 0, x: -20 }} 
-            animate={{ opacity: 1, x: 0 }} 
+          <motion.p
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
             className="text-muted-foreground"
           >
@@ -199,24 +208,24 @@ export default function BudgetsPage() {
       </div>
 
       {budgets.length > 0 ? (
-        <motion.div 
+        <motion.div
           className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
           variants={listVariants}
           initial="hidden"
           animate="visible"
         >
           {budgets.map((budget) => (
-            <BudgetCard 
-              key={budget.id} 
-              budget={budget} 
-              onEdit={handleEditBudget} 
+            <BudgetCard
+              key={budget.id}
+              budget={budget}
+              onEdit={handleEditBudget}
               onDelete={confirmDeleteBudget}
               variants={itemVariants}
             />
           ))}
         </motion.div>
       ) : (
-        <motion.div 
+        <motion.div
           className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/30 p-12 text-center"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -232,7 +241,7 @@ export default function BudgetsPage() {
             </Button>
         </motion.div>
       )}
-      
+
       <BudgetFormDialog
         open={isFormOpen}
         onOpenChange={setIsFormOpen}

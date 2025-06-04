@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -8,7 +9,7 @@ import { getColumns } from "@/components/transactions/transaction-table-columns"
 import { sampleTransactions } from "@/lib/placeholder-data";
 import type { Transaction } from "@/types";
 import { TransactionFormDialog } from "@/components/transactions/transaction-form-dialog";
-import { useToast } from '@/hooks/use-toast';
+import { useNotification } from '@/contexts/notification-context';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,6 +20,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { v4 as uuidv4 } from 'uuid';
+
 
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>(sampleTransactions);
@@ -27,7 +30,8 @@ export default function TransactionsPage() {
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
   const [transactionToDeleteId, setTransactionToDeleteId] = useState<string | null>(null);
 
-  const { toast } = useToast();
+  const { addNotification } = useNotification();
+
 
   const handleAddTransaction = () => {
     setEditingTransaction(null);
@@ -43,13 +47,14 @@ export default function TransactionsPage() {
     setTransactionToDeleteId(transactionId);
     setIsConfirmDeleteDialogOpen(true);
   };
-  
+
   const handleDeleteTransaction = () => {
     if (transactionToDeleteId) {
       setTransactions(prev => prev.filter(t => t.id !== transactionToDeleteId));
-      toast({
+      addNotification({
         title: "Transaction Deleted",
         description: "The transaction has been successfully deleted.",
+        type: "info",
       });
       setTransactionToDeleteId(null);
     }
@@ -57,15 +62,28 @@ export default function TransactionsPage() {
   };
 
   const handleSaveTransaction = (transactionData: Omit<Transaction, 'id'> | Transaction) => {
-    if ('id' in transactionData) { // Editing existing transaction
-      setTransactions(prev => prev.map(t => t.id === transactionData.id ? transactionData : t));
-    } else { // Adding new transaction
-      const newTransaction: Transaction = { ...transactionData, id: Date.now().toString() }; // Simple ID generation
+    let isEditing = false;
+    let savedDescription = "";
+
+    if ('id' in transactionData && transactions.some(t => t.id === transactionData.id)) { 
+      setTransactions(prev => prev.map(t => t.id === transactionData.id ? transactionData as Transaction : t));
+      isEditing = true;
+      savedDescription = (transactionData as Transaction).description;
+    } else { 
+      const newTransaction: Transaction = { ...(transactionData as Omit<Transaction, 'id'>), id: (transactionData as {id: string}).id || uuidv4() };
       setTransactions(prev => [newTransaction, ...prev]);
+      savedDescription = newTransaction.description;
     }
+
+    addNotification({
+      title: `Transaction ${isEditing ? 'Updated' : 'Added'}`,
+      description: `${savedDescription} successfully ${isEditing ? 'updated' : 'added'}.`,
+      type: "success",
+      href: "/transactions"
+    });
   };
-  
-  const columns = useMemo(() => getColumns(handleEditTransaction, confirmDeleteTransaction), []);
+
+  const columns = useMemo(() => getColumns(handleEditTransaction, confirmDeleteTransaction), [handleEditTransaction, confirmDeleteTransaction]);
 
   return (
     <div className="space-y-8">
