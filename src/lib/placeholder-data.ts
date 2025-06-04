@@ -95,3 +95,32 @@ export const expenseCategoriesData = [
   { category: 'Other', value: 475, fill: 'hsl(var(--chart-5))' },
 ];
 
+// For Income Overview Chart
+export const incomeHistory = [
+  { month: 'Jan', income: 4800 },
+  { month: 'Feb', income: 5200 },
+  { month: 'Mar', income: 5000 },
+  { month: 'Apr', income: 5500 },
+  { month: 'May', income: 5300 },
+  { month: 'Jun', income: 5800 },
+];
+
+// For Expense Overview Chart
+export const expenseHistory = [
+  { month: 'Jan', expenses: 2200 },
+  { month: 'Feb', expenses: 2500 },
+  { month: 'Mar', expenses: 2300 },
+  { month: 'Apr', expenses: 2800 },
+  { month: 'May', expenses: 2600 },
+  { month: 'Jun', expenses: 3000 },
+];
+
+// For Net Savings Overview Chart
+export const netSavingsHistory = [
+  { month: 'Jan', netSavings: 2600 },
+  { month: 'Feb', netSavings: 2700 },
+  { month: 'Mar', netSavings: 2700 },
+  { month: 'Apr', netSavings: 2700 },
+  { month: 'May', netSavings: 2700 },
+  { month: 'Jun', netSavings: 2800 },
+];
