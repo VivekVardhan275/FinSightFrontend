@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuthState } from "@/hooks/use-auth-state";
-import { User as UserIcon, Mail, Edit3, BellRing, Palette, Save, XCircle } from "lucide-react";
+import { User as UserIcon, Mail, Edit3, BellRing, Palette, Save, XCircle, CalendarDays } from "lucide-react";
 import { motion } from "framer-motion";
 import React, { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -19,10 +20,14 @@ export default function ProfilePage() {
 
   const [displayName, setDisplayName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [gender, setGender] = useState("");
+
   const [isEditingPersonalInfo, setIsEditingPersonalInfo] = useState(false);
   const [initialDisplayNameForEdit, setInitialDisplayNameForEdit] = useState("");
   const [initialPhoneNumberForEdit, setInitialPhoneNumberForEdit] = useState("");
-
+  const [initialDateOfBirthForEdit, setInitialDateOfBirthForEdit] = useState("");
+  const [initialGenderForEdit, setInitialGenderForEdit] = useState("");
 
   const [budgetAlerts, setBudgetAlerts] = useState(true);
   const [weeklySummary, setWeeklySummary] = useState(false);
@@ -34,10 +39,17 @@ export default function ProfilePage() {
       setDisplayName(initialName);
       setInitialDisplayNameForEdit(initialName); 
       
-      // Phone number isn't in user object, so it defaults to empty
-      const initialPhone = ""; // If user object could have phone: user.phone || "";
+      const initialPhone = ""; 
       setPhoneNumber(initialPhone); 
       setInitialPhoneNumberForEdit(initialPhone);
+
+      const initialDob = ""; // Example: "1990-01-01" if available from backend
+      setDateOfBirth(initialDob);
+      setInitialDateOfBirthForEdit(initialDob);
+
+      const initialGen = ""; // Example: "male" if available
+      setGender(initialGen);
+      setInitialGenderForEdit(initialGen);
     }
   }, [user]);
 
@@ -70,30 +82,33 @@ export default function ProfilePage() {
   const handleEditPersonalInfo = () => {
     setInitialDisplayNameForEdit(displayName);
     setInitialPhoneNumberForEdit(phoneNumber);
+    setInitialDateOfBirthForEdit(dateOfBirth);
+    setInitialGenderForEdit(gender);
     setIsEditingPersonalInfo(true);
   };
 
   const handleCancelPersonalInfoEdit = () => {
     setDisplayName(initialDisplayNameForEdit);
     setPhoneNumber(initialPhoneNumberForEdit);
+    setDateOfBirth(initialDateOfBirthForEdit);
+    setGender(initialGenderForEdit);
     setIsEditingPersonalInfo(false);
   };
 
   const handleSaveChanges = () => {
-    // In a real app, you'd save these to your backend
-    console.log("Saving profile:", { displayName, phoneNumber });
+    console.log("Saving profile:", { displayName, phoneNumber, dateOfBirth, gender });
     toast({
       title: "Profile Updated",
       description: "Your personal information has been (simulated) saved.",
     });
     setIsEditingPersonalInfo(false);
-    // Update initial values for the next edit session
     setInitialDisplayNameForEdit(displayName);
     setInitialPhoneNumberForEdit(phoneNumber);
+    setInitialDateOfBirthForEdit(dateOfBirth);
+    setInitialGenderForEdit(gender);
   };
 
   const handleSavePreferences = () => {
-    // In a real app, you'd save these to your backend
     console.log("Saving preferences:", { budgetAlerts, weeklySummary, billReminders });
     toast({
       title: "Preferences Updated",
@@ -190,6 +205,38 @@ export default function ProfilePage() {
                 readOnly={!isEditingPersonalInfo}
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="dateOfBirth">Date of Birth</Label>
+              <Input 
+                id="dateOfBirth" 
+                type="date" 
+                value={dateOfBirth} 
+                onChange={(e) => setDateOfBirth(e.target.value)} 
+                readOnly={!isEditingPersonalInfo}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="gender">Gender</Label>
+              {isEditingPersonalInfo ? (
+                <Select value={gender} onValueChange={setGender}>
+                  <SelectTrigger id="gender">
+                    <SelectValue placeholder="Select gender" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="male">Male</SelectItem>
+                    <SelectItem value="female">Female</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                    <SelectItem value="prefer_not_to_say">Prefer not to say</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input 
+                  id="gender" 
+                  value={gender ? gender.charAt(0).toUpperCase() + gender.slice(1).replace("_", " ") : "Not set"} 
+                  readOnly 
+                />
+              )}
+            </div>
             <div className="flex justify-end space-x-2">
               {isEditingPersonalInfo ? (
                 <>
@@ -268,3 +315,5 @@ export default function ProfilePage() {
     </div>
   );
 }
+
+    
