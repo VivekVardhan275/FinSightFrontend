@@ -5,10 +5,29 @@ import { AppLogo } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuthState } from '@/hooks/use-auth-state';
-import { ChromeIcon, GithubIcon } from 'lucide-react';
+import { GithubIcon } from 'lucide-react'; // Removed ChromeIcon
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { motion } from 'framer-motion';
+
+// Google logo SVG
+const GoogleLogo = () => (
+  <svg
+    className="mr-2 h-5 w-5"
+    aria-hidden="true"
+    focusable="false"
+    data-prefix="fab"
+    data-icon="google"
+    role="img"
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 488 512"
+  >
+    <path
+      fill="currentColor"
+      d="M488 261.8C488 403.3 381.5 512 244 512 110.5 512 0 401.5 0 265.5S110.5 19 244 19c70.5 0 131.5 30.5 174.5 78.5l-64 64C320.5 129 286 112 244 112c-88.5 0-160.5 71.5-160.5 158.5S155.5 429 244 429c52.5 0 94-23.5 124.5-62.5 30.5-39 43.5-82.5 46-131.5H244v-81.5h244z"
+    ></path>
+  </svg>
+);
 
 export default function LoginPage() {
   const { login, loginWithGitHub, user, isLoading } = useAuthState();
@@ -55,7 +74,7 @@ export default function LoginPage() {
                 asChild
               >
                 <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
-                  <ChromeIcon className="mr-2 h-5 w-5" />
+                  <GoogleLogo />
                   Sign in with Google
                 </motion.button>
               </Button>
