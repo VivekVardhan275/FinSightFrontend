@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,29 +19,33 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Transaction } from "@/types";
-import React, { useState, useEffect } from "react";
+import type { Transaction, TransactionFormData } from "@/types";
+import React, { useEffect } from "react";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { CalendarIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
 
 interface TransactionFormDialogProps {
-  transaction?: Transaction | null; // For editing
+  transaction?: Transaction | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (transaction: Omit<Transaction, 'id'> | Transaction) => void;
+  onSave: (transactionData: Omit<Transaction, 'id'> | Transaction) => void;
 }
 
-const initialFormState = {
-  date: new Date().toISOString().split('T')[0],
-  description: "",
-  category: "",
-  amount: 0,
-  type: "expense" as "income" | "expense",
-};
+const transactionSchema = z.object({
+  date: z.date({ required_error: "Date is required." }),
+  description: z.string().min(1, "Description is required."),
+  category: z.string().min(1, "Category is required."),
+  amount: z.number().positive("Amount must be positive."),
+  type: z.enum(["income", "expense"], { required_error: "Type is required." }),
+});
 
 export function TransactionFormDialog({
   transaction,
@@ -49,162 +53,170 @@ export function TransactionFormDialog({
   onOpenChange,
   onSave,
 }: TransactionFormDialogProps) {
-  const [formData, setFormData] = useState<Omit<Transaction, 'id'>>(initialFormState);
   const { toast } = useToast();
-  const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(
-    transaction?.date ? new Date(transaction.date) : new Date()
-  );
-
+  const {
+    control,
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<TransactionFormData>({
+    resolver: zodResolver(transactionSchema),
+    defaultValues: {
+      date: new Date(),
+      description: "",
+      category: "",
+      amount: 0,
+      type: "expense",
+    },
+  });
 
   useEffect(() => {
-    if (transaction) {
-      setFormData({
-        date: transaction.date,
-        description: transaction.description,
-        category: transaction.category,
-        amount: transaction.amount,
-        type: transaction.type,
-      });
-      setSelectedDate(new Date(transaction.date));
-    } else {
-      setFormData(initialFormState);
-      setSelectedDate(new Date());
+    if (open) {
+      if (transaction) {
+        reset({
+          date: parseISO(transaction.date),
+          description: transaction.description,
+          category: transaction.category,
+          amount: transaction.amount,
+          type: transaction.type,
+        });
+      } else {
+        reset({
+          date: new Date(),
+          description: "",
+          category: "",
+          amount: 0,
+          type: "expense",
+        });
+      }
     }
-  }, [transaction, open]);
+  }, [transaction, open, reset]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: name === "amount" ? parseFloat(value) : value,
-    }));
-  };
+  const processSubmit = (data: TransactionFormData) => {
+    const transactionDataToSave = {
+      ...data,
+      date: format(data.date, "yyyy-MM-dd"), // Format date back to string for saving
+    };
 
-  const handleSelectChange = (name: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-  
-  const handleDateChange = (date: Date | undefined) => {
-    setSelectedDate(date);
-    if (date) {
-      setFormData((prev) => ({ ...prev, date: format(date, "yyyy-MM-dd") }));
-    }
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.description || formData.amount <= 0 || !formData.category) {
-      toast({
-        title: "Validation Error",
-        description: "Please fill in all required fields and ensure amount is positive.",
-        variant: "destructive",
-      });
-      return;
-    }
-    onSave(transaction ? { ...formData, id: transaction.id } : formData);
-    onOpenChange(false); // Close dialog on save
+    onSave(transaction ? { ...transactionDataToSave, id: transaction.id } : transactionDataToSave);
+    onOpenChange(false);
     toast({
       title: `Transaction ${transaction ? 'Updated' : 'Added'}`,
-      description: `${formData.description} successfully ${transaction ? 'updated' : 'added'}.`,
+      description: `${data.description} successfully ${transaction ? 'updated' : 'added'}.`,
     });
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle className="font-headline">
-            {transaction ? "Edit Transaction" : "Add New Transaction"}
-          </DialogTitle>
-          <DialogDescription>
-            {transaction
-              ? "Update the details of your transaction."
-              : "Enter the details for your new transaction."}
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="date" className="text-right">Date</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant={"outline"}
-                  className={cn(
-                    "col-span-3 justify-start text-left font-normal",
-                    !selectedDate && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={handleDateChange}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="description" className="text-right">Description</Label>
-            <Input
-              id="description"
-              name="description"
-              value={formData.description}
-              onChange={handleChange}
-              className="col-span-3"
-              required
-            />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="amount" className="text-right">Amount</Label>
-            <Input
-              id="amount"
-              name="amount"
-              type="number"
-              step="0.01"
-              value={formData.amount}
-              onChange={handleChange}
-              className="col-span-3"
-              required
-            />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="category" className="text-right">Category</Label>
-            <Input
-              id="category"
-              name="category"
-              value={formData.category}
-              onChange={handleChange}
-              className="col-span-3"
-              required
-            />
-            {/* TODO: Replace with Select if categories are predefined */}
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="type" className="text-right">Type</Label>
-            <Select
-              name="type"
-              value={formData.type}
-              onValueChange={(value) => handleSelectChange("type", value)}
-            >
-              <SelectTrigger className="col-span-3">
-                <SelectValue placeholder="Select type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="income">Income</SelectItem>
-                <SelectItem value="expense">Expense</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit">Save Transaction</Button>
-          </DialogFooter>
-        </form>
+      <DialogContent className="sm:max-w-[425px] overflow-hidden">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+        >
+          <DialogHeader>
+            <DialogTitle className="font-headline">
+              {transaction ? "Edit Transaction" : "Add New Transaction"}
+            </DialogTitle>
+            <DialogDescription>
+              {transaction
+                ? "Update the details of your transaction."
+                : "Enter the details for your new transaction."}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit(processSubmit)} className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="date" className="text-right">Date</Label>
+              <Controller
+                name="date"
+                control={control}
+                render={({ field }) => (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "col-span-3 justify-start text-left font-normal",
+                          !field.value && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={field.onChange}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                )}
+              />
+              {errors.date && <p className="col-span-4 text-sm text-destructive text-right">{errors.date.message}</p>}
+            </div>
+
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="description" className="text-right">Description</Label>
+              <Input
+                id="description"
+                {...register("description")}
+                className="col-span-3"
+              />
+              {errors.description && <p className="col-span-4 text-sm text-destructive text-right">{errors.description.message}</p>}
+            </div>
+
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="amount" className="text-right">Amount</Label>
+              <Input
+                id="amount"
+                type="number"
+                step="0.01"
+                {...register("amount", { valueAsNumber: true })}
+                className="col-span-3"
+              />
+              {errors.amount && <p className="col-span-4 text-sm text-destructive text-right">{errors.amount.message}</p>}
+            </div>
+
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="category" className="text-right">Category</Label>
+              <Input
+                id="category"
+                {...register("category")}
+                className="col-span-3"
+              />
+              {errors.category && <p className="col-span-4 text-sm text-destructive text-right">{errors.category.message}</p>}
+            </div>
+
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="type" className="text-right">Type</Label>
+              <Controller
+                name="type"
+                control={control}
+                render={({ field }) => (
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="income">Income</SelectItem>
+                      <SelectItem value="expense">Expense</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors.type && <p className="col-span-4 text-sm text-destructive text-right">{errors.type.message}</p>}
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+              <Button type="submit">Save Transaction</Button>
+            </DialogFooter>
+          </form>
+        </motion.div>
       </DialogContent>
     </Dialog>
   );

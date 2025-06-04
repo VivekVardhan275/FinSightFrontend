@@ -4,8 +4,9 @@
 import type { SummaryCardData } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TrendingUp, TrendingDown } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { motion } from 'framer-motion';
+import { cn, formatCurrency } from '@/lib/utils';
+import { motion, animate } from 'framer-motion';
+import { useEffect, useState } from 'react';
 
 interface SummaryCardProps {
   data: SummaryCardData;
@@ -27,6 +28,21 @@ const cardVariants = {
 };
 
 export function SummaryCard({ data, index }: SummaryCardProps) {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    const controls = animate(0, data.rawValue, {
+      duration: 1.5,
+      ease: "easeOut",
+      onUpdate: (value) => {
+        setCount(value);
+      },
+    });
+    return () => controls.stop();
+  }, [data.rawValue]);
+
+  const displayValue = data.isCurrency !== false ? formatCurrency(count) : Math.round(count).toString();
+
   return (
     <motion.div
       custom={index}
@@ -41,7 +57,9 @@ export function SummaryCard({ data, index }: SummaryCardProps) {
           {data.icon}
         </CardHeader>
         <CardContent>
-          <div className="text-3xl font-bold font-headline">{data.value}</div>
+          <div className="text-3xl font-bold font-headline">
+            {data.prefix || ''}{displayValue}{data.suffix || ''}
+          </div>
           {data.trend && (
             <p className={cn(
               "text-xs text-muted-foreground flex items-center",

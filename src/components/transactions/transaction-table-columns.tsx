@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Transaction } from "@/types";
@@ -14,9 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-
-// This type is used to define the shape of our data.
-// You can use a Zod schema here if you want.
+import { formatCurrency } from "@/lib/utils";
 
 export const getColumns = (
   onEdit: (transaction: Transaction) => void,
@@ -83,11 +82,7 @@ export const getColumns = (
     },
     cell: ({ row }) => {
       const amount = parseFloat(row.getValue("amount"));
-      const formatted = new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-      }).format(amount);
-      return <div className="text-right font-medium">{formatted}</div>;
+      return <div className="text-right font-medium">{formatCurrency(amount)}</div>;
     },
   },
   {

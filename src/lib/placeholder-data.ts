@@ -1,5 +1,6 @@
+
 import type { Transaction, Budget, SummaryCardData } from '@/types';
-import { DollarSign, TrendingUp, TrendingDown, Wallet, CreditCard, Landmark, Percent } from 'lucide-react';
+import { DollarSign, CreditCard, TrendingUp, Wallet, PiggyBank } from 'lucide-react';
 
 export const sampleTransactions: Transaction[] = [
   { id: '1', date: '2024-07-15', description: 'Salary Deposit', category: 'Income', amount: 5000, type: 'income' },
@@ -19,11 +20,55 @@ export const sampleBudgets: Budget[] = [
   { id: 'b4', category: 'Utilities', allocated: 300, spent: 275.00, month: '2024-07' },
 ];
 
+// Placeholder calculations for July 2024
+const julyIncome = sampleTransactions
+  .filter(t => t.type === 'income' && t.date.startsWith('2024-07'))
+  .reduce((sum, t) => sum + t.amount, 0);
+
+const julyExpenses = sampleTransactions
+  .filter(t => t.type === 'expense' && t.date.startsWith('2024-07'))
+  .reduce((sum, t) => sum + t.amount, 0);
+
+const julyNetSavings = julyIncome - julyExpenses;
+
+const julyBudgetLeft = sampleBudgets
+  .filter(b => b.month === '2024-07' && b.allocated > b.spent)
+  .reduce((sum, b) => sum + (b.allocated - b.spent), 0);
+
+
 export const dashboardSummaryData: SummaryCardData[] = [
-  { title: 'Current Balance', value: '$12,345.67', icon: <Wallet className="h-6 w-6 text-primary" />, trend: '+ $1,200 this month', trendDirection: 'up' },
-  { title: 'Total Income', value: '$5,600.00', icon: <DollarSign className="h-6 w-6 text-green-500" />, trend: '+ 10% from last month', trendDirection: 'up' },
-  { title: 'Total Expenses', value: '$1,875.49', icon: <CreditCard className="h-6 w-6 text-red-500" />, trend: '- 5% from last month', trendDirection: 'down' },
-  { title: 'Budget Usage', value: '75%', icon: <Percent className="h-6 w-6 text-accent" />, trend: '3 of 4 budgets on track', trendDirection: 'up' },
+  { 
+    title: 'Total Income', 
+    rawValue: julyIncome, 
+    isCurrency: true,
+    icon: <DollarSign className="h-6 w-6 text-green-500" />, 
+    trend: '+10% this month', // Placeholder trend
+    trendDirection: 'up' 
+  },
+  { 
+    title: 'Total Expenses', 
+    rawValue: julyExpenses, 
+    isCurrency: true,
+    icon: <CreditCard className="h-6 w-6 text-red-500" />, 
+    trend: '-5% this month', // Placeholder trend
+    trendDirection: 'down' 
+  },
+  { 
+    title: 'Net Savings', 
+    rawValue: julyNetSavings, 
+    isCurrency: true,
+    icon: <TrendingUp className="h-6 w-6 text-primary" />, 
+    trend: 'Improving steadily', // Placeholder trend
+    trendDirection: julyNetSavings >= 0 ? 'up' : 'down' 
+  },
+  { 
+    title: 'Budget Left', 
+    rawValue: julyBudgetLeft, 
+    isCurrency: true,
+    icon: <PiggyBank className="h-6 w-6 text-accent" />, 
+    trend: `${sampleBudgets.filter(b => b.month === '2024-07' && b.spent <= b.allocated).length} budgets on track`, // Placeholder trend
+    trendDirection: 'up' 
+  },
 ];
 
 // For charts
@@ -48,3 +93,4 @@ export const expenseCategoriesData = [
   { category: 'Utilities', value: 500, fill: 'hsl(var(--chart-4))' },
   { category: 'Other', value: 475, fill: 'hsl(var(--chart-5))' },
 ];
+

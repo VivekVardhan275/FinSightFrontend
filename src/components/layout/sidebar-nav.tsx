@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -23,8 +24,8 @@ const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: <LayoutDashboard /> },
   { href: "/transactions", label: "Transactions", icon: <ListChecks /> },
   { href: "/budgets", label: "Budgets", icon: <Target /> },
-  // { href: "/forecast", label: "Forecast", icon: <LineChart />, disabled: true }, // Future feature
-  // { href: "/reports", label: "Reports", icon: <FileText />, disabled: true }, // Future feature
+  { href: "/forecast", label: "Forecast", icon: <LineChart /> }, 
+  { href: "/reports", label: "Reports", icon: <FileText /> },
 ];
 
 export function SidebarNav() {

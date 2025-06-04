@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Edit2, Trash2, AlertTriangle } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 import { motion, type Variants } from 'framer-motion';
 
 interface BudgetCardProps {
@@ -40,8 +40,8 @@ export function BudgetCard({ budget, onEdit, onDelete, variants }: BudgetCardPro
         <CardContent className="space-y-3 flex-grow">
           <div>
             <div className="mb-1 flex justify-between text-sm">
-              <span>Spent: ${budget.spent.toFixed(2)}</span>
-              <span className="text-muted-foreground">Allocated: ${budget.allocated.toFixed(2)}</span>
+              <span>Spent: {formatCurrency(budget.spent)}</span>
+              <span className="text-muted-foreground">Allocated: {formatCurrency(budget.allocated)}</span>
             </div>
             <Progress value={progress} className="h-3 [&>*]:bg-[--progress-bar-color]" style={{ '--progress-bar-color': `var(--${isOverBudget ? 'destructive' : progress > 90 ? 'destructive' : progress > 70 ? 'yellow-500' : 'primary'})` } as React.CSSProperties} />
           </div>
@@ -50,8 +50,8 @@ export function BudgetCard({ budget, onEdit, onDelete, variants }: BudgetCardPro
             isOverBudget ? "text-destructive" : remaining >=0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
           )}>
             {isOverBudget 
-              ? `Over budget by $${Math.abs(remaining).toFixed(2)}` 
-              : `$${remaining.toFixed(2)} Remaining`}
+              ? `Over budget by ${formatCurrency(Math.abs(remaining))}` 
+              : `${formatCurrency(remaining)} Remaining`}
           </p>
         </CardContent>
         <CardFooter className="flex justify-end space-x-2">

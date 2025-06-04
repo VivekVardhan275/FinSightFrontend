@@ -1,3 +1,4 @@
+
 export type Transaction = {
   id: string;
   date: string; // ISO string date for simplicity
@@ -17,8 +18,26 @@ export type Budget = {
 
 export type SummaryCardData = {
   title: string;
-  value: string;
+  rawValue: number; // The actual number for animation
+  prefix?: string;
+  suffix?: string;
+  isCurrency?: boolean;
   icon: React.ReactNode;
   trend?: string;
   trendDirection?: 'up' | 'down';
+};
+
+// Schema types for react-hook-form validation (using Zod)
+export type TransactionFormData = {
+  date: Date; // react-day-picker uses Date objects
+  description: string;
+  category: string;
+  amount: number;
+  type: 'income' | 'expense';
+};
+
+export type BudgetFormData = {
+  category: string;
+  allocated: number;
+  month: string; // YYYY-MM format
 };
