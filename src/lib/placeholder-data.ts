@@ -13,28 +13,27 @@ export const sampleTransactions: Transaction[] = [
   { id: '6', date: '2024-07-22', description: 'Dinner Out', category: 'Food', amount: 45.00, type: 'expense' },
   { id: '7', date: '2024-06-25', description: 'Rent Payment', category: 'Housing', amount: 1200, type: 'expense' },
   { id: '8', date: '2024-06-01', description: 'Salary June', category: 'Income', amount: 5000, type: 'income' },
+  // Adding more data for previous months to make charts more interesting
+  { id: 't9', date: '2024-05-15', description: 'Salary May', category: 'Income', amount: 4900, type: 'income' },
+  { id: 't10', date: '2024-05-20', description: 'Utilities May', category: 'Utilities', amount: 150, type: 'expense' },
+  { id: 't11', date: '2024-05-05', description: 'Groceries May', category: 'Food', amount: 80, type: 'expense' },
+  { id: 't12', date: '2024-04-15', description: 'Salary Apr', category: 'Income', amount: 4950, type: 'income' },
+  { id: 't13', date: '2024-04-10', description: 'Car Insurance', category: 'Transport', amount: 120, type: 'expense' },
+  { id: 't14', date: '2024-03-15', description: 'Salary Mar', category: 'Income', amount: 4800, type: 'income' },
+  { id: 't15', date: '2024-03-20', description: 'Internet Bill', category: 'Utilities', amount: 60, type: 'expense' },
+  { id: 't16', date: '2024-02-15', description: 'Salary Feb', category: 'Income', amount: 4700, type: 'income' },
+  { id: 't17', date: '2024-02-01', description: 'Student Loan', category: 'Education', amount: 300, type: 'expense' },
 ];
 
 export const sampleBudgets: Budget[] = [
-  { id: 'b1', category: 'Food', allocated: 500, spent: 0, month: '2024-07' }, // Spent will be dynamically calculated
+  { id: 'b1', category: 'Food', allocated: 500, spent: 0, month: '2024-07' }, 
   { id: 'b2', category: 'Transport', allocated: 150, spent: 0, month: '2024-07' },
   { id: 'b3', category: 'Entertainment', allocated: 200, spent: 0, month: '2024-07' },
   { id: 'b4', category: 'Utilities', allocated: 300, spent: 0, month: '2024-07' },
+  { id: 'b5', category: 'Food', allocated: 480, spent: 0, month: '2024-06' },
+  { id: 'b6', category: 'Housing', allocated: 1200, spent: 0, month: '2024-06' },
 ];
 
-// dashboardSummaryData is now dynamically generated in DashboardPage.
-// This can be removed or kept for reference/other uses if needed.
-/*
-export const dashboardSummaryData: SummaryCardData[] = [
-  // ... This data is now generated dynamically in DashboardPage ...
-];
-*/
-
-// For charts (these remain static for now)
-export const incomeExpenseData = [
-  { name: 'Income', value: 5600, fill: 'hsl(var(--chart-1))' },
-  { name: 'Expenses', value: 1875, fill: 'hsl(var(--chart-2))' },
-];
 
 export const expenseCategoriesData = [
   { category: 'Food', value: 400, fill: 'hsl(var(--chart-1))' },
@@ -44,32 +43,6 @@ export const expenseCategoriesData = [
   { category: 'Other', value: 475, fill: 'hsl(var(--chart-5))' },
 ];
 
-// For Income Overview Chart
-export const incomeHistory = [
-  { month: 'Jan', income: 4800 },
-  { month: 'Feb', income: 5200 },
-  { month: 'Mar', income: 5000 },
-  { month: 'Apr', income: 5500 },
-  { month: 'May', income: 5300 },
-  { month: 'Jun', income: 5800 },
-];
+// incomeHistory, expenseHistory, and netSavingsHistory are no longer needed as charts are dynamic.
+// They are removed.
 
-// For Expense Overview Chart
-export const expenseHistory = [
-  { month: 'Jan', expenses: 2200 },
-  { month: 'Feb', expenses: 2500 },
-  { month: 'Mar', expenses: 2300 },
-  { month: 'Apr', expenses: 2800 },
-  { month: 'May', expenses: 2600 },
-  { month: 'Jun', expenses: 3000 },
-];
-
-// For Net Savings Overview Chart
-export const netSavingsHistory = [
-  { month: 'Jan', netSavings: 2600 },
-  { month: 'Feb', netSavings: 2700 },
-  { month: 'Mar', netSavings: 2700 },
-  { month: 'Apr', netSavings: 2700 },
-  { month: 'May', netSavings: 2700 },
-  { month: 'Jun', netSavings: 2800 },
-];

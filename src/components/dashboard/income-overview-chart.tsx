@@ -1,7 +1,7 @@
 
 "use client"
 
-import React from "react";
+import React, { useMemo } from "react";
 import { TrendingUp, TrendingDown } from "lucide-react"
 import { CartesianGrid, Line, LineChart, XAxis, YAxis, Tooltip as RechartsTooltip } from "recharts"
 import {
@@ -17,19 +17,39 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
-import { incomeHistory } from "@/lib/placeholder-data"
 import { useCurrency } from "@/contexts/currency-context";
+import { useTransactionContext } from "@/contexts/transaction-context";
 import { formatCurrency } from "@/lib/utils";
 
 export function IncomeOverviewChart() {
   const { selectedCurrency, convertAmount } = useCurrency();
+  const { transactions } = useTransactionContext();
 
-  const chartData = React.useMemo(() => {
-    return incomeHistory.map(item => ({
-      ...item,
-      income: convertAmount(item.income, selectedCurrency),
-    }));
-  }, [selectedCurrency, convertAmount]);
+  const chartData = useMemo(() => {
+    const data = [];
+    const now = new Date();
+
+    for (let i = 5; i >= 0; i--) { // Last 6 months including current
+      const targetDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const year = targetDate.getFullYear();
+      const month = targetDate.getMonth(); // 0-indexed
+
+      const monthlyIncome = transactions
+        .filter(t => {
+          const transactionDate = new Date(t.date);
+          return t.type === 'income' &&
+                 transactionDate.getFullYear() === year &&
+                 transactionDate.getMonth() === month;
+        })
+        .reduce((sum, t) => sum + t.amount, 0); // Sum USD amounts
+
+      data.push({
+        month: targetDate.toLocaleString('default', { month: 'short' }), // e.g., "Jul"
+        income: convertAmount(monthlyIncome, selectedCurrency), // Convert final sum for display
+      });
+    }
+    return data;
+  }, [transactions, selectedCurrency, convertAmount]);
 
   const chartConfig = React.useMemo(() => ({
     income: {
@@ -39,20 +59,36 @@ export function IncomeOverviewChart() {
   }), [selectedCurrency]) satisfies ChartConfig;
 
   const yAxisTickFormatter = (value: number) => {
-    const kValue = value / 1000;
-    let symbol = '';
-    if (selectedCurrency === 'USD') symbol = '$';
-    else if (selectedCurrency === 'EUR') symbol = '€';
-    else if (selectedCurrency === 'GBP') symbol = '£';
-    else if (selectedCurrency === 'INR') symbol = '₹';
+    if (value === 0) return formatCurrency(0, selectedCurrency).replace(/\d/g, '').replace('.00','').trim() + '0'; // Handle 0 to show currency symbol + 0
     
-    return `${symbol}${kValue.toFixed(0)}k`;
+    const absValue = Math.abs(value);
+    let displayValue: string;
+    let suffix = '';
+
+    if (absValue >= 1000000) {
+        displayValue = (value / 1000000).toFixed(1);
+        suffix = 'M';
+    } else if (absValue >= 1000) {
+        displayValue = (value / 1000).toFixed(0);
+        suffix = 'k';
+    } else {
+        displayValue = value.toFixed(0);
+    }
+    
+    const currencySymbol = formatCurrency(0, selectedCurrency).replace(/\d/g, '').replace('.', '').trim();
+    return `${currencySymbol}${displayValue}${suffix}`;
   };
 
-  // Placeholder trend calculation (replace with actual logic if needed)
   const previousMonthIncome = chartData.length > 1 ? chartData[chartData.length - 2]?.income : 0;
   const currentMonthIncome = chartData.length > 0 ? chartData[chartData.length - 1]?.income : 0;
-  const trendPercentage = previousMonthIncome ? ((currentMonthIncome - previousMonthIncome) / previousMonthIncome) * 100 : 0;
+  
+  let trendPercentage = 0;
+  if (previousMonthIncome !== 0) {
+    trendPercentage = ((currentMonthIncome - previousMonthIncome) / previousMonthIncome) * 100;
+  } else if (currentMonthIncome !== 0) {
+    trendPercentage = 100; // If previous was 0 and current is not, it's a 100% increase
+  }
+
   const trendDirection = trendPercentage >= 0 ? 'up' : 'down';
 
   return (
@@ -79,21 +115,21 @@ export function IncomeOverviewChart() {
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={(value) => value.slice(0, 3)}
             />
             <YAxis
               tickLine={false}
               axisLine={false}
               tickMargin={8}
               tickFormatter={yAxisTickFormatter}
+              width={80}
             />
-            <RechartsTooltip 
+            <RechartsTooltip
               cursor={false}
               content={
-                <ChartTooltipContent 
+                <ChartTooltipContent
                   formatter={(value) => formatCurrency(value as number, selectedCurrency)}
                 />
-              } 
+              }
             />
             <Line
               dataKey="income"
@@ -108,8 +144,12 @@ export function IncomeOverviewChart() {
       </CardContent>
       <CardFooter className="flex-col items-start gap-2 text-sm">
         <div className="flex gap-2 font-medium leading-none">
-          {trendDirection === 'up' ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-          Trending {trendDirection} by {Math.abs(trendPercentage).toFixed(1)}% this period
+          {chartData.length > 1 && ( // Only show trend if there's enough data
+            <>
+              {trendDirection === 'up' ? <TrendingUp className="h-4 w-4 text-green-500" /> : <TrendingDown className="h-4 w-4 text-red-500" />}
+              Trending {trendDirection} by {Math.abs(trendPercentage).toFixed(1)}% this period
+            </>
+          )}
         </div>
         <div className="leading-none text-muted-foreground">
           Showing total income for the last 6 months
