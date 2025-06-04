@@ -7,17 +7,17 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Edit2, Trash2, AlertTriangle } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
-import { motion, type Variants } from 'framer-motion';
+// import { motion, type Variants } from 'framer-motion'; // Removed Framer Motion
 import { useCurrency } from '@/contexts/currency-context';
 
 interface BudgetCardProps {
   budget: Budget;
   onEdit: (budget: Budget) => void;
   onDelete: (budgetId: string) => void;
-  variants?: Variants;
+  // variants?: Variants; // Removed variants prop
 }
 
-export function BudgetCard({ budget, onEdit, onDelete, variants }: BudgetCardProps) {
+export function BudgetCard({ budget, onEdit, onDelete }: BudgetCardProps) {
   const { selectedCurrency, convertAmount } = useCurrency();
 
   const convertedSpent = convertAmount(budget.spent, selectedCurrency);
@@ -27,7 +27,6 @@ export function BudgetCard({ budget, onEdit, onDelete, variants }: BudgetCardPro
   const convertedRemaining = convertedAllocated - convertedSpent;
   const isOverBudget = convertedSpent > convertedAllocated;
 
-  // Determine which color variable to use based on budget status
   const colorVariable = isOverBudget || progress > 90 
     ? 'destructive' 
     : progress > 70 
@@ -35,10 +34,10 @@ export function BudgetCard({ budget, onEdit, onDelete, variants }: BudgetCardPro
     : 'primary';
 
   return (
-    <motion.div 
-      variants={variants} 
+    <div 
+      // variants={variants} // Removed variants
       className="h-full"
-      whileHover={{ y: -5, transition: { duration: 0.2 } }}
+      // whileHover={{ y: -5, transition: { duration: 0.2 } }} // Removed whileHover
     >
       <Card className="shadow-lg transition-shadow hover:shadow-xl h-full flex flex-col">
         <CardHeader>
@@ -80,6 +79,6 @@ export function BudgetCard({ budget, onEdit, onDelete, variants }: BudgetCardPro
           </Button>
         </CardFooter>
       </Card>
-    </motion.div>
+    </div>
   );
 }
