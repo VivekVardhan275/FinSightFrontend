@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Target } from "lucide-react";
 import { sampleBudgets } from "@/lib/placeholder-data";
@@ -20,6 +20,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { motion } from "framer-motion";
+import { useCurrency } from '@/contexts/currency-context';
+import { formatCurrency } from '@/lib/utils';
 
 const listVariants = {
   hidden: { opacity: 0 },
@@ -50,8 +52,75 @@ export default function BudgetsPage() {
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
   const [budgetToDeleteId, setBudgetToDeleteId] = useState<string | null>(null);
+  const [notifiedBudgets, setNotifiedBudgets] = useState<Set<string>>(new Set());
 
   const { toast } = useToast();
+  const { selectedCurrency, convertAmount } = useCurrency();
+
+  const checkAndNotifyBudgets = (budgetsToCheck: Budget[]) => {
+    budgetsToCheck.forEach(budget => {
+      // Calculate percentage based on base USD values
+      const percentageSpent = budget.allocated > 0 ? (budget.spent / budget.allocated) * 100 : 0;
+      const budgetId = budget.id;
+
+      // Convert amounts for display in toasts
+      const displaySpent = convertAmount(budget.spent, selectedCurrency);
+      const displayAllocated = convertAmount(budget.allocated, selectedCurrency);
+
+      const exceededKey = `${budgetId}-exceeded`;
+      const nearingKey = `${budgetId}-nearing`;
+
+      if (budget.spent > budget.allocated) {
+        if (!notifiedBudgets.has(exceededKey)) {
+          toast({
+            title: "Budget Exceeded!",
+            description: `You have exceeded your budget for ${budget.category} (${budget.month}). Spent: ${formatCurrency(displaySpent, selectedCurrency)}, Allocated: ${formatCurrency(displayAllocated, selectedCurrency)}.`,
+            variant: "destructive",
+            duration: 10000,
+          });
+          setNotifiedBudgets(prev => {
+            const newSet = new Set(prev);
+            newSet.add(exceededKey);
+            newSet.delete(nearingKey); // Remove nearing if it was previously nearing
+            return newSet;
+          });
+        }
+      } else if (percentageSpent >= 85) {
+        if (!notifiedBudgets.has(nearingKey) && !notifiedBudgets.has(exceededKey)) {
+          toast({
+            title: "Budget Nearing Limit",
+            description: `You have spent ${percentageSpent.toFixed(0)}% of your budget for ${budget.category} (${budget.month}). Spent: ${formatCurrency(displaySpent, selectedCurrency)}, Allocated: ${formatCurrency(displayAllocated, selectedCurrency)}.`,
+            variant: "default",
+            duration: 10000,
+          });
+          setNotifiedBudgets(prev => new Set(prev).add(nearingKey));
+        }
+      } else {
+        // Budget is okay, remove from notified set so it can be notified again if status changes
+        let changed = false;
+        const newSet = new Set(notifiedBudgets);
+        if (newSet.has(nearingKey)) {
+          newSet.delete(nearingKey);
+          changed = true;
+        }
+        if (newSet.has(exceededKey)) {
+          newSet.delete(exceededKey);
+          changed = true;
+        }
+        if (changed) {
+          setNotifiedBudgets(newSet);
+        }
+      }
+    });
+  };
+  
+  useEffect(() => {
+    if (budgets.length > 0) {
+      checkAndNotifyBudgets(budgets);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [budgets, selectedCurrency]); // Rerun when budgets or currency changes
+
 
   const handleAddBudget = () => {
     setEditingBudget(null);
@@ -75,20 +144,26 @@ export default function BudgetsPage() {
         title: "Budget Deleted",
         description: "The budget has been successfully deleted.",
       });
+      // Clear notification for deleted budget
+      setNotifiedBudgets(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(`${budgetToDeleteId}-nearing`);
+        newSet.delete(`${budgetToDeleteId}-exceeded`);
+        return newSet;
+      });
       setBudgetToDeleteId(null);
     }
     setIsConfirmDeleteDialogOpen(false);
   };
   
   const handleSaveBudget = (budgetDataFromForm: Omit<Budget, 'id' | 'spent'> | Budget) => {
-    if ('id' in budgetDataFromForm && 'spent' in budgetDataFromForm) { // Editing existing budget
-      // budgetDataFromForm has ID, spent, and other fields (allocated in USD)
+    if ('id' in budgetDataFromForm && 'spent' in budgetDataFromForm) { 
       setBudgets(prev => prev.map(b => b.id === budgetDataFromForm.id ? budgetDataFromForm : b));
-    } else { // Adding new budget (budgetDataFromForm has allocated in USD, category, month, but no id or spent)
+    } else { 
       const newBudget: Budget = { 
-        ...(budgetDataFromForm as Omit<Budget, 'id' | 'spent'>), // Cast to ensure types align
+        ...(budgetDataFromForm as Omit<Budget, 'id' | 'spent'>), 
         id: Date.now().toString(), 
-        spent: 0 // New budgets always start with 0 spent
+        spent: 0 
       };
       setBudgets(prev => [newBudget, ...prev]);
     }
@@ -130,7 +205,7 @@ export default function BudgetsPage() {
           initial="hidden"
           animate="visible"
         >
-          {budgets.map((budget, index) => (
+          {budgets.map((budget) => (
             <BudgetCard 
               key={budget.id} 
               budget={budget} 
