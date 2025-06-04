@@ -6,8 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { useAuthState } from "@/hooks/use-auth-state";
-import { User as UserIcon, Mail, Edit3 } from "lucide-react";
+import { User as UserIcon, Mail, Edit3, BellRing, Palette } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function ProfilePage() {
@@ -72,7 +73,7 @@ export default function ProfilePage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">
-            <Button variant="outline">
+            <Button variant="outline" disabled>
               <Edit3 className="mr-2 h-4 w-4" /> Edit Profile Picture
             </Button>
           </CardContent>
@@ -104,6 +105,62 @@ export default function ProfilePage() {
             <div className="flex justify-end">
               <Button disabled>
                 <Edit3 className="mr-2 h-4 w-4" /> Save Changes
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+      >
+        <Card className="shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <BellRing className="mr-2 h-6 w-6 text-primary" />
+              Preferences
+            </CardTitle>
+            <CardDescription>
+              Customize your application experience. These settings are illustrative.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-3">
+              <h4 className="text-md font-medium">Notification Settings</h4>
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div>
+                  <Label htmlFor="budget-alerts" className="font-medium">Budget Alerts</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Receive alerts when you're nearing or over budget.
+                  </p>
+                </div>
+                <Switch id="budget-alerts" aria-label="Toggle budget alerts" disabled />
+              </div>
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div>
+                  <Label htmlFor="weekly-summary" className="font-medium">Weekly Summary Email</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Get a summary of your finances every week.
+                  </p>
+                </div>
+                <Switch id="weekly-summary" aria-label="Toggle weekly summary email" disabled />
+              </div>
+               <div className="flex items-center justify-between rounded-lg border p-4">
+                <div>
+                  <Label htmlFor="bill-reminders" className="font-medium">Bill Reminders</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Get reminders for upcoming bill payments.
+                  </p>
+                </div>
+                <Switch id="bill-reminders" aria-label="Toggle bill reminders" disabled />
+              </div>
+            </div>
+            
+            <div className="flex justify-end pt-4">
+              <Button disabled>
+                <Edit3 className="mr-2 h-4 w-4" /> Save Preferences
               </Button>
             </div>
           </CardContent>
