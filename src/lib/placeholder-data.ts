@@ -1,4 +1,5 @@
 
+import React from 'react';
 import type { Transaction, Budget, SummaryCardData } from '@/types';
 import { DollarSign, CreditCard, TrendingUp, Wallet, PiggyBank } from 'lucide-react';
 
@@ -41,7 +42,7 @@ export const dashboardSummaryData: SummaryCardData[] = [
     title: 'Total Income', 
     rawValue: julyIncome, 
     isCurrency: true,
-    icon: <DollarSign className="h-6 w-6 text-green-500" />, 
+    icon: React.createElement(DollarSign, { className: "h-6 w-6 text-green-500" }), 
     trend: '+10% this month', // Placeholder trend
     trendDirection: 'up' 
   },
@@ -49,7 +50,7 @@ export const dashboardSummaryData: SummaryCardData[] = [
     title: 'Total Expenses', 
     rawValue: julyExpenses, 
     isCurrency: true,
-    icon: <CreditCard className="h-6 w-6 text-red-500" />, 
+    icon: React.createElement(CreditCard, { className: "h-6 w-6 text-red-500" }), 
     trend: '-5% this month', // Placeholder trend
     trendDirection: 'down' 
   },
@@ -57,7 +58,7 @@ export const dashboardSummaryData: SummaryCardData[] = [
     title: 'Net Savings', 
     rawValue: julyNetSavings, 
     isCurrency: true,
-    icon: <TrendingUp className="h-6 w-6 text-primary" />, 
+    icon: React.createElement(TrendingUp, { className: "h-6 w-6 text-primary" }), 
     trend: 'Improving steadily', // Placeholder trend
     trendDirection: julyNetSavings >= 0 ? 'up' : 'down' 
   },
@@ -65,7 +66,7 @@ export const dashboardSummaryData: SummaryCardData[] = [
     title: 'Budget Left', 
     rawValue: julyBudgetLeft, 
     isCurrency: true,
-    icon: <PiggyBank className="h-6 w-6 text-accent" />, 
+    icon: React.createElement(PiggyBank, { className: "h-6 w-6 text-accent" }), 
     trend: `${sampleBudgets.filter(b => b.month === '2024-07' && b.spent <= b.allocated).length} budgets on track`, // Placeholder trend
     trendDirection: 'up' 
   },
