@@ -41,3 +41,7 @@ export type BudgetFormData = {
   allocated: number;
   month: string; // YYYY-MM format
 };
+
+// Note: The source of truth for Currency type is now in currency-context.tsx
+// This is just a comment for general reference.
+// type CurrencySetting = "USD" | "EUR" | "GBP" | "INR"; 

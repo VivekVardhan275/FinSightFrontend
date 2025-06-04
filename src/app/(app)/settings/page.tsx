@@ -17,7 +17,6 @@ import { useCurrency, type Currency as AppCurrency } from "@/contexts/currency-c
 
 type ThemeSetting = "light" | "dark" | "system";
 type FontSizeSetting = "small" | "medium" | "large";
-// type CurrencySetting = "USD" | "EUR" | "GBP"; // Replaced by AppCurrency from context
 
 const FONT_SIZE_CLASSES: Record<FontSizeSetting, string> = {
   small: "font-size-small",
@@ -43,10 +42,6 @@ export default function SettingsPage() {
   const [weeklySummary, setWeeklySummary] = useState(false);
   const [billReminders, setBillReminders] = useState(true);
 
-  // Regional - currency is now from context
-  // const [currency, setCurrencyState] = useState<AppCurrency>("USD"); // Use selectedCurrency from context
-
-
   // Load settings from localStorage on mount
   useEffect(() => {
     const storedTheme = localStorage.getItem("app-theme") as ThemeSetting | null;
@@ -71,7 +66,6 @@ export default function SettingsPage() {
     const storedBillReminders = localStorage.getItem("app-bill-reminders");
     if (storedBillReminders) setBillReminders(storedBillReminders === "true");
 
-    // Currency is loaded by CurrencyProvider, selectedCurrency from useCurrency() will be correct
   }, [theme]);
   
   // Apply theme from state
@@ -103,7 +97,6 @@ export default function SettingsPage() {
     localStorage.setItem("app-budget-alerts", String(budgetAlerts));
     localStorage.setItem("app-weekly-summary", String(weeklySummary));
     localStorage.setItem("app-bill-reminders", String(billReminders));
-    // Currency is saved by setSelectedCurrency in the context when changed
 
     setTheme(currentTheme);
 
@@ -244,13 +237,13 @@ export default function SettingsPage() {
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="INR">INR - Indian Rupee</SelectItem>
                   <SelectItem value="USD">USD - United States Dollar</SelectItem>
                   <SelectItem value="EUR">EUR - Euro</SelectItem>
                   <SelectItem value="GBP">GBP - British Pound</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            {/* Placeholders for Date Format, Number Format, Time Zone */}
             <p className="text-sm text-muted-foreground">Date format, number format, and time zone settings will be available in a future update.</p>
           </CardContent>
         </Card>

@@ -46,6 +46,7 @@ export function BalanceOverviewChart() {
     if (selectedCurrency === 'USD') symbol = '$';
     else if (selectedCurrency === 'EUR') symbol = '€';
     else if (selectedCurrency === 'GBP') symbol = '£';
+    else if (selectedCurrency === 'INR') symbol = '₹';
     
     return `${symbol}${kValue.toFixed(0)}k`;
   };
