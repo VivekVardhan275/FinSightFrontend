@@ -24,8 +24,6 @@ const FONT_SIZE_CLASSES: Record<FontSizeSetting, string> = {
   large: "font-size-large",
 };
 
-const COMPACT_MODE_CLASS = "compact-mode";
-
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
@@ -35,7 +33,6 @@ export default function SettingsPage() {
   // Appearance
   const [currentTheme, setCurrentTheme] = useState<ThemeSetting>("system");
   const [fontSize, setFontSize] = useState<FontSizeSetting>("medium");
-  const [compactMode, setCompactMode] = useState(false);
 
   // Notifications
   const [budgetAlerts, setBudgetAlerts] = useState(true);
@@ -54,9 +51,6 @@ export default function SettingsPage() {
     const storedFontSize = localStorage.getItem("app-font-size") as FontSizeSetting | null;
     if (storedFontSize) setFontSize(storedFontSize);
 
-    const storedCompactMode = localStorage.getItem("app-compact-mode");
-    if (storedCompactMode) setCompactMode(storedCompactMode === "true");
-
     const storedBudgetAlerts = localStorage.getItem("app-budget-alerts");
     if (storedBudgetAlerts) setBudgetAlerts(storedBudgetAlerts === "true");
 
@@ -74,26 +68,19 @@ export default function SettingsPage() {
   }, [currentTheme, setTheme]);
 
 
-  // Apply font size and compact mode classes
+  // Apply font size classes
   useEffect(() => {
     const htmlElement = document.documentElement;
     Object.values(FONT_SIZE_CLASSES).forEach(cls => htmlElement.classList.remove(cls));
     if (FONT_SIZE_CLASSES[fontSize]) {
       htmlElement.classList.add(FONT_SIZE_CLASSES[fontSize]);
     }
-
-    if (compactMode) {
-      htmlElement.classList.add(COMPACT_MODE_CLASS);
-    } else {
-      htmlElement.classList.remove(COMPACT_MODE_CLASS);
-    }
-  }, [fontSize, compactMode]);
+  }, [fontSize]);
 
   const handleSaveSettings = () => {
     // Save to localStorage
     localStorage.setItem("app-theme", currentTheme);
     localStorage.setItem("app-font-size", fontSize);
-    localStorage.setItem("app-compact-mode", String(compactMode));
     localStorage.setItem("app-budget-alerts", String(budgetAlerts));
     localStorage.setItem("app-weekly-summary", String(weeklySummary));
     localStorage.setItem("app-bill-reminders", String(billReminders));
@@ -162,16 +149,6 @@ export default function SettingsPage() {
                   <Label htmlFor="font-large" className="ml-2 cursor-pointer">Large</Label>
                 </div>
               </RadioGroup>
-            </div>
-            
-            <div className="flex items-center justify-between rounded-lg border p-4">
-              <div>
-                <Label htmlFor="compact-mode" className="font-medium">Compact Mode</Label>
-                <p className="text-xs text-muted-foreground">
-                  Reduce spacing for a more data-dense view.
-                </p>
-              </div>
-              <Switch id="compact-mode" checked={compactMode} onCheckedChange={setCompactMode} />
             </div>
           </CardContent>
         </Card>
@@ -254,7 +231,7 @@ export default function SettingsPage() {
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center font-headline">
-              <UserIcon className="mr-2 h-6 w-6 text-primary" />
+              <UserIconLucide className="mr-2 h-6 w-6 text-primary" />
                Account
             </CardTitle>
             <CardDescription>Manage your account details and security.</CardDescription>

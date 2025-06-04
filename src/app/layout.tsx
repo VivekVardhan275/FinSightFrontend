@@ -1,21 +1,19 @@
 "use client"; // Required for useEffect
 
-import type { Metadata } from 'next'; // Keep if you still want static metadata
-import { Inter } from 'next/font/google';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { ThemeProvider } from '@/components/theme-provider';
 import React, { useEffect } from 'react'; // Import useEffect
+import { Inter } from 'next/font/google';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
-// Font size and compact mode constants
+// Font size constants
 const FONT_SIZE_CLASSES = {
   small: "font-size-small",
   medium: "font-size-medium",
   large: "font-size-large",
 };
-const COMPACT_MODE_CLASS = "compact-mode";
 
 
 export default function RootLayout({
@@ -35,13 +33,6 @@ export default function RootLayout({
       htmlElement.classList.add(FONT_SIZE_CLASSES.medium); // Default
     }
 
-    // Apply compact mode
-    const storedCompactMode = localStorage.getItem("app-compact-mode");
-    if (storedCompactMode === "true") {
-      htmlElement.classList.add(COMPACT_MODE_CLASS);
-    } else {
-      htmlElement.classList.remove(COMPACT_MODE_CLASS);
-    }
   }, []);
 
   return (

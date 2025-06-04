@@ -97,13 +97,13 @@ body {
   html.font-size-small body {
     font-size: 14px; /* Corresponds to text-sm */
   }
-  html.font-size-small .text-xs { font-size: 11px !important; } /* Custom smaller than default text-xs */
-  html.font-size-small .text-sm { font-size: 12px !important; } /* Default text-xs */
-  html.font-size-small .text-base { font-size: 14px !important; } /* Default text-sm */
-  html.font-size-small .text-lg { font-size: 16px !important; } /* Default text-base */
-  html.font-size-small .text-xl { font-size: 18px !important; } /* Default text-lg */
-  html.font-size-small .text-2xl { font-size: 20px !important; } /* Default text-xl */
-  html.font-size-small .text-3xl { font-size: 22px !important; } /* Between text-xl and text-2xl */
+  html.font-size-small .text-xs { font-size: 11px !important; }
+  html.font-size-small .text-sm { font-size: 12px !important; }
+  html.font-size-small .text-base { font-size: 14px !important; }
+  html.font-size-small .text-lg { font-size: 16px !important; }
+  html.font-size-small .text-xl { font-size: 18px !important; }
+  html.font-size-small .text-2xl { font-size: 20px !important; }
+  html.font-size-small .text-3xl { font-size: 22px !important; }
 
 
   html.font-size-medium body {
@@ -114,40 +114,11 @@ body {
   html.font-size-large body {
     font-size: 18px; /* Corresponds to text-lg */
   }
-  html.font-size-large .text-xs { font-size: 14px !important; } /* Default text-sm */
-  html.font-size-large .text-sm { font-size: 16px !important; } /* Default text-base */
-  html.font-size-large .text-base { font-size: 18px !important; } /* Default text-lg */
-  html.font-size-large .text-lg { font-size: 20px !important; } /* Default text-xl */
-  html.font-size-large .text-xl { font-size: 22px !important; } /* Between text-xl and text-2xl */
-  html.font-size-large .text-2xl { font-size: 24px !important; } /* Default text-2xl */
-  html.font-size-large .text-3xl { font-size: 28px !important; } /* Between text-2xl and text-3xl */
-
-
-  /* Compact mode: directly applying CSS properties */
-  html.compact-mode .space-y-2 > :not([hidden]) ~ :not([hidden]) {
-    margin-top: 0.25rem; /* equivalent to space-y-1 */
-  }
-  html.compact-mode .space-y-4 > :not([hidden]) ~ :not([hidden]) {
-    margin-top: 0.5rem; /* equivalent to space-y-2 */
-  }
-  html.compact-mode .space-y-6 > :not([hidden]) ~ :not([hidden]) {
-    margin-top: 0.75rem; /* equivalent to space-y-3 */
-  }
-  html.compact-mode .space-y-8 > :not([hidden]) ~ :not([hidden]) {
-    margin-top: 1rem; /* equivalent to space-y-4 */
-  }
-  html.compact-mode .p-4 {
-    padding: 0.75rem; /* equivalent to p-3 */
-  }
-  html.compact-mode .p-6 {
-    padding: 1rem; /* equivalent to p-4 */
-  }
-  html.compact-mode .py-4 {
-    padding-top: 0.5rem; /* equivalent to py-2 */
-    padding-bottom: 0.5rem; /* equivalent to py-2 */
-  }
-  html.compact-mode .h-10 {
-    height: 2.25rem; /* equivalent to h-9 */
-  }
-  /* Add more specific selectors for compact mode as needed */
+  html.font-size-large .text-xs { font-size: 14px !important; }
+  html.font-size-large .text-sm { font-size: 16px !important; }
+  html.font-size-large .text-base { font-size: 18px !important; }
+  html.font-size-large .text-lg { font-size: 20px !important; }
+  html.font-size-large .text-xl { font-size: 22px !important; }
+  html.font-size-large .text-2xl { font-size: 24px !important; }
+  html.font-size-large .text-3xl { font-size: 28px !important; }
 }
