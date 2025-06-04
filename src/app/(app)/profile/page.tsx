@@ -30,11 +30,14 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (user) {
-      setDisplayName(user.name);
-      setInitialDisplayNameForEdit(user.name); 
-      // Phone number isn't in user object, so it defaults to empty or a placeholder
-      setPhoneNumber(""); // Default phone number
-      setInitialPhoneNumberForEdit("");
+      const initialName = user.name || "";
+      setDisplayName(initialName);
+      setInitialDisplayNameForEdit(initialName); 
+      
+      // Phone number isn't in user object, so it defaults to empty
+      const initialPhone = ""; // If user object could have phone: user.phone || "";
+      setPhoneNumber(initialPhone); 
+      setInitialPhoneNumberForEdit(initialPhone);
     }
   }, [user]);
 
@@ -84,6 +87,9 @@ export default function ProfilePage() {
       description: "Your personal information has been (simulated) saved.",
     });
     setIsEditingPersonalInfo(false);
+    // Update initial values for the next edit session
+    setInitialDisplayNameForEdit(displayName);
+    setInitialPhoneNumberForEdit(phoneNumber);
   };
 
   const handleSavePreferences = () => {
