@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useAuthState } from "@/hooks/use-auth-state";
-import { User as UserIcon, Mail, Edit3, BellRing, Palette } from "lucide-react";
+import { User as UserIcon, Mail, Edit3, BellRing, Palette, Save, XCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import React, { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -19,6 +19,10 @@ export default function ProfilePage() {
 
   const [displayName, setDisplayName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [isEditingPersonalInfo, setIsEditingPersonalInfo] = useState(false);
+  const [initialDisplayNameForEdit, setInitialDisplayNameForEdit] = useState("");
+  const [initialPhoneNumberForEdit, setInitialPhoneNumberForEdit] = useState("");
+
 
   const [budgetAlerts, setBudgetAlerts] = useState(true);
   const [weeklySummary, setWeeklySummary] = useState(false);
@@ -27,7 +31,10 @@ export default function ProfilePage() {
   useEffect(() => {
     if (user) {
       setDisplayName(user.name);
+      setInitialDisplayNameForEdit(user.name); 
       // Phone number isn't in user object, so it defaults to empty or a placeholder
+      setPhoneNumber(""); // Default phone number
+      setInitialPhoneNumberForEdit("");
     }
   }, [user]);
 
@@ -48,12 +55,25 @@ export default function ProfilePage() {
   }
 
   const getInitials = (name: string) => {
+    if (!name) return "";
     const names = name.split(' ');
     let initials = names[0].substring(0, 1).toUpperCase();
     if (names.length > 1) {
       initials += names[names.length - 1].substring(0, 1).toUpperCase();
     }
     return initials;
+  };
+
+  const handleEditPersonalInfo = () => {
+    setInitialDisplayNameForEdit(displayName);
+    setInitialPhoneNumberForEdit(phoneNumber);
+    setIsEditingPersonalInfo(true);
+  };
+
+  const handleCancelPersonalInfoEdit = () => {
+    setDisplayName(initialDisplayNameForEdit);
+    setPhoneNumber(initialPhoneNumberForEdit);
+    setIsEditingPersonalInfo(false);
   };
 
   const handleSaveChanges = () => {
@@ -63,6 +83,7 @@ export default function ProfilePage() {
       title: "Profile Updated",
       description: "Your personal information has been (simulated) saved.",
     });
+    setIsEditingPersonalInfo(false);
   };
 
   const handleSavePreferences = () => {
@@ -127,20 +148,43 @@ export default function ProfilePage() {
           <CardContent className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="fullName">Full Name</Label>
-              <Input id="fullName" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+              <Input 
+                id="fullName" 
+                value={displayName} 
+                onChange={(e) => setDisplayName(e.target.value)} 
+                readOnly={!isEditingPersonalInfo}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email Address</Label>
-              <Input id="email" type="email" defaultValue={user.email} readOnly />
+              <Input id="email" type="email" value={user.email} readOnly />
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Phone Number (Optional)</Label>
-              <Input id="phone" type="tel" placeholder="e.g., (123) 456-7890" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} />
+              <Input 
+                id="phone" 
+                type="tel" 
+                placeholder="e.g., (123) 456-7890" 
+                value={phoneNumber} 
+                onChange={(e) => setPhoneNumber(e.target.value)} 
+                readOnly={!isEditingPersonalInfo}
+              />
             </div>
-            <div className="flex justify-end">
-              <Button onClick={handleSaveChanges}>
-                <Edit3 className="mr-2 h-4 w-4" /> Save Changes
-              </Button>
+            <div className="flex justify-end space-x-2">
+              {isEditingPersonalInfo ? (
+                <>
+                  <Button variant="outline" onClick={handleCancelPersonalInfoEdit}>
+                    <XCircle className="mr-2 h-4 w-4" /> Cancel
+                  </Button>
+                  <Button onClick={handleSaveChanges}>
+                    <Save className="mr-2 h-4 w-4" /> Save Changes
+                  </Button>
+                </>
+              ) : (
+                <Button onClick={handleEditPersonalInfo}>
+                  <Edit3 className="mr-2 h-4 w-4" /> Edit Info
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -203,5 +247,4 @@ export default function ProfilePage() {
       </motion.div>
     </div>
   );
-
-    
+}
