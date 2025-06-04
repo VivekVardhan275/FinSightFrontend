@@ -50,13 +50,14 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center bg-gradient-to-br from-background to-secondary p-4">
-      <main className="flex flex-1 flex-col items-center justify-center">
+      <main className="flex flex-1 flex-col items-center justify-center w-full">
         <motion.div
           initial={{ opacity: 0, y: -20, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
+          className="w-full max-w-md"
         >
-          <Card className="w-full max-w-md shadow-2xl">
+          <Card className="shadow-2xl">
             <CardHeader className="text-center">
               <div className="mb-4 flex items-center justify-center space-x-2">
                 <AppLogo className="h-12 w-12 text-primary" />
@@ -65,7 +66,7 @@ export default function LoginPage() {
               <CardTitle className="font-headline text-2xl mb-2">Welcome Back</CardTitle>
               <CardDescription>Sign in to manage your finances and forecast your financial future.</CardDescription>
             </CardHeader>
-            <CardContent className="py-12 space-y-4">
+            <CardContent className="py-16 space-y-4">
               <Button 
                 onClick={login} 
                 className="w-full transition-all hover:shadow-lg hover:scale-105" 
