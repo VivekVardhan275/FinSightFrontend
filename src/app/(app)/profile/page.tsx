@@ -101,6 +101,13 @@ export default function ProfilePage() {
     });
   };
 
+  const handleEmailClick = () => {
+    toast({
+      title: "Email Address",
+      description: "Your email address cannot be changed.",
+    });
+  };
+
   return (
     <div className="space-y-8">
       <motion.div 
@@ -163,7 +170,14 @@ export default function ProfilePage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email Address</Label>
-              <Input id="email" type="email" value={user.email} readOnly />
+              <Input 
+                id="email" 
+                type="email" 
+                value={user.email} 
+                readOnly 
+                onClick={handleEmailClick}
+                className="cursor-not-allowed"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Phone Number (Optional)</Label>
