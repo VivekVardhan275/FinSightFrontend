@@ -18,32 +18,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-// import { motion } from "framer-motion"; // Removed Framer Motion
 import { useBudgetContext } from '@/contexts/budget-context';
 import { useTransactionContext } from '@/contexts/transaction-context';
 
-// const listVariants = {
-//   hidden: { opacity: 0 },
-//   visible: {
-//     opacity: 1,
-//     transition: {
-//       staggerChildren: 0.1,
-//     },
-//   },
-// };
-
-// const itemVariants = {
-//   hidden: { opacity: 0, y: 20, scale: 0.98 },
-//   visible: {
-//     opacity: 1,
-//     y: 0,
-//     scale: 1,
-//     transition: {
-//       duration: 0.4,
-//       ease: "easeOut",
-//     },
-//   },
-// };
 
 export default function BudgetsPage() {
   const { budgets, addBudget, updateBudget, deleteBudget: deleteBudgetFromContext, updateBudgetSpentAmount } = useBudgetContext();
@@ -84,26 +61,61 @@ export default function BudgetsPage() {
   };
 
   const handleSaveBudget = useCallback((budgetDataFromForm: Omit<Budget, 'id' | 'spent'> | Budget) => {
+    const newBudgetCategoryLower = budgetDataFromForm.category.toLowerCase();
+    const newBudgetMonth = budgetDataFromForm.month;
+
+    const isDuplicate = budgets.some(existingBudget => {
+      // If we are editing and existingBudget is the one being edited, don't consider it a duplicate of itself.
+      if ('id' in budgetDataFromForm && existingBudget.id === (budgetDataFromForm as Budget).id) {
+        return false; 
+      }
+      return existingBudget.category.toLowerCase() === newBudgetCategoryLower &&
+             existingBudget.month === newBudgetMonth;
+    });
+
+    if (isDuplicate) {
+      addNotification({
+        title: "Duplicate Budget",
+        description: `A budget for ${budgetDataFromForm.category} in ${newBudgetMonth} already exists or matches another budget.`,
+        type: "error",
+      });
+      setIsFormOpen(false); 
+      return; 
+    }
+    
     let savedCategory = "";
     let savedBudget: Budget;
     let notificationAction = "Added";
+    let isActuallyAnEditOperationBudget = false;
 
-    const formHasId = 'id' in budgetDataFromForm && typeof (budgetDataFromForm as Budget).id === 'string';
-    const existingBudgetInContext = formHasId ? budgets.find(b => b.id === (budgetDataFromForm as Budget).id) : undefined;
+    if ('id' in budgetDataFromForm && (budgetDataFromForm as Budget).id) {
+        const existingBudget = budgets.find(b => b.id === (budgetDataFromForm as Budget).id);
+        if (existingBudget) {
+            isActuallyAnEditOperationBudget = true;
+        }
+    }
 
-    if (formHasId && existingBudgetInContext) {
+    if (isActuallyAnEditOperationBudget) {
       notificationAction = "Updated";
       const budgetToUpdate: Budget = {
-        ...existingBudgetInContext,
+        // Ensure we merge with existing context data if some fields aren't on budgetDataFromForm (like 'spent')
+        ...budgets.find(b => b.id === (budgetDataFromForm as Budget).id)!, 
         ...(budgetDataFromForm as Budget), 
       };
       updateBudget(budgetToUpdate); 
       savedBudget = budgetToUpdate;
     } else {
-      savedBudget = addBudget(budgetDataFromForm as Omit<Budget, 'id' | 'spent'>);
+      // The budgetDataFromForm for a new budget from dialog already has an ID.
+      // The context's addBudget expects Omit<Budget, 'id' | 'spent'>.
+      const { id, spent, ...newBudgetData } = budgetDataFromForm as Budget; // Remove form-generated id and spent
+      savedBudget = addBudget(newBudgetData); // Context addBudget will assign new ID and spent:0
     }
     
     savedCategory = savedBudget.category;
+    // Ensure spent amount is updated using *all* transactions, not just the 'transactions' from this page's scope
+    // which might be stale if this is called from a different context or if transactions were updated elsewhere.
+    // The updateBudgetSpentAmount function in the context should ideally use the transactions from its own context.
+    // For now, assuming 'transactions' here is up-to-date enough for this immediate action.
     updateBudgetSpentAmount(savedBudget.id, transactions); 
 
     addNotification({
@@ -112,7 +124,8 @@ export default function BudgetsPage() {
         type: 'success',
         href: '/budgets'
       });
-  }, [budgets, transactions, addBudget, updateBudget, updateBudgetSpentAmount, addNotification]);
+    setIsFormOpen(false); // Ensure form closes on successful save
+  }, [budgets, transactions, addBudget, updateBudget, updateBudgetSpentAmount, addNotification, setIsFormOpen]);
 
 
   return (
@@ -148,7 +161,6 @@ export default function BudgetsPage() {
               budget={budget}
               onEdit={handleEditBudget}
               onDelete={confirmDeleteBudget}
-              // variants={itemVariants} // Removed variants
             />
           ))}
         </div>

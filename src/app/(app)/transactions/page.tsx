@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useTransactionContext } from '@/contexts/transaction-context';
 import { useBudgetContext } from '@/contexts/budget-context';
+import { format } from 'date-fns';
 
 
 export default function TransactionsPage() {
@@ -48,7 +49,6 @@ export default function TransactionsPage() {
     });
     
     affectedBudgets.forEach(budget => {
-      // Pass all transactions for recalculation, updateBudgetSpentAmount will filter internally
       updateBudgetSpentAmount(budget.id, transactions); 
     });
   };
@@ -79,10 +79,8 @@ export default function TransactionsPage() {
         type: "info",
       });
       if (transactionToDelete) {
-        // Create a temporary list of transactions *without* the deleted one for accurate recalculation
         const remainingTransactions = transactions.filter(t => t.id !== transactionToDeleteId);
         
-        // Refresh affected budgets based on the state *after* deletion.
         const transactionDate = new Date(transactionToDelete.date);
         const year = transactionDate.getFullYear();
         const month = transactionDate.getMonth() + 1;
@@ -105,39 +103,92 @@ export default function TransactionsPage() {
   };
 
   const handleSaveTransaction = (transactionData: Omit<Transaction, 'id'> | Transaction) => {
-    let isEditing = false;
+    const formTxDate = transactionData.date; // This is already "yyyy-MM-dd" string from dialog
+    const formTxDescriptionLower = transactionData.description.toLowerCase();
+    const formTxCategoryLower = transactionData.category.toLowerCase();
+    const formTxAmount = transactionData.amount; // This is in USD
+    const formTxType = transactionData.type;
+
+    const isDuplicate = transactions.some(existingTx => {
+      // If we are editing and existingTx is the one being edited, don't consider it a duplicate of itself.
+      if ('id' in transactionData && existingTx.id === (transactionData as Transaction).id) {
+        return false; 
+      }
+      return existingTx.date === formTxDate &&
+             existingTx.description.toLowerCase() === formTxDescriptionLower &&
+             existingTx.category.toLowerCase() === formTxCategoryLower &&
+             existingTx.amount === formTxAmount && 
+             existingTx.type === formTxType;
+    });
+
+    if (isDuplicate) {
+      addNotification({
+        title: "Duplicate Data",
+        description: "This transaction's details match an existing transaction.",
+        type: "error",
+      });
+      setIsFormOpen(false); 
+      return; 
+    }
+
+    let isEditingOperation = false;
     let savedDescription = "";
     let savedTransaction: Transaction;
     let originalTransactionForEdit: Transaction | undefined = undefined;
 
-    if ('id' in transactionData && transactions.some(t => t.id === transactionData.id)) { 
-      originalTransactionForEdit = transactions.find(t => t.id === transactionData.id);
+    if ('id' in transactionData) {
+        const existingTxFromContext = transactions.find(t => t.id === (transactionData as Transaction).id);
+        if (existingTxFromContext) {
+            isEditingOperation = true;
+            originalTransactionForEdit = existingTxFromContext;
+        }
+    }
+    
+    if (isEditingOperation) {
       updateTransaction(transactionData as Transaction);
-      isEditing = true;
       savedDescription = (transactionData as Transaction).description;
       savedTransaction = transactionData as Transaction;
     } else { 
-      savedTransaction = addTransaction(transactionData as Omit<Transaction, 'id'>);
+      // The ID is already added in the dialog for new transactions too.
+      // So addTransaction should just take the Transaction object.
+      // However, the context's addTransaction expects Omit<Transaction, 'id'>
+      // Let's ensure the object passed to addTransaction doesn't have an 'id' if it's truly new
+      // or let the context's addTransaction assign it.
+      // For now, assuming transactionData might come with a new ID from dialog.
+      // If addTransaction in context assigns ID, then we might need to adjust dialog or context.
+      // The current TransactionFormDialog generates an ID if it's a new tx.
+      // So, if it's not an edit, we can assume transactionData is a full Transaction object with a *new* ID.
+      // The context's addTransaction should be robust to this, or we use a different pathway.
+
+      // Let's modify the context's addTransaction to accept a full Transaction object with a pre-generated ID
+      // or adjust here. For now, assume addTransaction in context handles it or generates one if not present.
+      // The simplest is that `addTransaction` takes Omit<Transaction, 'id'>.
+      // But our dialog creates an ID. So, we should pass the full object if the ID is indeed new.
+
+      // If it's not an editing operation, it's an add.
+      // The `addTransaction` in context expects `Omit<Transaction, 'id'>` and generates its own ID.
+      // So we need to pass `transactionData` without its pre-generated ID from the form.
+      const { id, ...newTxData } = transactionData as Transaction; // remove the form-generated ID for new TX
+      savedTransaction = addTransaction(newTxData); // context addTransaction will assign a new ID
       savedDescription = savedTransaction.description;
+
     }
 
     addNotification({
-      title: `Transaction ${isEditing ? 'Updated' : 'Added'}`,
-      description: `${savedDescription} successfully ${isEditing ? 'updated' : 'added'}.`,
+      title: `Transaction ${isEditingOperation ? 'Updated' : 'Added'}`,
+      description: `${savedDescription} successfully ${isEditingOperation ? 'updated' : 'added'}.`,
       type: "success",
       href: "/transactions"
     });
+    setIsFormOpen(false); // Ensure form closes on successful save too
 
-    // For accurate recalculation after save, especially if category/date changed during edit
-    const updatedTransactionsList = isEditing 
-      ? transactions.map(t => t.id === savedTransaction.id ? savedTransaction : t)
-      : [savedTransaction, ...transactions];
-
-    // Refresh budgets potentially affected by the old state of an edited transaction
-    if (isEditing && originalTransactionForEdit && 
+    const updatedTransactionsList = transactions.map(t => t.id === savedTransaction.id ? savedTransaction : t);
+    
+    if (isEditingOperation && originalTransactionForEdit && 
         (originalTransactionForEdit.category.toLowerCase() !== savedTransaction.category.toLowerCase() || 
          originalTransactionForEdit.date.substring(0,7) !== savedTransaction.date.substring(0,7) ||
-         originalTransactionForEdit.type !== savedTransaction.type )
+         originalTransactionForEdit.type !== savedTransaction.type ||
+         originalTransactionForEdit.amount !== savedTransaction.amount)
        ) {
       const oldTransactionDate = new Date(originalTransactionForEdit.date);
       const oldYear = oldTransactionDate.getFullYear();
@@ -155,21 +206,10 @@ export default function TransactionsPage() {
       });
     }
     
-    // Refresh budgets affected by the new/current state of the transaction
     refreshAffectedBudgets(savedTransaction); 
   };
   
-  useEffect(() => {
-    // This effect ensures that if transactions are loaded/changed externally, budgets are updated.
-    // This might be too broad if transactions change very frequently from other sources.
-    // For user-driven changes, refreshAffectedBudgets is more targeted.
-    budgets.forEach(budget => {
-        updateBudgetSpentAmount(budget.id, transactions);
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transactions]); // Removed budgets and updateBudgetSpentAmount to prevent loops; only react to transactions changing.
-
-  const columns = useMemo(() => getColumns(handleEditTransaction, confirmDeleteTransaction), [transactions, budgets]);
+  const columns = useMemo(() => getColumns(handleEditTransaction, confirmDeleteTransaction), [transactions, budgets]); //eslint-disable-line react-hooks/exhaustive-deps
 
 
   return (
