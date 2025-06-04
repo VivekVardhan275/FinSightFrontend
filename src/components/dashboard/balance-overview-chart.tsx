@@ -1,3 +1,4 @@
+
 "use client"
 
 import { TrendingUp } from "lucide-react"
@@ -29,7 +30,7 @@ const chartConfig = {
 
 export function BalanceOverviewChart() {
   return (
-    <Card className="shadow-lg transition-all hover:shadow-xl animate-in fade-in-50 zoom-in-95 duration-300 delay-100">
+    <Card className="shadow-lg transition-shadow hover:shadow-xl h-full">
       <CardHeader>
         <CardTitle className="font-headline">Balance Overview</CardTitle>
         <CardDescription>Your account balance over the last 6 months.</CardDescription>
@@ -67,6 +68,7 @@ export function BalanceOverviewChart() {
               stroke="var(--color-balance)"
               strokeWidth={3}
               dot={true}
+              animationDuration={800}
             />
           </LineChart>
         </ChartContainer>

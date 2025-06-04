@@ -1,8 +1,9 @@
+
 "use client";
 
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, Target } from "lucide-react";
 import { sampleBudgets } from "@/lib/placeholder-data";
 import type { Budget } from "@/types";
 import { BudgetCard } from '@/components/budgets/budget-card';
@@ -18,6 +19,30 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { motion } from "framer-motion";
+
+const listVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20, scale: 0.98 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.4,
+      ease: "easeOut",
+    },
+  },
+};
 
 export default function BudgetsPage() {
   const [budgets, setBudgets] = useState<Budget[]>(sampleBudgets);
@@ -68,28 +93,55 @@ export default function BudgetsPage() {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-headline text-3xl font-bold tracking-tight">Budgets</h1>
-          <p className="text-muted-foreground">Set and track your monthly spending goals.</p>
+          <motion.h1 
+            initial={{ opacity: 0, x: -20 }} 
+            animate={{ opacity: 1, x: 0 }} 
+            transition={{ duration: 0.5 }}
+            className="font-headline text-3xl font-bold tracking-tight"
+          >
+            Budgets
+          </motion.h1>
+          <motion.p 
+            initial={{ opacity: 0, x: -20 }} 
+            animate={{ opacity: 1, x: 0 }} 
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="text-muted-foreground"
+          >
+            Set and track your monthly spending goals.
+          </motion.p>
         </div>
-        <Button onClick={handleAddBudget} className="animate-in fade-in duration-300">
-          <PlusCircle className="mr-2 h-5 w-5" />
-          Add Budget
-        </Button>
+        <motion.div initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3, delay: 0.2 }}>
+          <Button onClick={handleAddBudget}>
+            <PlusCircle className="mr-2 h-5 w-5" />
+            Add Budget
+          </Button>
+        </motion.div>
       </div>
 
       {budgets.length > 0 ? (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {budgets.map((budget) => (
+        <motion.div 
+          className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
+          variants={listVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          {budgets.map((budget, index) => (
             <BudgetCard 
               key={budget.id} 
               budget={budget} 
               onEdit={handleEditBudget} 
-              onDelete={confirmDeleteBudget} 
+              onDelete={confirmDeleteBudget}
+              variants={itemVariants}
             />
           ))}
-        </div>
+        </motion.div>
       ) : (
-        <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/30 p-12 text-center">
+        <motion.div 
+          className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/30 p-12 text-center"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+        >
             <Target className="mx-auto h-12 w-12 text-muted-foreground" />
             <h3 className="mt-4 text-xl font-semibold">No budgets yet</h3>
             <p className="mb-4 mt-2 text-sm text-muted-foreground">
@@ -98,7 +150,7 @@ export default function BudgetsPage() {
             <Button onClick={handleAddBudget}>
               <PlusCircle className="mr-2 h-4 w-4" /> Create Budget
             </Button>
-        </div>
+        </motion.div>
       )}
       
       <BudgetFormDialog

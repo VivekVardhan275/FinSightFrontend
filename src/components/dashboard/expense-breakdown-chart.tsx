@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -51,7 +52,7 @@ export function ExpenseBreakdownChart() {
   }, [])
 
   return (
-    <Card className="flex flex-col shadow-lg transition-all hover:shadow-xl animate-in fade-in-50 zoom-in-95 duration-300 delay-200">
+    <Card className="flex flex-col shadow-lg transition-shadow hover:shadow-xl h-full">
       <CardHeader className="items-center pb-0">
         <CardTitle className="font-headline">Expense Breakdown</CardTitle>
         <CardDescription>Current month's expenses by category</CardDescription>
@@ -69,6 +70,8 @@ export function ExpenseBreakdownChart() {
               nameKey="category"
               innerRadius={60}
               strokeWidth={5}
+              animationDuration={800}
+              animationBegin={200}
             >
               {chartData.map((entry) => (
                 <Cell key={entry.category} fill={entry.fill} />

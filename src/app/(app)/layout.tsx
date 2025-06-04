@@ -1,3 +1,4 @@
+
 "use client";
 
 import { AppLogo } from "@/components/icons";
@@ -18,8 +19,9 @@ import {
 import { useAuthState } from "@/hooks/use-auth-state";
 import { Bell, Search } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import React, { useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function AuthenticatedAppLayout({
   children,
@@ -28,6 +30,7 @@ export default function AuthenticatedAppLayout({
 }) {
   const { user, isLoading } = useAuthState();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -84,9 +87,18 @@ export default function AuthenticatedAppLayout({
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
-          {children}
-        </main>
+        <AnimatePresence mode="wait">
+          <motion.main
+            key={pathname}
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.25 }}
+            className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8"
+          >
+            {children}
+          </motion.main>
+        </AnimatePresence>
       </SidebarInset>
     </SidebarProvider>
   );
