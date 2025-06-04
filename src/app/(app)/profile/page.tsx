@@ -9,11 +9,18 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuthState } from "@/hooks/use-auth-state";
-import { User as UserIcon, Mail, Edit3, BellRing, Palette, Save, XCircle, CalendarDays } from "lucide-react";
+import { User as UserIcon, Mail, Edit3, BellRing, Palette, Save, XCircle, CalendarDays, Phone } from "lucide-react";
 import { motion } from "framer-motion";
 import React, { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
+
+const ReadOnlyFieldDisplay = ({ value, placeholder = "Not set" }: { value: string | null | undefined, placeholder?: string }) => (
+  <div className="flex h-10 w-full items-center rounded-md border border-transparent bg-transparent px-3 py-2 text-sm">
+    {value || <span className="text-muted-foreground">{placeholder}</span>}
+  </div>
+);
 
 export default function ProfilePage() {
   const { user, isLoading } = useAuthState();
@@ -40,15 +47,16 @@ export default function ProfilePage() {
       setDisplayName(initialName);
       setInitialDisplayNameForEdit(initialName); 
       
-      const initialPhone = ""; 
+      // Assuming these are not part of the initial user object from useAuthState
+      const initialPhone = ""; // Load from user profile data if available
       setPhoneNumber(initialPhone); 
       setInitialPhoneNumberForEdit(initialPhone);
 
-      const initialDob = ""; 
+      const initialDob = ""; // Load from user profile data if available
       setDateOfBirth(initialDob);
       setInitialDateOfBirthForEdit(initialDob);
 
-      const initialGen = ""; 
+      const initialGen = ""; // Load from user profile data if available
       setGender(initialGen);
       setInitialGenderForEdit(initialGen);
     }
@@ -97,12 +105,14 @@ export default function ProfilePage() {
   };
 
   const handleSaveChanges = () => {
+    // In a real app, you would save these to a backend.
     console.log("Saving profile:", { displayName, phoneNumber, dateOfBirth, gender });
     toast({
       title: "Profile Updated",
       description: "Your personal information has been (simulated) saved.",
     });
     setIsEditingPersonalInfo(false);
+    // Update initial values for next edit session
     setInitialDisplayNameForEdit(displayName);
     setInitialPhoneNumberForEdit(phoneNumber);
     setInitialDateOfBirthForEdit(dateOfBirth);
@@ -110,18 +120,24 @@ export default function ProfilePage() {
   };
 
   const handleSavePreferences = () => {
+    // In a real app, you would save these to a backend.
     console.log("Saving preferences:", { budgetAlerts, weeklySummary, billReminders });
     toast({
       title: "Preferences Updated",
       description: "Your application preferences have been (simulated) saved.",
     });
   };
-
+  
   const handleEmailClick = () => {
     toast({
       title: "Email Address",
       description: "Your email address cannot be changed.",
     });
+  };
+
+  const getFormattedGender = (genderValue: string) => {
+    if (!genderValue) return "";
+    return genderValue.charAt(0).toUpperCase() + genderValue.slice(1).replace(/_/g, " ");
   };
 
   return (
@@ -158,7 +174,7 @@ export default function ProfilePage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">
-            <Button variant="outline" disabled>
+            <Button variant="outline" disabled> {/* Kept disabled as per previous behavior */}
               <Edit3 className="mr-2 h-4 w-4" /> Edit Profile Picture
             </Button>
           </CardContent>
@@ -177,45 +193,60 @@ export default function ProfilePage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="fullName">Full Name</Label>
-              <Input 
-                id="fullName" 
-                value={displayName} 
-                onChange={(e) => setDisplayName(e.target.value)} 
-                readOnly={!isEditingPersonalInfo}
-              />
+              {isEditingPersonalInfo ? (
+                <Input 
+                  id="fullName" 
+                  value={displayName} 
+                  onChange={(e) => setDisplayName(e.target.value)}
+                />
+              ) : (
+                <ReadOnlyFieldDisplay value={displayName} placeholder="Enter your full name" />
+              )}
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="email">Email Address</Label>
-              <Input 
-                id="email" 
-                type="email" 
-                value={user.email} 
-                readOnly 
+              <div
+                id="email"
                 onClick={handleEmailClick}
-                className="cursor-not-allowed"
-              />
+                className={cn(
+                  "flex h-10 w-full items-center rounded-md border border-transparent bg-transparent px-3 py-2 text-sm",
+                  "cursor-not-allowed"
+                )}
+              >
+                {user.email}
+              </div>
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number (Optional)</Label>
-              <Input 
-                id="phone" 
-                type="tel" 
-                placeholder="e.g., (123) 456-7890" 
-                value={phoneNumber} 
-                onChange={(e) => setPhoneNumber(e.target.value)} 
-                readOnly={!isEditingPersonalInfo}
-              />
+              <Label htmlFor="phone">Phone Number</Label>
+              {isEditingPersonalInfo ? (
+                <Input 
+                  id="phone" 
+                  type="tel" 
+                  placeholder="e.g., (123) 456-7890" 
+                  value={phoneNumber} 
+                  onChange={(e) => setPhoneNumber(e.target.value)} 
+                />
+              ) : (
+                <ReadOnlyFieldDisplay value={phoneNumber} placeholder="Add phone number" />
+              )}
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="dateOfBirth">Date of Birth</Label>
-              <Input 
-                id="dateOfBirth" 
-                type="date" 
-                value={dateOfBirth} 
-                onChange={(e) => setDateOfBirth(e.target.value)} 
-                readOnly={!isEditingPersonalInfo}
-              />
+              {isEditingPersonalInfo ? (
+                <Input 
+                  id="dateOfBirth" 
+                  type="date" 
+                  value={dateOfBirth} 
+                  onChange={(e) => setDateOfBirth(e.target.value)} 
+                />
+              ) : (
+                 <ReadOnlyFieldDisplay value={dateOfBirth ? new Date(dateOfBirth + 'T00:00:00').toLocaleDateString('en-CA') : null} placeholder="Select date of birth" />
+              )}
             </div>
+            
             <div className="space-y-2">
               <Label htmlFor="gender">Gender</Label>
               {isEditingPersonalInfo ? (
@@ -231,14 +262,11 @@ export default function ProfilePage() {
                   </SelectContent>
                 </Select>
               ) : (
-                <Input 
-                  id="gender" 
-                  value={gender ? gender.charAt(0).toUpperCase() + gender.slice(1).replace(/_/g, " ") : "Not set"} 
-                  readOnly 
-                />
+                <ReadOnlyFieldDisplay value={getFormattedGender(gender)} placeholder="Select gender" />
               )}
             </div>
-            <div className="pt-2"> {/* Added padding top for visual separation from fields */}
+
+            <div className="pt-2">
               <Separator className="mb-4" />
               <div className="flex justify-end space-x-2">
                 {isEditingPersonalInfo ? (
@@ -319,3 +347,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+
