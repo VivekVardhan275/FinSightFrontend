@@ -13,6 +13,7 @@ import { User as UserIcon, Mail, Edit3, BellRing, Palette, Save, XCircle, Calend
 import { motion } from "framer-motion";
 import React, { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { Separator } from "@/components/ui/separator";
 
 export default function ProfilePage() {
   const { user, isLoading } = useAuthState();
@@ -43,11 +44,11 @@ export default function ProfilePage() {
       setPhoneNumber(initialPhone); 
       setInitialPhoneNumberForEdit(initialPhone);
 
-      const initialDob = ""; // Example: "1990-01-01" if available from backend
+      const initialDob = ""; 
       setDateOfBirth(initialDob);
       setInitialDateOfBirthForEdit(initialDob);
 
-      const initialGen = ""; // Example: "male" if available
+      const initialGen = ""; 
       setGender(initialGen);
       setInitialGenderForEdit(initialGen);
     }
@@ -165,7 +166,7 @@ export default function ProfilePage() {
 
         <Card className="md:col-span-2 shadow-lg">
           <CardHeader>
-            <CardTitle className="flex items-center">
+            <CardTitle className="flex items-center font-headline">
               <UserIcon className="mr-2 h-6 w-6 text-primary" />
               Personal Information
             </CardTitle>
@@ -173,7 +174,7 @@ export default function ProfilePage() {
               Update your personal details here.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="fullName">Full Name</Label>
               <Input 
@@ -232,26 +233,29 @@ export default function ProfilePage() {
               ) : (
                 <Input 
                   id="gender" 
-                  value={gender ? gender.charAt(0).toUpperCase() + gender.slice(1).replace("_", " ") : "Not set"} 
+                  value={gender ? gender.charAt(0).toUpperCase() + gender.slice(1).replace(/_/g, " ") : "Not set"} 
                   readOnly 
                 />
               )}
             </div>
-            <div className="flex justify-end space-x-2">
-              {isEditingPersonalInfo ? (
-                <>
-                  <Button variant="outline" onClick={handleCancelPersonalInfoEdit}>
-                    <XCircle className="mr-2 h-4 w-4" /> Cancel
+            <div className="pt-2"> {/* Added padding top for visual separation from fields */}
+              <Separator className="mb-4" />
+              <div className="flex justify-end space-x-2">
+                {isEditingPersonalInfo ? (
+                  <>
+                    <Button variant="outline" onClick={handleCancelPersonalInfoEdit}>
+                      <XCircle className="mr-2 h-4 w-4" /> Cancel
+                    </Button>
+                    <Button onClick={handleSaveChanges}>
+                      <Save className="mr-2 h-4 w-4" /> Save Changes
+                    </Button>
+                  </>
+                ) : (
+                  <Button onClick={handleEditPersonalInfo}>
+                    <Edit3 className="mr-2 h-4 w-4" /> Edit Info
                   </Button>
-                  <Button onClick={handleSaveChanges}>
-                    <Save className="mr-2 h-4 w-4" /> Save Changes
-                  </Button>
-                </>
-              ) : (
-                <Button onClick={handleEditPersonalInfo}>
-                  <Edit3 className="mr-2 h-4 w-4" /> Edit Info
-                </Button>
-              )}
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -264,7 +268,7 @@ export default function ProfilePage() {
       >
         <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle className="flex items-center">
+            <CardTitle className="flex items-center font-headline">
               <BellRing className="mr-2 h-6 w-6 text-primary" />
               Preferences
             </CardTitle>
@@ -315,5 +319,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
-    
