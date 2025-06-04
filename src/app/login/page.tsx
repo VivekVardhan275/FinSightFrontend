@@ -43,7 +43,7 @@ export default function LoginPage() {
                 <AppLogo className="h-12 w-12 text-primary" />
                 <h1 className="font-headline text-4xl font-bold text-primary">Foresight Finance</h1>
               </div>
-              <CardTitle className="font-headline text-2xl">Welcome Back</CardTitle>
+              <CardTitle className="font-headline text-2xl mb-2">Welcome Back</CardTitle>
               <CardDescription>Sign in to manage your finances and forecast your financial future.</CardDescription>
             </CardHeader>
             <CardContent className="py-12">
