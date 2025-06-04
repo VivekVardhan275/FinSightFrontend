@@ -13,8 +13,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggleButton } from "@/components/ui/theme-toggle-button";
-import { useAuthState, type User } from "@/hooks/use-auth-state";
-import { CreditCard, LogOut, Settings, User as UserIcon } from "lucide-react";
+import { useAuthState } from "@/hooks/use-auth-state";
+import { LogOut, Settings, User as UserIcon } from "lucide-react";
+import Link from "next/link";
 
 export function UserNav() {
   const { user, logout } = useAuthState();
@@ -55,13 +56,17 @@ export function UserNav() {
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
-            <DropdownMenuItem>
-              <UserIcon className="mr-2 h-4 w-4" />
-              <span>Profile</span>
+            <DropdownMenuItem asChild>
+              <Link href="/profile">
+                <UserIcon className="mr-2 h-4 w-4" />
+                <span>Profile</span>
+              </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Settings className="mr-2 h-4 w-4" />
-              <span>Settings</span>
+            <DropdownMenuItem asChild>
+              <Link href="/settings">
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Settings</span>
+              </Link>
             </DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
