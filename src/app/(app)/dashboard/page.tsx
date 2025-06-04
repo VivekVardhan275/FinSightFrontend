@@ -36,7 +36,7 @@ const calculatePercentageChange = (current: number, previous: number): number | 
   return ((current - previous) / Math.abs(previous)) * 100;
 };
 
-const formatTrendText = (percentage: number | null, type: "income" | "expense"): string => {
+const formatTrendText = (percentage: number | null, type: "income" | "expense" | "savings"): string => {
   if (percentage === null || isNaN(percentage)) return "Data unavailable";
   if (percentage === Infinity) return `Increased (was 0)`;
   if (percentage === -Infinity) return `Decreased (was 0)`;
@@ -96,21 +96,9 @@ export default function DashboardPage() {
     const currentMonthNetSavings = currentMonthTotalIncome - currentMonthTotalExpenses;
     const previousMonthNetSavings = previousMonthTotalIncome - previousMonthTotalExpenses;
     
-    let netSavingsTrendText = "Data unavailable";
-    let netSavingsTrendDirection: 'up' | 'down' = 'up';
-
-    if (currentMonthTransactions.length > 0 || previousMonthTransactions.length > 0) {
-        if (currentMonthNetSavings > previousMonthNetSavings) {
-            netSavingsTrendText = "Improved from last month";
-            netSavingsTrendDirection = 'up';
-        } else if (currentMonthNetSavings < previousMonthNetSavings) {
-            netSavingsTrendText = "Declined from last month";
-            netSavingsTrendDirection = 'down';
-        } else {
-            netSavingsTrendText = "No change from last month";
-            netSavingsTrendDirection = 'up'; // Neutral, icon can be up
-        }
-    }
+    const netSavingsPercentageChange = calculatePercentageChange(currentMonthNetSavings, previousMonthNetSavings);
+    const netSavingsTrendText = formatTrendText(netSavingsPercentageChange, "savings");
+    const netSavingsTrendDirection: 'up' | 'down' = (netSavingsPercentageChange === null || netSavingsPercentageChange >= 0) ? 'up' : 'down';
 
 
     const currentMonthBudgets = budgets.filter(b => {
@@ -119,17 +107,13 @@ export default function DashboardPage() {
     });
     
     const budgetLeft = currentMonthBudgets.reduce((sum, b) => {
-        const spentOnBudget = currentMonthTransactions
-            .filter(t => t.type === 'expense' && t.category === b.category)
-            .reduce((s, t) => s + t.amount, 0);
-        return sum + (b.allocated - spentOnBudget); // Sum of (allocated - spent)
+        // Use the 'spent' property directly from the budget object, which is updated by BudgetContext
+        return sum + (b.allocated - b.spent);
     }, 0);
     
     const onTrackBudgetsCount = currentMonthBudgets.filter(b => {
-        const spentOnBudget = currentMonthTransactions
-            .filter(t => t.type === 'expense' && t.category === b.category)
-            .reduce((s, t) => s + t.amount, 0);
-        return spentOnBudget <= b.allocated;
+        // Use the 'spent' property directly
+        return b.spent <= b.allocated;
     }).length;
 
 
@@ -148,7 +132,9 @@ export default function DashboardPage() {
         isCurrency: true,
         icon: React.createElement(CreditCard, { className: "h-6 w-6 text-red-500" }), 
         trend: expenseTrendText, 
-        trendDirection: expensePercentageChange === null || expensePercentageChange >= 0 ? 'up' : 'down'
+        // For expenses, an increase (positive percentage) is usually 'bad' but trendDirection 'up' will be green.
+        // This is fine, the user interprets based on "Total Expenses".
+        trendDirection: expensePercentageChange === null || expensePercentageChange <= 0 ? 'down' : 'up' 
       },
       { 
         title: 'Net Savings', 
