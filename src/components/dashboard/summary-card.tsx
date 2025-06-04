@@ -30,10 +30,10 @@ const cardVariants = {
 
 export function SummaryCard({ data, index }: SummaryCardProps) {
   const { selectedCurrency, convertAmount } = useCurrency();
-  const [animatedRawValue, setAnimatedRawValue] = useState(0); // This will animate the raw USD value
+  const [animatedRawValue, setAnimatedRawValue] = useState(0); 
 
   useEffect(() => {
-    const controls = animate(0, data.rawValue, { // Animate rawValue (assumed USD)
+    const controls = animate(0, data.rawValue, { 
       duration: 1.5,
       ease: "easeOut",
       onUpdate: (value) => {
@@ -47,12 +47,14 @@ export function SummaryCard({ data, index }: SummaryCardProps) {
   const displayValue = data.isCurrency !== false ? formatCurrency(convertedDisplayValue, selectedCurrency) : Math.round(convertedDisplayValue).toString();
 
   let trendColorClass = "";
-  if (data.trendDirection) {
+  if (!data.isSimpleTrend && data.trendDirection) {
     const isExpenseCard = data.title === 'Total Expenses';
-    if (data.trendDirection === 'up') {
-      trendColorClass = isExpenseCard ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400';
-    } else { // trendDirection === 'down'
-      trendColorClass = isExpenseCard ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
+    if (isExpenseCard) {
+      // For expenses, 'up' trend (increased expenses) is red, 'down' trend (decreased expenses) is green.
+      trendColorClass = data.trendDirection === 'up' ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400';
+    } else {
+      // For income and net savings, 'up' trend is green, 'down' trend is red.
+      trendColorClass = data.trendDirection === 'up' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
     }
   }
 
@@ -74,14 +76,20 @@ export function SummaryCard({ data, index }: SummaryCardProps) {
           <div className="text-3xl font-bold font-headline">
             {data.prefix || ''}{displayValue}{data.suffix || ''}
           </div>
-          {data.trend && data.trendDirection && (
-            <p className={cn(
-              "text-xs text-muted-foreground flex items-center",
-              trendColorClass
-            )}>
-              {data.trendDirection === 'up' ? <TrendingUp className="mr-1 h-4 w-4" /> : <TrendingDown className="mr-1 h-4 w-4" />}
-              {data.trend}
-            </p>
+          {data.trend && (
+            data.isSimpleTrend ? (
+              <p className="text-xs text-muted-foreground font-semibold">
+                {data.trend}
+              </p>
+            ) : data.trendDirection && (
+              <p className={cn(
+                "text-xs text-muted-foreground flex items-center",
+                trendColorClass
+              )}>
+                {data.trendDirection === 'up' ? <TrendingUp className="mr-1 h-4 w-4" /> : <TrendingDown className="mr-1 h-4 w-4" />}
+                {data.trend}
+              </p>
+            )
           )}
         </CardContent>
       </Card>

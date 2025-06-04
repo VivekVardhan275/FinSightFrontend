@@ -25,6 +25,7 @@ export type SummaryCardData = {
   icon: React.ReactNode;
   trend?: string;
   trendDirection?: 'up' | 'down';
+  isSimpleTrend?: boolean; // Added for simple bold trend text without icon/color
 };
 
 // Schema types for react-hook-form validation (using Zod)
@@ -51,3 +52,4 @@ export interface AppNotification {
   read: boolean;
   href?: string; // Optional link for the notification
 }
+

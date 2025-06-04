@@ -33,7 +33,6 @@ const calculatePercentageChange = (current: number, previous: number): number | 
     if (current < 0) return -Infinity; 
     return 0; 
   }
-  // Ensure previous is not zero to prevent division by zero, though already handled above
   if (Math.abs(previous) < 0.00001) return current === 0 ? 0 : (current > 0 ? Infinity : -Infinity);
 
   return ((current - previous) / Math.abs(previous)) * 100;
@@ -103,8 +102,11 @@ export default function DashboardPage() {
     const netSavingsTrendText = formatTrendText(netSavingsPercentageChange, "savings");
     
     const incomeTrendDirection: 'up' | 'down' = (incomePercentageChange === null || incomePercentageChange >= 0) ? 'up' : 'down';
-    // For expenses: icon direction matches numeric trend, color is inverted in SummaryCard
-    const expenseIconTrendDirection: 'up' | 'down' = (expensePercentageChange === null || expensePercentageChange <= 0) ? 'down' : 'up';
+    
+    // For expenses: if expenses increased (positive change), we want an 'up' arrow icon (which will be colored red by SummaryCard)
+    // If expenses decreased (negative change), we want a 'down' arrow icon (which will be colored green by SummaryCard)
+    const expenseIconTrendDirection: 'up' | 'down' = (expensePercentageChange === null || expensePercentageChange > 0) ? 'up' : 'down';
+    
     const netSavingsTrendDirection: 'up' | 'down' = (netSavingsPercentageChange === null || netSavingsPercentageChange >= 0) ? 'up' : 'down';
 
 
@@ -114,12 +116,10 @@ export default function DashboardPage() {
     });
     
     const budgetLeft = currentMonthBudgets.reduce((sum, b) => {
-        // Use the 'spent' property directly from the budget object, which is updated by BudgetContext
         return sum + (b.allocated - b.spent);
     }, 0);
     
     const onTrackBudgetsCount = currentMonthBudgets.filter(b => {
-        // Use the 'spent' property directly
         return b.spent <= b.allocated;
     }).length;
 
@@ -139,7 +139,7 @@ export default function DashboardPage() {
         isCurrency: true,
         icon: React.createElement(CreditCard, { className: "h-6 w-6 text-red-500" }), 
         trend: expenseTrendText, 
-        trendDirection: expenseIconTrendDirection // This determines the arrow icon
+        trendDirection: expenseIconTrendDirection 
       },
       { 
         title: 'Net Savings', 
@@ -151,11 +151,11 @@ export default function DashboardPage() {
       },
       { 
         title: 'Budget Left', 
-        rawValue: budgetLeft > 0 ? budgetLeft : 0, // Show 0 if negative
+        rawValue: budgetLeft > 0 ? budgetLeft : 0,
         isCurrency: true,
         icon: React.createElement(PiggyBank, { className: "h-6 w-6 text-accent" }), 
-        trend: `${onTrackBudgetsCount} budgets on track`, 
-        trendDirection: 'up' 
+        trend: `${onTrackBudgetsCount} budgets on track`,
+        isSimpleTrend: true, // Use simple bold text, no icon/color
       },
     ] as SummaryCardData[];
 
