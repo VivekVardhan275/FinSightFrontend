@@ -33,6 +33,9 @@ const calculatePercentageChange = (current: number, previous: number): number | 
     if (current < 0) return -Infinity; // Represents a large decrease from zero
     return 0; // No change from zero
   }
+  // Ensure previous is not zero to prevent division by zero, though already handled above
+  if (Math.abs(previous) < 0.00001) return current === 0 ? 0 : (current > 0 ? Infinity : -Infinity);
+
   return ((current - previous) / Math.abs(previous)) * 100;
 };
 
@@ -132,9 +135,9 @@ export default function DashboardPage() {
         isCurrency: true,
         icon: React.createElement(CreditCard, { className: "h-6 w-6 text-red-500" }), 
         trend: expenseTrendText, 
-        // For expenses, an increase (positive percentage) is usually 'bad' but trendDirection 'up' will be green.
-        // This is fine, the user interprets based on "Total Expenses".
-        trendDirection: expensePercentageChange === null || expensePercentageChange <= 0 ? 'down' : 'up' 
+        // If expensePercentageChange > 0 (increased), trendDirection is 'down' (red).
+        // If expensePercentageChange <= 0 (decreased/same), trendDirection is 'up' (green).
+        trendDirection: expensePercentageChange !== null && expensePercentageChange > 0 ? 'down' : 'up' 
       },
       { 
         title: 'Net Savings', 
@@ -202,3 +205,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
