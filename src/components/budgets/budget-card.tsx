@@ -17,9 +17,16 @@ interface BudgetCardProps {
 }
 
 export function BudgetCard({ budget, onEdit, onDelete, variants }: BudgetCardProps) {
-  const progress = Math.min((budget.spent / budget.allocated) * 100, 100);
+  const progress = budget.allocated > 0 ? Math.min((budget.spent / budget.allocated) * 100, 100) : 0;
   const remaining = budget.allocated - budget.spent;
   const isOverBudget = budget.spent > budget.allocated;
+
+  // Determine which color variable to use based on budget status
+  const colorVariable = isOverBudget || progress > 90 
+    ? 'destructive' 
+    : progress > 70 
+    ? 'chart-4' // Using chart-4 for yellow/warning, ensure it's defined in globals.css
+    : 'primary';
 
   return (
     <motion.div 
@@ -43,7 +50,11 @@ export function BudgetCard({ budget, onEdit, onDelete, variants }: BudgetCardPro
               <span>Spent: {formatCurrency(budget.spent)}</span>
               <span className="text-muted-foreground">Allocated: {formatCurrency(budget.allocated)}</span>
             </div>
-            <Progress value={progress} className="h-3 [&>*]:bg-[--progress-bar-color]" style={{ '--progress-bar-color': `var(--${isOverBudget ? 'destructive' : progress > 90 ? 'destructive' : progress > 70 ? 'yellow-500' : 'primary'})` } as React.CSSProperties} />
+            <Progress 
+              value={progress} 
+              className="h-3 [&>*]:bg-[--progress-bar-color]" 
+              style={{ '--progress-bar-color': `hsl(var(--${colorVariable}))` } as React.CSSProperties} 
+            />
           </div>
           <p className={cn(
             "text-sm font-medium",
