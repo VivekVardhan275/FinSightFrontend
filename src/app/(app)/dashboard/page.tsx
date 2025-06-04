@@ -29,9 +29,9 @@ const cardVariants = {
 
 const calculatePercentageChange = (current: number, previous: number): number | null => {
   if (previous === 0) {
-    if (current > 0) return Infinity; // Represents a large increase from zero
-    if (current < 0) return -Infinity; // Represents a large decrease from zero
-    return 0; // No change from zero
+    if (current > 0) return Infinity; 
+    if (current < 0) return -Infinity; 
+    return 0; 
   }
   // Ensure previous is not zero to prevent division by zero, though already handled above
   if (Math.abs(previous) < 0.00001) return current === 0 ? 0 : (current > 0 ? Infinity : -Infinity);
@@ -101,6 +101,10 @@ export default function DashboardPage() {
     
     const netSavingsPercentageChange = calculatePercentageChange(currentMonthNetSavings, previousMonthNetSavings);
     const netSavingsTrendText = formatTrendText(netSavingsPercentageChange, "savings");
+    
+    const incomeTrendDirection: 'up' | 'down' = (incomePercentageChange === null || incomePercentageChange >= 0) ? 'up' : 'down';
+    // For expenses: icon direction matches numeric trend, color is inverted in SummaryCard
+    const expenseIconTrendDirection: 'up' | 'down' = (expensePercentageChange === null || expensePercentageChange <= 0) ? 'down' : 'up';
     const netSavingsTrendDirection: 'up' | 'down' = (netSavingsPercentageChange === null || netSavingsPercentageChange >= 0) ? 'up' : 'down';
 
 
@@ -127,7 +131,7 @@ export default function DashboardPage() {
         isCurrency: true,
         icon: React.createElement(DollarSign, { className: "h-6 w-6 text-green-500" }), 
         trend: incomeTrendText, 
-        trendDirection: incomePercentageChange === null || incomePercentageChange >= 0 ? 'up' : 'down'
+        trendDirection: incomeTrendDirection
       },
       { 
         title: 'Total Expenses', 
@@ -135,9 +139,7 @@ export default function DashboardPage() {
         isCurrency: true,
         icon: React.createElement(CreditCard, { className: "h-6 w-6 text-red-500" }), 
         trend: expenseTrendText, 
-        // If expensePercentageChange > 0 (increased), trendDirection is 'down' (red).
-        // If expensePercentageChange <= 0 (decreased/same), trendDirection is 'up' (green).
-        trendDirection: expensePercentageChange !== null && expensePercentageChange > 0 ? 'down' : 'up' 
+        trendDirection: expenseIconTrendDirection // This determines the arrow icon
       },
       { 
         title: 'Net Savings', 

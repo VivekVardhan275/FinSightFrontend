@@ -46,6 +46,16 @@ export function SummaryCard({ data, index }: SummaryCardProps) {
   const convertedDisplayValue = data.isCurrency !== false ? convertAmount(animatedRawValue, selectedCurrency) : animatedRawValue;
   const displayValue = data.isCurrency !== false ? formatCurrency(convertedDisplayValue, selectedCurrency) : Math.round(convertedDisplayValue).toString();
 
+  let trendColorClass = "";
+  if (data.trendDirection) {
+    const isExpenseCard = data.title === 'Total Expenses';
+    if (data.trendDirection === 'up') {
+      trendColorClass = isExpenseCard ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400';
+    } else { // trendDirection === 'down'
+      trendColorClass = isExpenseCard ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
+    }
+  }
+
 
   return (
     <motion.div
@@ -64,10 +74,10 @@ export function SummaryCard({ data, index }: SummaryCardProps) {
           <div className="text-3xl font-bold font-headline">
             {data.prefix || ''}{displayValue}{data.suffix || ''}
           </div>
-          {data.trend && (
+          {data.trend && data.trendDirection && (
             <p className={cn(
               "text-xs text-muted-foreground flex items-center",
-              data.trendDirection === 'up' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+              trendColorClass
             )}>
               {data.trendDirection === 'up' ? <TrendingUp className="mr-1 h-4 w-4" /> : <TrendingDown className="mr-1 h-4 w-4" />}
               {data.trend}
@@ -78,3 +88,4 @@ export function SummaryCard({ data, index }: SummaryCardProps) {
     </motion.div>
   );
 }
+
