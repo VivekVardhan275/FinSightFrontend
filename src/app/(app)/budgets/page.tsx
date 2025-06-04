@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Target } from "lucide-react";
 import type { Budget } from "@/types";
@@ -92,36 +92,45 @@ export default function BudgetsPage() {
     setIsConfirmDeleteDialogOpen(false);
   };
 
-  const handleSaveBudget = (budgetDataFromForm: Omit<Budget, 'id' | 'spent'> | Budget) => {
+  const handleSaveBudget = useCallback((budgetDataFromForm: Omit<Budget, 'id' | 'spent'> | Budget) => {
     let savedCategory = "";
-    let isEditing = false;
     let savedBudget: Budget;
+    let notificationAction = "Added";
 
-    if ('id' in budgetDataFromForm && budgets.some(b => b.id === budgetDataFromForm.id)) {
-      // Ensure 'spent' is preserved if it's an update, or calculated if missing
-      const existingBudget = budgets.find(b => b.id === (budgetDataFromForm as Budget).id);
-      const budgetToUpdate = {
-        ...(budgetDataFromForm as Budget),
-        spent: existingBudget?.spent ?? 0 // Keep existing spent or default to 0
+    // Determine if we are editing or adding
+    const formHasId = 'id' in budgetDataFromForm && typeof (budgetDataFromForm as Budget).id === 'string';
+    const existingBudgetInContext = formHasId ? budgets.find(b => b.id === (budgetDataFromForm as Budget).id) : undefined;
+
+    if (formHasId && existingBudgetInContext) {
+      // Editing an existing budget
+      notificationAction = "Updated";
+      const budgetToUpdate: Budget = {
+        ...existingBudgetInContext, // Base with existing context budget (preserves original spent)
+        ...(budgetDataFromForm as Budget), // Overlay with form data (category, allocated in USD, month)
       };
-      updateBudget(budgetToUpdate);
+      updateBudget(budgetToUpdate); // Update in context
       savedBudget = budgetToUpdate;
-      isEditing = true;
     } else {
+      // Adding a new budget
+      // budgetDataFromForm is Omit<Budget, 'id' | 'spent'>
       savedBudget = addBudget(budgetDataFromForm as Omit<Budget, 'id' | 'spent'>);
+      // addBudget in context assigns a new id and spent: 0, returns the full Budget object
     }
     
     savedCategory = savedBudget.category;
-    // Recalculate spent amount for the saved budget
+    // Recalculate spent amount for the saved budget.
+    // For new budgets, this will usually be 0 unless transactions already exist.
+    // For edited budgets, this ensures 'spent' is accurate if category/month changed.
     updateBudgetSpentAmount(savedBudget.id, transactions);
 
     addNotification({
-        title: `Budget ${isEditing ? 'Updated' : 'Added'}`,
-        description: `Budget for ${savedCategory} successfully ${isEditing ? 'updated' : 'added'}.`,
+        title: `Budget ${notificationAction}`,
+        description: `Budget for ${savedCategory} successfully ${notificationAction.toLowerCase()}.`,
         type: 'success',
         href: '/budgets'
       });
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [budgets, transactions, addBudget, updateBudget, updateBudgetSpentAmount, addNotification]);
 
 
   return (
