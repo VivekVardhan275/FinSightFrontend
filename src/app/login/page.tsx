@@ -82,7 +82,7 @@ export default function LoginPage() {
               <Button 
                 onClick={loginWithGitHub} 
                 variant="outline"
-                className="w-full transition-all hover:shadow-lg hover:scale-105 border-foreground/20 hover:bg-accent/10" 
+                className="w-full transition-all hover:shadow-lg hover:scale-105 border-foreground/20 hover:bg-accent/10 hover:text-foreground" 
                 size="lg"
                 disabled={isLoading}
                 asChild
