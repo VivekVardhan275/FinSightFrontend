@@ -25,7 +25,7 @@ const FONT_SIZE_CLASSES: Record<FontSizeSetting, string> = {
 };
 
 export default function SettingsPage() {
-  const { theme, setTheme } = useTheme();
+  const { theme: activeTheme, setTheme } = useTheme(); // Renamed theme to activeTheme to avoid conflict with currentTheme state
   const { toast } = useToast();
   const { selectedCurrency, setSelectedCurrency } = useCurrency();
 
@@ -42,34 +42,39 @@ export default function SettingsPage() {
   // Load settings from localStorage on mount
   useEffect(() => {
     const storedTheme = localStorage.getItem("app-theme") as ThemeSetting | null;
-    if (storedTheme) {
+    if (storedTheme && ["light", "dark", "system"].includes(storedTheme)) {
       setCurrentTheme(storedTheme);
     } else {
-      setCurrentTheme((theme as ThemeSetting) || "system");
+      setCurrentTheme((activeTheme as ThemeSetting) || "system");
     }
 
     const storedFontSize = localStorage.getItem("app-font-size") as FontSizeSetting | null;
-    if (storedFontSize) setFontSize(storedFontSize);
+    if (storedFontSize && FONT_SIZE_CLASSES[storedFontSize]) setFontSize(storedFontSize);
+    else localStorage.setItem("app-font-size", "medium");
+
 
     const storedBudgetAlerts = localStorage.getItem("app-budget-alerts");
     if (storedBudgetAlerts) setBudgetAlerts(storedBudgetAlerts === "true");
+    else localStorage.setItem("app-budget-alerts", "true");
 
     const storedWeeklySummary = localStorage.getItem("app-weekly-summary");
     if (storedWeeklySummary) setWeeklySummary(storedWeeklySummary === "true");
+    else localStorage.setItem("app-weekly-summary", "false");
     
     const storedBillReminders = localStorage.getItem("app-bill-reminders");
     if (storedBillReminders) setBillReminders(storedBillReminders === "true");
+    else localStorage.setItem("app-bill-reminders", "true");
 
-  }, [theme]);
+  }, []); // Run only on mount
   
-  // Apply theme from state
+  // Persist settings to localStorage whenever they change
   useEffect(() => {
-    setTheme(currentTheme);
+    localStorage.setItem("app-theme", currentTheme);
+    setTheme(currentTheme); // Apply theme using next-themes
   }, [currentTheme, setTheme]);
 
-
-  // Apply font size classes
   useEffect(() => {
+    localStorage.setItem("app-font-size", fontSize);
     const htmlElement = document.documentElement;
     Object.values(FONT_SIZE_CLASSES).forEach(cls => htmlElement.classList.remove(cls));
     if (FONT_SIZE_CLASSES[fontSize]) {
@@ -77,19 +82,25 @@ export default function SettingsPage() {
     }
   }, [fontSize]);
 
-  const handleSaveSettings = () => {
-    // Save to localStorage
-    localStorage.setItem("app-theme", currentTheme);
-    localStorage.setItem("app-font-size", fontSize);
+  useEffect(() => {
     localStorage.setItem("app-budget-alerts", String(budgetAlerts));
+  }, [budgetAlerts]);
+
+  useEffect(() => {
     localStorage.setItem("app-weekly-summary", String(weeklySummary));
+  }, [weeklySummary]);
+
+  useEffect(() => {
     localStorage.setItem("app-bill-reminders", String(billReminders));
+  }, [billReminders]);
 
-    setTheme(currentTheme);
 
+  const handleSaveSettings = () => {
+    // localStorage saving is now handled by individual useEffects.
+    // This function can primarily be for user feedback.
     toast({
-      title: "Settings Saved",
-      description: "Your preferences have been updated.",
+      title: "Settings Applied",
+      description: "Your preferences have been updated and saved.",
     });
   };
 
@@ -259,3 +270,4 @@ export default function SettingsPage() {
 const UserIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
 );
+
