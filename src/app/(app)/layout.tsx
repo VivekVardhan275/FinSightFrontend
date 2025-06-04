@@ -49,9 +49,9 @@ export default function AuthenticatedAppLayout({
   return (
     <SidebarProvider defaultOpen>
       <Sidebar variant="sidebar" collapsible="icon" side="left" className="border-r">
-        <SidebarHeader className="p-4">
+        <SidebarHeader className="p-4 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-2">
           <Link href="/dashboard" className="flex items-center gap-2">
-            <AppLogo className="h-8 w-8 text-primary" />
+            <AppLogo className="h-10 w-10 text-primary" />
             <span className="font-headline text-xl font-semibold group-data-[collapsible=icon]:hidden">
               Foresight
             </span>
