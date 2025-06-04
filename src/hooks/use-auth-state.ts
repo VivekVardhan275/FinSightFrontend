@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
@@ -42,6 +43,16 @@ export function useAuthState() {
     router.push('/dashboard');
   }, [router]);
 
+  const loginWithGitHub = useCallback(async () => {
+    setIsLoading(true);
+    // Simulate API call (same as Google for now)
+    await new Promise(resolve => setTimeout(resolve, 500));
+    localStorage.setItem('isLoggedInForesight', 'true');
+    setUser({...mockUser, name: "GitHub User", email: "github@example.com"}); // Slightly different mock user
+    setIsLoading(false);
+    router.push('/dashboard');
+  }, [router]);
+
   const logout = useCallback(async () => {
     setIsLoading(true);
     // Simulate API call
@@ -52,5 +63,5 @@ export function useAuthState() {
     router.push('/login');
   }, [router]);
 
-  return { user, isLoading, login, logout };
+  return { user, isLoading, login, loginWithGitHub, logout };
 }

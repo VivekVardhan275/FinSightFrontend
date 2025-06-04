@@ -5,13 +5,13 @@ import { AppLogo } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuthState } from '@/hooks/use-auth-state';
-import { ChromeIcon } from 'lucide-react';
+import { ChromeIcon, GithubIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 
 export default function LoginPage() {
-  const { login, user, isLoading } = useAuthState();
+  const { login, loginWithGitHub, user, isLoading } = useAuthState();
   const router = useRouter();
 
   useEffect(() => {
@@ -46,7 +46,7 @@ export default function LoginPage() {
               <CardTitle className="font-headline text-2xl mb-2">Welcome Back</CardTitle>
               <CardDescription>Sign in to manage your finances and forecast your financial future.</CardDescription>
             </CardHeader>
-            <CardContent className="py-12">
+            <CardContent className="py-12 space-y-4">
               <Button 
                 onClick={login} 
                 className="w-full transition-all hover:shadow-lg hover:scale-105" 
@@ -57,6 +57,19 @@ export default function LoginPage() {
                 <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
                   <ChromeIcon className="mr-2 h-5 w-5" />
                   Sign in with Google
+                </motion.button>
+              </Button>
+              <Button 
+                onClick={loginWithGitHub} 
+                variant="outline"
+                className="w-full transition-all hover:shadow-lg hover:scale-105 border-foreground/20 hover:bg-accent/10" 
+                size="lg"
+                disabled={isLoading}
+                asChild
+              >
+                <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
+                  <GithubIcon className="mr-2 h-5 w-5" />
+                  Sign in with GitHub
                 </motion.button>
               </Button>
               <p className="mt-4 text-center text-xs text-muted-foreground">
