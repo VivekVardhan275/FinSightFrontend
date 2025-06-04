@@ -5,7 +5,7 @@ import { AppLogo } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuthState } from '@/hooks/use-auth-state';
-import { GithubIcon } from 'lucide-react'; // Removed ChromeIcon
+import { GithubIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { motion } from 'framer-motion';
