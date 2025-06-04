@@ -7,6 +7,7 @@ import { TrendingUp, TrendingDown } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
 import { motion, animate } from 'framer-motion';
 import { useEffect, useState } from 'react';
+import { useCurrency } from "@/contexts/currency-context";
 
 interface SummaryCardProps {
   data: SummaryCardData;
@@ -28,20 +29,23 @@ const cardVariants = {
 };
 
 export function SummaryCard({ data, index }: SummaryCardProps) {
-  const [count, setCount] = useState(0);
+  const { selectedCurrency, convertAmount } = useCurrency();
+  const [animatedRawValue, setAnimatedRawValue] = useState(0); // This will animate the raw USD value
 
   useEffect(() => {
-    const controls = animate(0, data.rawValue, {
+    const controls = animate(0, data.rawValue, { // Animate rawValue (assumed USD)
       duration: 1.5,
       ease: "easeOut",
       onUpdate: (value) => {
-        setCount(value);
+        setAnimatedRawValue(value);
       },
     });
     return () => controls.stop();
   }, [data.rawValue]);
 
-  const displayValue = data.isCurrency !== false ? formatCurrency(count) : Math.round(count).toString();
+  const convertedDisplayValue = data.isCurrency !== false ? convertAmount(animatedRawValue, selectedCurrency) : animatedRawValue;
+  const displayValue = data.isCurrency !== false ? formatCurrency(convertedDisplayValue, selectedCurrency) : Math.round(convertedDisplayValue).toString();
+
 
   return (
     <motion.div

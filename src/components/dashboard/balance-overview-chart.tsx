@@ -1,6 +1,7 @@
 
 "use client"
 
+import React from "react";
 import { TrendingUp } from "lucide-react"
 import { CartesianGrid, Line, LineChart, XAxis, YAxis, Tooltip as RechartsTooltip } from "recharts"
 import {
@@ -13,27 +14,47 @@ import {
 } from "@/components/ui/card"
 import {
   ChartContainer,
-  ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
 import { balanceHistory } from "@/lib/placeholder-data"
+import { useCurrency } from "@/contexts/currency-context";
+import { formatCurrency } from "@/lib/utils";
 
-const chartData = balanceHistory;
-
-const chartConfig = {
-  balance: {
-    label: "Balance",
-    color: "hsl(var(--chart-1))",
-  },
-} satisfies ChartConfig
 
 export function BalanceOverviewChart() {
+  const { selectedCurrency, convertAmount } = useCurrency();
+
+  const chartData = React.useMemo(() => {
+    return balanceHistory.map(item => ({
+      ...item,
+      balance: convertAmount(item.balance, selectedCurrency), // Convert balance to selected currency
+    }));
+  }, [selectedCurrency, convertAmount, balanceHistory]); // Added balanceHistory to dependencies
+
+  const chartConfig = React.useMemo(() => ({
+    balance: {
+      label: `Balance (${selectedCurrency})`,
+      color: "hsl(var(--chart-1))",
+    },
+  }), [selectedCurrency]) satisfies ChartConfig;
+
+  const yAxisTickFormatter = (value: number) => {
+    // value is already converted from chartData
+    const kValue = value / 1000;
+    let symbol = '';
+    if (selectedCurrency === 'USD') symbol = '$';
+    else if (selectedCurrency === 'EUR') symbol = '€';
+    else if (selectedCurrency === 'GBP') symbol = '£';
+    
+    return `${symbol}${kValue.toFixed(0)}k`;
+  };
+
   return (
     <Card className="shadow-lg transition-shadow hover:shadow-xl h-full">
       <CardHeader>
         <CardTitle className="font-headline">Balance Overview</CardTitle>
-        <CardDescription>Your account balance over the last 6 months.</CardDescription>
+        <CardDescription>Your account balance over the last 6 months (in {selectedCurrency}).</CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
@@ -59,9 +80,16 @@ export function BalanceOverviewChart() {
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={(value) => `$${value / 1000}k`}
+              tickFormatter={yAxisTickFormatter}
             />
-            <RechartsTooltip content={<ChartTooltipContent hideIndicator />} />
+            <RechartsTooltip 
+              content={
+                <ChartTooltipContent 
+                  hideIndicator 
+                  formatter={(value, name) => [formatCurrency(value as number, selectedCurrency), name as string]}
+                />
+              } 
+            />
             <Line
               dataKey="balance"
               type="monotone"

@@ -10,12 +10,14 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useTheme } from "next-themes";
 import { useToast } from "@/hooks/use-toast";
-import { Palette, BellRing, Globe, Save } from "lucide-react";
+import { Palette, BellRing, Globe, Save, User as UserIconLucide } from "lucide-react"; // UserIcon might clash with local one
 import { motion } from "framer-motion";
+import { useCurrency, type Currency as AppCurrency } from "@/contexts/currency-context";
+
 
 type ThemeSetting = "light" | "dark" | "system";
 type FontSizeSetting = "small" | "medium" | "large";
-type CurrencySetting = "USD" | "EUR" | "GBP";
+// type CurrencySetting = "USD" | "EUR" | "GBP"; // Replaced by AppCurrency from context
 
 const FONT_SIZE_CLASSES: Record<FontSizeSetting, string> = {
   small: "font-size-small",
@@ -28,6 +30,8 @@ const COMPACT_MODE_CLASS = "compact-mode";
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
+  const { selectedCurrency, setSelectedCurrency } = useCurrency();
+
 
   // Appearance
   const [currentTheme, setCurrentTheme] = useState<ThemeSetting>("system");
@@ -39,20 +43,18 @@ export default function SettingsPage() {
   const [weeklySummary, setWeeklySummary] = useState(false);
   const [billReminders, setBillReminders] = useState(true);
 
-  // Regional
-  const [currency, setCurrency] = useState<CurrencySetting>("USD");
+  // Regional - currency is now from context
+  // const [currency, setCurrencyState] = useState<AppCurrency>("USD"); // Use selectedCurrency from context
+
 
   // Load settings from localStorage on mount
   useEffect(() => {
     const storedTheme = localStorage.getItem("app-theme") as ThemeSetting | null;
     if (storedTheme) {
       setCurrentTheme(storedTheme);
-      // setTheme(storedTheme); // next-themes already handles its own persistence
     } else {
-      // If next-themes has a theme, use it, otherwise default to system
       setCurrentTheme((theme as ThemeSetting) || "system");
     }
-
 
     const storedFontSize = localStorage.getItem("app-font-size") as FontSizeSetting | null;
     if (storedFontSize) setFontSize(storedFontSize);
@@ -69,12 +71,10 @@ export default function SettingsPage() {
     const storedBillReminders = localStorage.getItem("app-bill-reminders");
     if (storedBillReminders) setBillReminders(storedBillReminders === "true");
 
-    const storedCurrency = localStorage.getItem("app-currency") as CurrencySetting | null;
-    if (storedCurrency) setCurrency(storedCurrency);
-
-  }, []);
+    // Currency is loaded by CurrencyProvider, selectedCurrency from useCurrency() will be correct
+  }, [theme]);
   
-  // Apply theme from state (needed if not relying solely on next-themes for initial display)
+  // Apply theme from state
   useEffect(() => {
     setTheme(currentTheme);
   }, [currentTheme, setTheme]);
@@ -103,11 +103,9 @@ export default function SettingsPage() {
     localStorage.setItem("app-budget-alerts", String(budgetAlerts));
     localStorage.setItem("app-weekly-summary", String(weeklySummary));
     localStorage.setItem("app-bill-reminders", String(billReminders));
-    localStorage.setItem("app-currency", currency);
+    // Currency is saved by setSelectedCurrency in the context when changed
 
-    // Apply directly (some are handled by useEffect, theme is by next-themes)
     setTheme(currentTheme);
-    // Font size and compact mode are applied by useEffect
 
     toast({
       title: "Settings Saved",
@@ -241,7 +239,7 @@ export default function SettingsPage() {
           <CardContent className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="currency-select">Currency</Label>
-              <Select value={currency} onValueChange={(value: string) => setCurrency(value as CurrencySetting)}>
+              <Select value={selectedCurrency} onValueChange={(value: string) => setSelectedCurrency(value as AppCurrency)}>
                 <SelectTrigger id="currency-select">
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
@@ -251,9 +249,6 @@ export default function SettingsPage() {
                   <SelectItem value="GBP">GBP - British Pound</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                Note: Changing currency here is a preference. App-wide currency conversion is not yet implemented.
-              </p>
             </div>
             {/* Placeholders for Date Format, Number Format, Time Zone */}
             <p className="text-sm text-muted-foreground">Date format, number format, and time zone settings will be available in a future update.</p>

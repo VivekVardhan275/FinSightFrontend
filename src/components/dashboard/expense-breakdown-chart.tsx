@@ -12,15 +12,14 @@ import {
 } from "@/components/ui/card"
 import {
   ChartContainer,
-  ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
 import { expenseCategoriesData } from "@/lib/placeholder-data"
+import { useCurrency } from "@/contexts/currency-context";
+import { formatCurrency } from "@/lib/utils";
 
-const chartData = expenseCategoriesData;
-
-const chartConfig = {
+const baseChartConfig = { // Renamed to avoid conflict in memo
   value: {
     label: "Expenses",
   },
@@ -47,15 +46,28 @@ const chartConfig = {
 } satisfies ChartConfig
 
 export function ExpenseBreakdownChart() {
+  const { selectedCurrency, convertAmount } = useCurrency();
+
+  const chartData = React.useMemo(() => {
+    return expenseCategoriesData.map(item => ({
+      ...item,
+      value: convertAmount(item.value, selectedCurrency), // Convert value to selected currency
+    }));
+  }, [selectedCurrency, convertAmount, expenseCategoriesData]); // Added expenseCategoriesData
+
+  const chartConfig = React.useMemo(() => baseChartConfig, []);
+
+
+  // totalValue calculation will now use the converted chartData
   const totalValue = React.useMemo(() => {
     return chartData.reduce((acc, curr) => acc + curr.value, 0)
-  }, [])
+  }, [chartData])
 
   return (
     <Card className="flex flex-col shadow-lg transition-shadow hover:shadow-xl h-full">
       <CardHeader className="items-center pb-0">
         <CardTitle className="font-headline">Expense Breakdown</CardTitle>
-        <CardDescription>Current month's expenses by category</CardDescription>
+        <CardDescription>Current month's expenses by category (in {selectedCurrency})</CardDescription>
       </CardHeader>
       <CardContent className="flex-1 pb-0">
         <ChartContainer
@@ -63,7 +75,15 @@ export function ExpenseBreakdownChart() {
           className="mx-auto aspect-square max-h-[300px]"
         >
           <PieChart>
-            <RechartsTooltip content={<ChartTooltipContent nameKey="category" hideLabel />} />
+            <RechartsTooltip 
+              content={
+                <ChartTooltipContent 
+                  nameKey="category" 
+                  hideLabel 
+                  formatter={(value, name) => [formatCurrency(value as number, selectedCurrency), name as string]}
+                />
+              } 
+            />
             <Pie
               data={chartData}
               dataKey="value"
@@ -74,7 +94,7 @@ export function ExpenseBreakdownChart() {
               animationBegin={200}
             >
               {chartData.map((entry) => (
-                <Cell key={entry.category} fill={entry.fill} />
+                <Cell key={entry.category} fill={entry.fill as string} /> // Added 'as string' for fill
               ))}
             </Pie>
           </PieChart>

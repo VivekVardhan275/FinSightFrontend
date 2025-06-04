@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Edit2, Trash2, AlertTriangle } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
 import { motion, type Variants } from 'framer-motion';
+import { useCurrency } from '@/contexts/currency-context';
 
 interface BudgetCardProps {
   budget: Budget;
@@ -17,15 +18,20 @@ interface BudgetCardProps {
 }
 
 export function BudgetCard({ budget, onEdit, onDelete, variants }: BudgetCardProps) {
-  const progress = budget.allocated > 0 ? Math.min((budget.spent / budget.allocated) * 100, 100) : 0;
-  const remaining = budget.allocated - budget.spent;
-  const isOverBudget = budget.spent > budget.allocated;
+  const { selectedCurrency, convertAmount } = useCurrency();
+
+  const convertedSpent = convertAmount(budget.spent, selectedCurrency);
+  const convertedAllocated = convertAmount(budget.allocated, selectedCurrency);
+
+  const progress = convertedAllocated > 0 ? Math.min((convertedSpent / convertedAllocated) * 100, 100) : 0;
+  const convertedRemaining = convertedAllocated - convertedSpent;
+  const isOverBudget = convertedSpent > convertedAllocated;
 
   // Determine which color variable to use based on budget status
   const colorVariable = isOverBudget || progress > 90 
     ? 'destructive' 
     : progress > 70 
-    ? 'chart-4' // Using chart-4 for yellow/warning, ensure it's defined in globals.css
+    ? 'chart-4' 
     : 'primary';
 
   return (
@@ -47,8 +53,8 @@ export function BudgetCard({ budget, onEdit, onDelete, variants }: BudgetCardPro
         <CardContent className="space-y-3 flex-grow">
           <div>
             <div className="mb-1 flex justify-between text-sm">
-              <span>Spent: {formatCurrency(budget.spent)}</span>
-              <span className="text-muted-foreground">Allocated: {formatCurrency(budget.allocated)}</span>
+              <span>Spent: {formatCurrency(convertedSpent, selectedCurrency)}</span>
+              <span className="text-muted-foreground">Allocated: {formatCurrency(convertedAllocated, selectedCurrency)}</span>
             </div>
             <Progress 
               value={progress} 
@@ -58,11 +64,11 @@ export function BudgetCard({ budget, onEdit, onDelete, variants }: BudgetCardPro
           </div>
           <p className={cn(
             "text-sm font-medium",
-            isOverBudget ? "text-destructive" : remaining >=0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
+            isOverBudget ? "text-destructive" : convertedRemaining >=0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
           )}>
             {isOverBudget 
-              ? `Over budget by ${formatCurrency(Math.abs(remaining))}` 
-              : `${formatCurrency(remaining)} Remaining`}
+              ? `Over budget by ${formatCurrency(Math.abs(convertedRemaining), selectedCurrency)}` 
+              : `${formatCurrency(convertedRemaining, selectedCurrency)} Remaining`}
           </p>
         </CardContent>
         <CardFooter className="flex justify-end space-x-2">

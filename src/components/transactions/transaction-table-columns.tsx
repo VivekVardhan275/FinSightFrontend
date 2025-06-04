@@ -2,7 +2,7 @@
 "use client";
 
 import type { Transaction } from "@/types";
-import type { ColumnDef } from "@tanstack/react-table";
+import type { ColumnDef, CellContext } from "@tanstack/react-table";
 import { ArrowUpDown, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +16,17 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatCurrency } from "@/lib/utils";
+import { useCurrency } from "@/contexts/currency-context";
+import React from "react"; // Import React for JSX
+
+// A small component to render the amount cell, allowing use of the useCurrency hook
+const AmountCellContent: React.FC<{ cell: CellContext<Transaction, unknown> }> = ({ cell }) => {
+  const { selectedCurrency, convertAmount } = useCurrency();
+  const amount = parseFloat(cell.row.getValue("amount")); // This is amount in USD
+  const convertedAmount = convertAmount(amount, selectedCurrency);
+  return <div className="text-right font-medium">{formatCurrency(convertedAmount, selectedCurrency)}</div>;
+};
+
 
 export const getColumns = (
   onEdit: (transaction: Transaction) => void,
@@ -80,10 +91,7 @@ export const getColumns = (
         </Button>
       );
     },
-    cell: ({ row }) => {
-      const amount = parseFloat(row.getValue("amount"));
-      return <div className="text-right font-medium">{formatCurrency(amount)}</div>;
-    },
+    cell: (cellContext) => <AmountCellContent cell={cellContext} />,
   },
   {
     accessorKey: "type",
