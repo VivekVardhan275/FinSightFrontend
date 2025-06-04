@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -46,7 +47,8 @@ export function DataTable<TData, TValue>({
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
-  const [rowSelection, setRowSelection] = React.useState({})
+  // Row selection state is no longer needed as checkboxes are removed
+  // const [rowSelection, setRowSelection] = React.useState({}) 
   const [globalFilter, setGlobalFilter] = React.useState('')
 
 
@@ -60,14 +62,14 @@ export function DataTable<TData, TValue>({
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange: setRowSelection,
+    // onRowSelectionChange: setRowSelection, // Row selection change handler no longer needed
     onGlobalFilterChange: setGlobalFilter,
     globalFilterFn: 'auto',
     state: {
       sorting,
       columnFilters,
       columnVisibility,
-      rowSelection,
+      // rowSelection, // Row selection state no longer needed
       globalFilter,
     },
   })
@@ -141,7 +143,7 @@ export function DataTable<TData, TValue>({
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
+                  // data-state={row.getIsSelected() && "selected"} // Row selection state attribute no longer needed
                   className="transition-colors hover:bg-muted/50"
                 >
                   {row.getVisibleCells().map((cell) => (
@@ -169,8 +171,8 @@ export function DataTable<TData, TValue>({
       </div>
       <div className="flex items-center justify-end space-x-2 py-4">
         <div className="flex-1 text-sm text-muted-foreground">
-          {table.getFilteredSelectedRowModel().rows.length} of{" "}
-          {table.getFilteredRowModel().rows.length} row(s) selected.
+          {/* Row selection count display removed */}
+          {table.getFilteredRowModel().rows.length} row(s) found. 
         </div>
         <div className="space-x-2">
           <Button
@@ -194,3 +196,4 @@ export function DataTable<TData, TValue>({
     </div>
   )
 }
+
