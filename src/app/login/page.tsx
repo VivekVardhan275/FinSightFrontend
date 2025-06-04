@@ -44,7 +44,7 @@ export default function LoginPage() {
                 <h1 className="font-headline text-4xl font-bold text-primary">Foresight Finance</h1>
               </div>
               <CardTitle className="font-headline text-2xl">Welcome Back</CardTitle>
-              <CardDescription>Sign in to manage your finances and forecast your future.</CardDescription>
+              <CardDescription>Sign in to manage your finances and forecast your financial future.</CardDescription>
             </CardHeader>
             <CardContent className="py-12">
               <Button 
