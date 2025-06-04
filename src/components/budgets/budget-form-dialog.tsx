@@ -86,12 +86,12 @@ export function BudgetFormDialog({
     const budgetDataToSaveBase = {
       category: data.category,
       allocated: allocatedInUSD,
-      month: data.month
+      month: data.month,
     };
 
     const budgetDataToSave: Omit<Budget, 'id' | 'spent'> | Budget = budget
-      ? { ...budget, ...budgetDataToSaveBase } // Preserve ID if editing
-      : { ...budgetDataToSaveBase, id: uuidv4(), spent: 0 }; // Generate ID for new budget
+      ? { ...budget, ...budgetDataToSaveBase } // For editing, it's a full Budget.
+      : budgetDataToSaveBase; // For new, it's Omit<Budget, 'id' | 'spent'>. Context will add id and spent.
 
     onSave(budgetDataToSave);
     onOpenChange(false);
