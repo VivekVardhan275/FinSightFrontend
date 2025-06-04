@@ -27,6 +27,26 @@ const cardVariants = {
   }),
 };
 
+const calculatePercentageChange = (current: number, previous: number): number | null => {
+  if (previous === 0) {
+    if (current > 0) return Infinity; // Represents a large increase from zero
+    if (current < 0) return -Infinity; // Represents a large decrease from zero
+    return 0; // No change from zero
+  }
+  return ((current - previous) / Math.abs(previous)) * 100;
+};
+
+const formatTrendText = (percentage: number | null, type: "income" | "expense"): string => {
+  if (percentage === null || isNaN(percentage)) return "Data unavailable";
+  if (percentage === Infinity) return `Increased (was 0)`;
+  if (percentage === -Infinity) return `Decreased (was 0)`;
+  if (percentage === 0) return "No change from last month";
+  
+  const prefix = percentage > 0 ? "+" : "";
+  return `${prefix}${percentage.toFixed(1)}% from last month`;
+};
+
+
 export default function DashboardPage() {
   const { transactions } = useTransactionContext();
   const { budgets } = useBudgetContext();
@@ -36,20 +56,62 @@ export default function DashboardPage() {
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth(); // 0-indexed
 
+    const previousMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const previousMonthYear = previousMonthDate.getFullYear();
+    const previousMonth = previousMonthDate.getMonth(); // 0-indexed
+
+
     const currentMonthTransactions = transactions.filter(t => {
       const transactionDate = new Date(t.date);
       return transactionDate.getFullYear() === currentYear && transactionDate.getMonth() === currentMonth;
     });
 
-    const totalIncome = currentMonthTransactions
+    const previousMonthTransactions = transactions.filter(t => {
+      const transactionDate = new Date(t.date);
+      return transactionDate.getFullYear() === previousMonthYear && transactionDate.getMonth() === previousMonth;
+    });
+
+    const currentMonthTotalIncome = currentMonthTransactions
+      .filter(t => t.type === 'income')
+      .reduce((sum, t) => sum + t.amount, 0);
+    
+    const previousMonthTotalIncome = previousMonthTransactions
       .filter(t => t.type === 'income')
       .reduce((sum, t) => sum + t.amount, 0);
 
-    const totalExpenses = currentMonthTransactions
+    const currentMonthTotalExpenses = currentMonthTransactions
       .filter(t => t.type === 'expense')
       .reduce((sum, t) => sum + t.amount, 0);
 
-    const netSavings = totalIncome - totalExpenses;
+    const previousMonthTotalExpenses = previousMonthTransactions
+      .filter(t => t.type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const incomePercentageChange = calculatePercentageChange(currentMonthTotalIncome, previousMonthTotalIncome);
+    const expensePercentageChange = calculatePercentageChange(currentMonthTotalExpenses, previousMonthTotalExpenses);
+    
+    const incomeTrendText = formatTrendText(incomePercentageChange, "income");
+    const expenseTrendText = formatTrendText(expensePercentageChange, "expense");
+
+    const currentMonthNetSavings = currentMonthTotalIncome - currentMonthTotalExpenses;
+    const previousMonthNetSavings = previousMonthTotalIncome - previousMonthTotalExpenses;
+    
+    let netSavingsTrendText = "Data unavailable";
+    let netSavingsTrendDirection: 'up' | 'down' = 'up';
+
+    if (currentMonthTransactions.length > 0 || previousMonthTransactions.length > 0) {
+        if (currentMonthNetSavings > previousMonthNetSavings) {
+            netSavingsTrendText = "Improved from last month";
+            netSavingsTrendDirection = 'up';
+        } else if (currentMonthNetSavings < previousMonthNetSavings) {
+            netSavingsTrendText = "Declined from last month";
+            netSavingsTrendDirection = 'down';
+        } else {
+            netSavingsTrendText = "No change from last month";
+            netSavingsTrendDirection = 'up'; // Neutral, icon can be up
+        }
+    }
+
 
     const currentMonthBudgets = budgets.filter(b => {
         const budgetMonthYear = b.month.split('-'); // YYYY-MM
@@ -60,7 +122,7 @@ export default function DashboardPage() {
         const spentOnBudget = currentMonthTransactions
             .filter(t => t.type === 'expense' && t.category === b.category)
             .reduce((s, t) => s + t.amount, 0);
-        return sum + (b.allocated - spentOnBudget);
+        return sum + (b.allocated - spentOnBudget); // Sum of (allocated - spent)
     }, 0);
     
     const onTrackBudgetsCount = currentMonthBudgets.filter(b => {
@@ -74,27 +136,27 @@ export default function DashboardPage() {
     return [
       { 
         title: 'Total Income', 
-        rawValue: totalIncome, 
+        rawValue: currentMonthTotalIncome, 
         isCurrency: true,
         icon: React.createElement(DollarSign, { className: "h-6 w-6 text-green-500" }), 
-        trend: '+X% this month', 
-        trendDirection: 'up' 
+        trend: incomeTrendText, 
+        trendDirection: incomePercentageChange === null || incomePercentageChange >= 0 ? 'up' : 'down'
       },
       { 
         title: 'Total Expenses', 
-        rawValue: totalExpenses, 
+        rawValue: currentMonthTotalExpenses, 
         isCurrency: true,
         icon: React.createElement(CreditCard, { className: "h-6 w-6 text-red-500" }), 
-        trend: '-Y% this month', 
-        trendDirection: 'down' 
+        trend: expenseTrendText, 
+        trendDirection: expensePercentageChange === null || expensePercentageChange >= 0 ? 'up' : 'down'
       },
       { 
         title: 'Net Savings', 
-        rawValue: netSavings, 
+        rawValue: currentMonthNetSavings, 
         isCurrency: true,
         icon: React.createElement(TrendingUp, { className: "h-6 w-6 text-primary" }), 
-        trend: 'Improving', 
-        trendDirection: netSavings >= 0 ? 'up' : 'down' 
+        trend: netSavingsTrendText, 
+        trendDirection: netSavingsTrendDirection 
       },
       { 
         title: 'Budget Left', 
