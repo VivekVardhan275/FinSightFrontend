@@ -10,9 +10,26 @@ import { Switch } from "@/components/ui/switch";
 import { useAuthState } from "@/hooks/use-auth-state";
 import { User as UserIcon, Mail, Edit3, BellRing, Palette } from "lucide-react";
 import { motion } from "framer-motion";
+import React, { useState, useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function ProfilePage() {
   const { user, isLoading } = useAuthState();
+  const { toast } = useToast();
+
+  const [displayName, setDisplayName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+
+  const [budgetAlerts, setBudgetAlerts] = useState(true);
+  const [weeklySummary, setWeeklySummary] = useState(false);
+  const [billReminders, setBillReminders] = useState(true);
+
+  useEffect(() => {
+    if (user) {
+      setDisplayName(user.name);
+      // Phone number isn't in user object, so it defaults to empty or a placeholder
+    }
+  }, [user]);
 
   if (isLoading) {
     return (
@@ -39,6 +56,24 @@ export default function ProfilePage() {
     return initials;
   };
 
+  const handleSaveChanges = () => {
+    // In a real app, you'd save these to your backend
+    console.log("Saving profile:", { displayName, phoneNumber });
+    toast({
+      title: "Profile Updated",
+      description: "Your personal information has been (simulated) saved.",
+    });
+  };
+
+  const handleSavePreferences = () => {
+    // In a real app, you'd save these to your backend
+    console.log("Saving preferences:", { budgetAlerts, weeklySummary, billReminders });
+    toast({
+      title: "Preferences Updated",
+      description: "Your application preferences have been (simulated) saved.",
+    });
+  };
+
   return (
     <div className="space-y-8">
       <motion.div 
@@ -63,10 +98,10 @@ export default function ProfilePage() {
         <Card className="md:col-span-1 shadow-lg">
           <CardHeader className="items-center text-center">
             <Avatar className="h-24 w-24 mb-4 border-2 border-primary">
-              <AvatarImage src={user.imageUrl} alt={user.name} data-ai-hint="avatar person" />
-              <AvatarFallback className="text-3xl">{getInitials(user.name)}</AvatarFallback>
+              <AvatarImage src={user.imageUrl} alt={displayName} data-ai-hint="avatar person" />
+              <AvatarFallback className="text-3xl">{getInitials(displayName)}</AvatarFallback>
             </Avatar>
-            <CardTitle className="text-2xl font-headline">{user.name}</CardTitle>
+            <CardTitle className="text-2xl font-headline">{displayName}</CardTitle>
             <CardDescription className="flex items-center justify-center gap-1">
               <Mail className="h-4 w-4 text-muted-foreground" />
               {user.email}
@@ -86,13 +121,13 @@ export default function ProfilePage() {
               Personal Information
             </CardTitle>
             <CardDescription>
-              Update your personal details here. Fields are currently read-only.
+              Update your personal details here.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="fullName">Full Name</Label>
-              <Input id="fullName" defaultValue={user.name} readOnly />
+              <Input id="fullName" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email Address</Label>
@@ -100,10 +135,10 @@ export default function ProfilePage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Phone Number (Optional)</Label>
-              <Input id="phone" type="tel" placeholder="e.g., (123) 456-7890" readOnly />
+              <Input id="phone" type="tel" placeholder="e.g., (123) 456-7890" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} />
             </div>
             <div className="flex justify-end">
-              <Button disabled>
+              <Button onClick={handleSaveChanges}>
                 <Edit3 className="mr-2 h-4 w-4" /> Save Changes
               </Button>
             </div>
@@ -123,7 +158,7 @@ export default function ProfilePage() {
               Preferences
             </CardTitle>
             <CardDescription>
-              Customize your application experience. These settings are illustrative.
+              Customize your application experience.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -136,7 +171,7 @@ export default function ProfilePage() {
                     Receive alerts when you're nearing or over budget.
                   </p>
                 </div>
-                <Switch id="budget-alerts" aria-label="Toggle budget alerts" disabled />
+                <Switch id="budget-alerts" aria-label="Toggle budget alerts" checked={budgetAlerts} onCheckedChange={setBudgetAlerts} />
               </div>
               <div className="flex items-center justify-between rounded-lg border p-4">
                 <div>
@@ -145,7 +180,7 @@ export default function ProfilePage() {
                     Get a summary of your finances every week.
                   </p>
                 </div>
-                <Switch id="weekly-summary" aria-label="Toggle weekly summary email" disabled />
+                <Switch id="weekly-summary" aria-label="Toggle weekly summary email" checked={weeklySummary} onCheckedChange={setWeeklySummary} />
               </div>
                <div className="flex items-center justify-between rounded-lg border p-4">
                 <div>
@@ -154,12 +189,12 @@ export default function ProfilePage() {
                     Get reminders for upcoming bill payments.
                   </p>
                 </div>
-                <Switch id="bill-reminders" aria-label="Toggle bill reminders" disabled />
+                <Switch id="bill-reminders" aria-label="Toggle bill reminders" checked={billReminders} onCheckedChange={setBillReminders} />
               </div>
             </div>
             
             <div className="flex justify-end pt-4">
-              <Button disabled>
+              <Button onClick={handleSavePreferences}>
                 <Edit3 className="mr-2 h-4 w-4" /> Save Preferences
               </Button>
             </div>
@@ -168,4 +203,5 @@ export default function ProfilePage() {
       </motion.div>
     </div>
   );
-}
+
+    
