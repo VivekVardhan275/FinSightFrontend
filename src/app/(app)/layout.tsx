@@ -69,7 +69,7 @@ export default function AuthenticatedAppLayout({
         {/* Top Navigation Bar */}
         <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background/80 px-4 backdrop-blur-md sm:px-6">
           <div className="flex items-center gap-2">
-            <SidebarTrigger className="md:hidden" />
+            <SidebarTrigger /> 
              {/* Search Bar (Optional) */}
             {/* <div className="relative hidden md:block">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
