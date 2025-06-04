@@ -13,7 +13,7 @@ import { motion } from 'framer-motion';
 // Google logo SVG
 const GoogleLogo = () => (
   <svg
-    className="mr-2 h-5 w-5"
+    className="mr-2 h-6 w-6"
     aria-hidden="true"
     focusable="false"
     data-prefix="fab"
