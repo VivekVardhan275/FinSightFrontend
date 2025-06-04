@@ -31,6 +31,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
+import { useCurrency } from "@/contexts/currency-context";
 
 interface TransactionFormDialogProps {
   transaction?: Transaction | null;
@@ -39,13 +40,15 @@ interface TransactionFormDialogProps {
   onSave: (transactionData: Omit<Transaction, 'id'> | Transaction) => void;
 }
 
-const transactionSchema = z.object({
+// Zod schema amount is now for the input value, which will be in selectedCurrency
+const getTransactionSchema = (selectedCurrency: string) => z.object({
   date: z.date({ required_error: "Date is required." }),
   description: z.string().min(1, "Description is required."),
   category: z.string().min(1, "Category is required."),
-  amount: z.number().positive("Amount must be positive."),
+  amount: z.number().positive(`Amount in ${selectedCurrency} must be positive.`),
   type: z.enum(["income", "expense"], { required_error: "Type is required." }),
 });
+
 
 export function TransactionFormDialog({
   transaction,
@@ -54,19 +57,24 @@ export function TransactionFormDialog({
   onSave,
 }: TransactionFormDialogProps) {
   const { toast } = useToast();
+  const { selectedCurrency, convertAmount, conversionRates } = useCurrency();
+  
+  const transactionSchema = getTransactionSchema(selectedCurrency);
+
   const {
     control,
     register,
     handleSubmit,
     reset,
     formState: { errors },
+    setValue,
   } = useForm<TransactionFormData>({
     resolver: zodResolver(transactionSchema),
     defaultValues: {
       date: new Date(),
       description: "",
       category: "",
-      amount: 0,
+      amount: 0, // Will be in selectedCurrency
       type: "expense",
     },
   });
@@ -74,11 +82,12 @@ export function TransactionFormDialog({
   useEffect(() => {
     if (open) {
       if (transaction) {
+        const displayAmount = convertAmount(transaction.amount, selectedCurrency);
         reset({
           date: parseISO(transaction.date),
           description: transaction.description,
           category: transaction.category,
-          amount: transaction.amount,
+          amount: parseFloat(displayAmount.toFixed(2)), // Ensure it's a number with 2 decimal places
           type: transaction.type,
         });
       } else {
@@ -91,12 +100,16 @@ export function TransactionFormDialog({
         });
       }
     }
-  }, [transaction, open, reset]);
+  }, [transaction, open, reset, selectedCurrency, convertAmount]);
 
   const processSubmit = (data: TransactionFormData) => {
+    // Convert amount from selectedCurrency back to USD for saving
+    const amountInUSD = data.amount / (conversionRates[selectedCurrency] || 1);
+
     const transactionDataToSave = {
       ...data,
       date: format(data.date, "yyyy-MM-dd"), // Format date back to string for saving
+      amount: amountInUSD, // Save USD amount
     };
 
     onSave(transaction ? { ...transactionDataToSave, id: transaction.id } : transactionDataToSave);
@@ -170,12 +183,15 @@ export function TransactionFormDialog({
             </div>
 
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="amount" className="text-right">Amount</Label>
+              <Label htmlFor="amount" className="text-right">Amount ({selectedCurrency})</Label>
               <Input
                 id="amount"
                 type="number"
                 step="0.01"
-                {...register("amount", { valueAsNumber: true })}
+                {...register("amount", { 
+                  valueAsNumber: true,
+                  onChange: (e) => setValue("amount", parseFloat(parseFloat(e.target.value).toFixed(2)))
+                })}
                 className="col-span-3"
               />
               {errors.amount && <p className="col-span-4 text-sm text-destructive text-right">{errors.amount.message}</p>}

@@ -80,11 +80,16 @@ export default function BudgetsPage() {
     setIsConfirmDeleteDialogOpen(false);
   };
   
-  const handleSaveBudget = (budgetData: Omit<Budget, 'id'> | Budget) => {
-    if ('id' in budgetData) { // Editing existing budget
-      setBudgets(prev => prev.map(b => b.id === budgetData.id ? budgetData : b));
-    } else { // Adding new budget
-      const newBudget: Budget = { ...budgetData, id: Date.now().toString(), spent: 0 }; // Simple ID, 0 spent initially
+  const handleSaveBudget = (budgetDataFromForm: Omit<Budget, 'id' | 'spent'> | Budget) => {
+    if ('id' in budgetDataFromForm && 'spent' in budgetDataFromForm) { // Editing existing budget
+      // budgetDataFromForm has ID, spent, and other fields (allocated in USD)
+      setBudgets(prev => prev.map(b => b.id === budgetDataFromForm.id ? budgetDataFromForm : b));
+    } else { // Adding new budget (budgetDataFromForm has allocated in USD, category, month, but no id or spent)
+      const newBudget: Budget = { 
+        ...(budgetDataFromForm as Omit<Budget, 'id' | 'spent'>), // Cast to ensure types align
+        id: Date.now().toString(), 
+        spent: 0 // New budgets always start with 0 spent
+      };
       setBudgets(prev => [newBudget, ...prev]);
     }
   };

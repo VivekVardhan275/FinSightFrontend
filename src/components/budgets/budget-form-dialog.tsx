@@ -19,21 +19,22 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
+import { useCurrency } from "@/contexts/currency-context";
 
 interface BudgetFormDialogProps {
   budget?: Budget | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (budgetData: Omit<Budget, 'id'> | Budget) => void;
+  onSave: (budgetData: Omit<Budget, 'id' | 'spent'> | Budget) => void; // spent is handled by parent
 }
 
-const budgetSchema = z.object({
+const getDefaultMonth = () => new Date().toISOString().slice(0, 7);
+
+const getBudgetSchema = (selectedCurrency: string) => z.object({
   category: z.string().min(1, "Category is required."),
-  allocated: z.number().positive("Allocated amount must be positive."),
+  allocated: z.number().positive(`Allocated amount in ${selectedCurrency} must be positive.`),
   month: z.string().regex(/^\d{4}-\d{2}$/, "Month must be in YYYY-MM format."),
 });
-
-const getDefaultMonth = () => new Date().toISOString().slice(0, 7);
 
 export function BudgetFormDialog({
   budget,
@@ -42,16 +43,21 @@ export function BudgetFormDialog({
   onSave,
 }: BudgetFormDialogProps) {
   const { toast } = useToast();
+  const { selectedCurrency, convertAmount, conversionRates } = useCurrency();
+
+  const budgetSchema = getBudgetSchema(selectedCurrency);
+
   const {
     register,
     handleSubmit,
     reset,
     formState: { errors },
+    setValue,
   } = useForm<BudgetFormData>({
     resolver: zodResolver(budgetSchema),
     defaultValues: {
       category: "",
-      allocated: 0,
+      allocated: 0, // Will be in selectedCurrency
       month: getDefaultMonth(),
     },
   });
@@ -59,9 +65,10 @@ export function BudgetFormDialog({
   useEffect(() => {
     if (open) {
       if (budget) {
+        const displayAllocated = convertAmount(budget.allocated, selectedCurrency);
         reset({
           category: budget.category,
-          allocated: budget.allocated,
+          allocated: parseFloat(displayAllocated.toFixed(2)),
           month: budget.month,
         });
       } else {
@@ -72,12 +79,21 @@ export function BudgetFormDialog({
         });
       }
     }
-  }, [budget, open, reset]);
+  }, [budget, open, reset, selectedCurrency, convertAmount]);
 
   const processSubmit = (data: BudgetFormData) => {
-    const budgetDataToSave: Omit<Budget, 'id'> | Budget = budget
-      ? { ...budget, ...data } // Preserve spent amount if editing
-      : { ...data, spent: 0 }; // New budget starts with 0 spent
+    // Convert allocated amount from selectedCurrency back to USD for saving
+    const allocatedInUSD = data.allocated / (conversionRates[selectedCurrency] || 1);
+    
+    const budgetDataToSaveBase = { 
+      category: data.category, 
+      allocated: allocatedInUSD, 
+      month: data.month 
+    };
+
+    const budgetDataToSave: Omit<Budget, 'id' | 'spent'> | Budget = budget
+      ? { ...budget, ...budgetDataToSaveBase } // Preserve spent and ID if editing
+      : budgetDataToSaveBase; // For new budget, parent will add ID and spent
 
     onSave(budgetDataToSave);
     onOpenChange(false);
@@ -117,12 +133,15 @@ export function BudgetFormDialog({
             </div>
 
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="allocated" className="text-right">Allocated Amount</Label>
+              <Label htmlFor="allocated" className="text-right">Allocated ({selectedCurrency})</Label>
               <Input
                 id="allocated"
                 type="number"
                 step="0.01"
-                {...register("allocated", { valueAsNumber: true })}
+                {...register("allocated", { 
+                    valueAsNumber: true,
+                    onChange: (e) => setValue("allocated", parseFloat(parseFloat(e.target.value).toFixed(2))) 
+                })}
                 className="col-span-3"
               />
               {errors.allocated && <p className="col-span-4 text-sm text-destructive text-right">{errors.allocated.message}</p>}
