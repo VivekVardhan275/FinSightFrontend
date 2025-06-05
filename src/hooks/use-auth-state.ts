@@ -26,61 +26,61 @@ export function useAuthState() {
     image: session.user.image,
   } : null;
 
+
   const navigateBasedOnAuthAndSetup = useCallback(() => {
     if (isLoading) return; // Don't navigate while session status is loading
 
     const hasCompletedSetup = localStorage.getItem('foresight_hasCompletedSetup') === 'true';
 
     if (status === 'authenticated') {
-      console.log("useAuthState: Authenticated. Checking setup...");
+      // console.log("useAuthState: Authenticated. Checking setup...");
       if (hasCompletedSetup) {
         if (pathname === '/login' || pathname === '/welcome/setup') {
-          console.log("useAuthState: Setup complete, redirecting to /dashboard");
+          // console.log("useAuthState: Setup complete, redirecting to /dashboard");
           router.replace('/dashboard');
         }
       } else {
         if (pathname !== '/welcome/setup') {
-          console.log("useAuthState: Setup incomplete, redirecting to /welcome/setup");
+          // console.log("useAuthState: Setup incomplete, redirecting to /welcome/setup");
           router.replace('/welcome/setup');
         }
       }
     } else if (status === 'unauthenticated') {
-      console.log("useAuthState: Unauthenticated.");
+      // console.log("useAuthState: Unauthenticated.");
       // Allow access to login and setup page even if unauthenticated (setup page handles its own auth check)
       if (pathname !== '/login' && pathname !== '/welcome/setup') {
-        console.log("useAuthState: Redirecting to /login");
+        // console.log("useAuthState: Redirecting to /login because current path is:", pathname);
         router.replace('/login');
       }
     }
   }, [status, isLoading, pathname, router]);
 
   useEffect(() => {
+    // console.log("useAuthState Effect: Status:", status, "User:", session?.user, "Pathname:", pathname, "IsLoading:", isLoading);
     navigateBasedOnAuthAndSetup();
-  }, [status, isLoading, pathname, navigateBasedOnAuthAndSetup]);
+  }, [status, session, pathname, isLoading, navigateBasedOnAuthAndSetup]);
 
 
   const loginWithGoogle = useCallback(async () => {
-    // The { callbackUrl } option can be used to redirect after sign-in.
-    // Auth.js by default tries to redirect to the page the user was on, or to the root.
-    // We can explicitly set it if needed, e.g., to '/welcome/setup' or '/dashboard'
-    // depending on setup status, but often the default behavior is fine.
-    await signIn('google', { callbackUrl: '/welcome/setup' });
+    console.log("Attempting Google login (default callback)");
+    // Temporarily removed callbackUrl for debugging. NextAuth will use its default.
+    await signIn('google'); 
   }, []);
 
   const loginWithGitHub = useCallback(async () => {
+    console.log("Attempting GitHub login with callback to /welcome/setup");
     await signIn('github', { callbackUrl: '/welcome/setup' });
   }, []);
 
   const appLogout = useCallback(async () => {
-    // Clear local setup flag before signing out from NextAuth
+    console.log("Attempting logout, redirecting to /login");
     localStorage.removeItem('foresight_hasCompletedSetup');
-    await signOut({ callbackUrl: '/login' }); // Redirect to login page after sign out
+    await signOut({ callbackUrl: '/login' }); 
   }, []);
 
   return { 
     user, 
     isLoading, 
-    login: loginWithGoogle, // Default login to Google
     loginWithGoogle,
     loginWithGitHub, 
     logout: appLogout,

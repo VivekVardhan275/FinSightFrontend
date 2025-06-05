@@ -17,12 +17,17 @@ if (!authUrl) {
     "\x1b[31m%s\x1b[0m", // Red color for error
     "CRITICAL ERROR: `AUTH_URL` environment variable is not set. " +
     "This is REQUIRED for NextAuth.js to function correctly, especially with OAuth providers. " +
-    "Set it to your application's base URL (e.g., http://localhost:9002 for local development)."
+    "Set it to your application's base URL (e.g., http://localhost:9002 for local development). " +
+    "Ensure it does NOT have a trailing slash."
   );
-  // Depending on your setup, you might want to throw an error here in development
-  // to prevent the server from starting with a critical misconfiguration.
-  // For now, we'll log an error and let NextAuth.js potentially handle its absence.
+} else if (authUrl.endsWith('/')) {
+  console.warn(
+    "\x1b[33m%s\x1b[0m", // Yellow color for warning
+    "WARNING: `AUTH_URL` in your .env.local file has a trailing slash. " +
+    "It is recommended to remove it (e.g., use 'http://localhost:9002' instead of 'http://localhost:9002/')."
+  );
 }
+
 
 if (!authSecret) {
   console.error(
@@ -77,11 +82,11 @@ if (providers.length === 0) {
 export const authOptions: NextAuthOptions = {
   providers: providers,
   session: {
-    strategy: "jwt",
+    strategy: "jwt", // Using JWT for session strategy
   },
-  // NextAuth.js v5 uses the AUTH_SECRET environment variable automatically.
+  // NextAuth.js v5 uses the AUTH_SECRET environment variable automatically if set.
   // The 'secret' option here is not needed if AUTH_SECRET is set.
-  // secret: authSecret, // Only needed if not using AUTH_SECRET env var
+  // secret: authSecret, 
 
   pages: {
     signIn: '/login',
@@ -93,17 +98,17 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     async jwt({ token, user, account }) {
+      // Persist the OAuth access_token to the token right after signin
       if (account && user) {
-        // Persist the OAuth access_token or other details to the token
-        // token.accessToken = account.access_token;
-        // token.id = user.id; // Ensure your User model has an id
+        // token.accessToken = account.access_token; // Example: if you need provider's access token
+        // token.id = user.id; // user object might have id from provider
       }
       return token;
     },
     async session({ session, token }) {
       // Send properties to the client, like an access_token and user id from a provider.
-      // (session.user as any).id = token.id;
-      // (session as any).accessToken = token.accessToken;
+      // (session.user as any).id = token.id; // Example
+      // (session as any).accessToken = token.accessToken; // Example
       return session;
     },
   },
