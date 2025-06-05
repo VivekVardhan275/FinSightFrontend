@@ -20,12 +20,14 @@ import { z } from "zod";
 import { motion } from "framer-motion";
 import { useCurrency } from "@/contexts/currency-context";
 import { v4 as uuidv4 } from 'uuid';
+import { RotateCw } from "lucide-react";
 
 interface BudgetFormDialogProps {
   budget?: Budget | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (budgetData: Omit<Budget, 'id' | 'spent'> | Budget) => void;
+  onSave: (budgetData: Budget) => void; // Now expects a full Budget object
+  isSaving?: boolean;
 }
 
 const getDefaultMonth = () => new Date().toISOString().slice(0, 7);
@@ -41,6 +43,7 @@ export function BudgetFormDialog({
   open,
   onOpenChange,
   onSave,
+  isSaving = false,
 }: BudgetFormDialogProps) {
   const { selectedCurrency, convertAmount, conversionRates } = useCurrency();
 
@@ -50,7 +53,7 @@ export function BudgetFormDialog({
     register,
     handleSubmit,
     reset,
-    formState: { errors },
+    formState: { errors, isSubmitting: formIsSubmitting },
     setValue,
   } = useForm<BudgetFormData>({
     resolver: zodResolver(budgetSchema),
@@ -83,22 +86,24 @@ export function BudgetFormDialog({
   const processSubmit = (data: BudgetFormData) => {
     const allocatedInUSD = data.allocated / (conversionRates[selectedCurrency] || 1);
 
-    const budgetDataToSaveBase = {
-      category: data.category,
-      allocated: allocatedInUSD,
-      month: data.month,
-    };
-
-    const budgetDataToSave: Omit<Budget, 'id' | 'spent'> | Budget = budget
-      ? { ...budget, ...budgetDataToSaveBase } // For editing, it's a full Budget.
-      : budgetDataToSaveBase; // For new, it's Omit<Budget, 'id' | 'spent'>. Context will add id and spent.
+    const budgetDataToSave: Budget = budget
+      ? { ...budget, category: data.category, allocated: allocatedInUSD, month: data.month }
+      : {
+          id: uuidv4(),
+          category: data.category,
+          allocated: allocatedInUSD,
+          month: data.month,
+          spent: 0, // Initialize spent to 0 for new budgets
+        };
 
     onSave(budgetDataToSave);
-    onOpenChange(false);
+    // onOpenChange(false); // Parent component will handle closing on successful save
   };
 
+  const finalIsSaving = isSaving || formIsSubmitting;
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={!finalIsSaving ? onOpenChange : undefined}>
       <DialogContent className="sm:max-w-[425px] overflow-hidden">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -122,6 +127,7 @@ export function BudgetFormDialog({
                 id="category"
                 {...register("category")}
                 className="col-span-3"
+                disabled={finalIsSaving}
               />
               {errors.category && <p className="col-span-4 text-sm text-destructive text-right">{errors.category.message}</p>}
             </div>
@@ -137,6 +143,7 @@ export function BudgetFormDialog({
                     onChange: (e) => setValue("allocated", parseFloat(parseFloat(e.target.value).toFixed(2)))
                 })}
                 className="col-span-3"
+                disabled={finalIsSaving}
               />
               {errors.allocated && <p className="col-span-4 text-sm text-destructive text-right">{errors.allocated.message}</p>}
             </div>
@@ -148,12 +155,16 @@ export function BudgetFormDialog({
                 type="month"
                 {...register("month")}
                 className="col-span-3"
+                disabled={finalIsSaving}
               />
               {errors.month && <p className="col-span-4 text-sm text-destructive text-right">{errors.month.message}</p>}
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-              <Button type="submit">Save Budget</Button>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={finalIsSaving}>Cancel</Button>
+              <Button type="submit" disabled={finalIsSaving}>
+                {finalIsSaving && <RotateCw className="mr-2 h-4 w-4 animate-spin" />}
+                {finalIsSaving ? "Saving..." : "Save Budget"}
+              </Button>
             </DialogFooter>
           </form>
         </motion.div>
