@@ -25,6 +25,7 @@ import { NotificationBell } from "@/components/layout/notification-bell";
 import { TransactionProvider, useTransactionContext } from "@/contexts/transaction-context";
 import { BudgetProvider, useBudgetContext } from "@/contexts/budget-context";
 import { formatCurrency } from "@/lib/utils";
+import { UserSettingsLoader } from "@/components/layout/user-settings-loader"; // Import the new loader
 
 function BudgetNotificationEffect() {
   const { budgets, getBudgetsByMonth } = useBudgetContext();
@@ -127,10 +128,8 @@ export default function AuthenticatedAppLayout({
   const router = useRouter();
   const pathname = usePathname();
 
-  // This useEffect handles redirection based on auth status and setup completion from session
-  // It replaces the one in useAuthState for clarity and directness in the layout.
   useEffect(() => {
-    if (isLoading || status === 'loading') return; // Wait for auth status to resolve
+    if (isLoading || status === 'loading') return; 
 
     const setupCompleted = user?.hasCompletedSetup === true;
 
@@ -139,23 +138,20 @@ export default function AuthenticatedAppLayout({
         if (pathname === '/login' || pathname === '/welcome/setup') {
           router.replace('/dashboard');
         }
-        // If authenticated and setup complete, and on any other app page, stay.
       } else {
-        // Authenticated but setup not complete
         if (pathname !== '/welcome/setup') {
           router.replace('/welcome/setup');
         }
       }
     } else if (status === 'unauthenticated') {
-      // Unauthenticated
-      if (pathname !== '/login' && pathname !== '/welcome/setup') { // Allow /welcome/setup for potential OAuth redirect interim state
+      if (pathname !== '/login' && pathname !== '/welcome/setup') { 
         router.replace('/login');
       }
     }
   }, [user, isLoading, status, pathname, router]);
 
 
-  if (isLoading || status === 'loading') {
+  if (isLoading || status === 'loading' || (status === 'authenticated' && user?.hasCompletedSetup === undefined) ) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <p>Loading application...</p>
@@ -163,7 +159,6 @@ export default function AuthenticatedAppLayout({
     );
   }
   
-  // If unauthenticated and not trying to go to login or setup (initial load before useEffect kicks in, or direct navigation)
   if (status === 'unauthenticated' && pathname !== '/login' && pathname !== '/welcome/setup') {
      return (
         <div className="flex h-screen items-center justify-center bg-background">
@@ -172,7 +167,6 @@ export default function AuthenticatedAppLayout({
      );
   }
 
-  // If authenticated, but setup not complete, and not on setup page (initial load)
   if (status === 'authenticated' && !user?.hasCompletedSetup && pathname !== '/welcome/setup') {
        return (
         <div className="flex h-screen items-center justify-center bg-background">
@@ -181,8 +175,6 @@ export default function AuthenticatedAppLayout({
       );
   }
 
-  // If we are on login or setup page, but authentication and setup are complete, let useEffect handle redirect.
-  // Otherwise, render the main layout.
   if ((pathname === '/login' || pathname === '/welcome/setup') && status === 'authenticated' && user?.hasCompletedSetup) {
     return (
         <div className="flex h-screen items-center justify-center bg-background">
@@ -191,12 +183,11 @@ export default function AuthenticatedAppLayout({
       );
   }
   
-  // For users who are authenticated and have completed setup, or are on the setup page itself.
-  // Or unauthenticated users on the login page.
-  // Basically, if not covered by the loading/redirect conditions above.
   return (
     <TransactionProvider>
       <BudgetProvider>
+        {/* UserSettingsLoader will fetch and apply settings if user is authenticated and setup is complete */}
+        {isAuthenticated && user?.hasCompletedSetup && <UserSettingsLoader />}
         {isAuthenticated && user?.hasCompletedSetup && <BudgetNotificationEffect />}
         <SidebarProvider defaultOpen>
           <Sidebar variant="sidebar" collapsible="icon" side="left" className="border-r">
@@ -248,5 +239,3 @@ export default function AuthenticatedAppLayout({
     </TransactionProvider>
   );
 }
-
-    
