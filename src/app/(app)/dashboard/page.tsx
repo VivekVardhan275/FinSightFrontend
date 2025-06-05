@@ -15,16 +15,16 @@ import { DollarSign, CreditCard, TrendingUp, PiggyBank } from 'lucide-react';
 
 const cardVariants = {
   hidden: { opacity: 0, y: 20, scale: 0.98 },
-  visible: (i: number) => ({
+  visible: { // No longer a function, so 'custom' prop won't apply this way
     opacity: 1,
     y: 0,
     scale: 1,
     transition: {
-      delay: i * 0.1,
+      delay: 0.15, // Uniform delay for charts
       duration: 0.4,
       ease: "easeOut",
     },
-  }),
+  },
 };
 
 const calculatePercentageChange = (current: number, previous: number): number | null => {
@@ -102,8 +102,6 @@ export default function DashboardPage() {
     
     const incomeTrendDirection: 'up' | 'down' = (incomePercentageChange === null || incomePercentageChange >= 0) ? 'up' : 'down';
     
-    // For expenses: if expenses increased (positive change), we want an 'up' arrow icon. The SummaryCard will color it red.
-    // If expenses decreased (negative change), we want a 'down' arrow icon. The SummaryCard will color it green.
     const expenseIconTrendDirection: 'up' | 'down' = (expensePercentageChange === null || expensePercentageChange > 0) ? 'up' : 'down';
     
     const netSavingsTrendDirection: 'up' | 'down' = (netSavingsPercentageChange === null || netSavingsPercentageChange >= 0) ? 'up' : 'down';
@@ -160,7 +158,6 @@ export default function DashboardPage() {
 
   }, [transactions, budgets]);
   
-  const summaryCardCount = currentMonthDashboardData.length;
 
   return (
     <div className="space-y-8">
@@ -168,7 +165,7 @@ export default function DashboardPage() {
         <motion.h1 
           initial={{ opacity: 0, x: -20 }} 
           animate={{ opacity: 1, x: 0 }} 
-          transition={{ duration: 0.5 }}
+          transition={{ duration: 0.5, delay: 0.05 }}
           className="font-headline text-3xl font-bold tracking-tight"
         >
           Dashboard
@@ -184,26 +181,25 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {currentMonthDashboardData.map((data, index) => (
-          <SummaryCard key={data.title} data={data} index={index} />
+        {currentMonthDashboardData.map((data) => (
+          <SummaryCard key={data.title} data={data} />
         ))}
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <motion.div custom={summaryCardCount} variants={cardVariants} initial="hidden" animate="visible">
+        <motion.div variants={cardVariants} initial="hidden" animate="visible">
           <IncomeOverviewChart />
         </motion.div>
-        <motion.div custom={summaryCardCount + 1} variants={cardVariants} initial="hidden" animate="visible">
+        <motion.div variants={cardVariants} initial="hidden" animate="visible">
           <ExpenseOverviewChart />
         </motion.div>
-        <motion.div custom={summaryCardCount + 2} variants={cardVariants} initial="hidden" animate="visible">
+        <motion.div variants={cardVariants} initial="hidden" animate="visible">
           <ExpenseBreakdownChart />
         </motion.div>
-         <motion.div custom={summaryCardCount + 3} variants={cardVariants} initial="hidden" animate="visible" className="md:col-span-2 lg:col-span-1">
+         <motion.div variants={cardVariants} initial="hidden" animate="visible" className="md:col-span-2 lg:col-span-1">
           <NetSavingsOverviewChart />
         </motion.div>
       </div>
     </div>
   );
 }
-

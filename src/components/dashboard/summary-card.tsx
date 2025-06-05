@@ -11,24 +11,24 @@ import { useCurrency } from "@/contexts/currency-context";
 
 interface SummaryCardProps {
   data: SummaryCardData;
-  index: number;
+  // index prop removed as it's no longer used for staggered animation here
 }
 
 const cardVariants = {
   hidden: { opacity: 0, y: 20, scale: 0.98 },
-  visible: (i: number) => ({
+  visible: { // No longer a function, animation is uniform
     opacity: 1,
     y: 0,
     scale: 1,
     transition: {
-      delay: i * 0.1,
+      delay: 0.1, // Uniform delay for all summary cards
       duration: 0.4,
       ease: "easeOut",
     },
-  }),
+  },
 };
 
-export function SummaryCard({ data, index }: SummaryCardProps) {
+export function SummaryCard({ data }: SummaryCardProps) {
   const { selectedCurrency, convertAmount } = useCurrency();
   const [animatedRawValue, setAnimatedRawValue] = useState(0); 
 
@@ -50,10 +50,8 @@ export function SummaryCard({ data, index }: SummaryCardProps) {
   if (!data.isSimpleTrend && data.trendDirection) {
     const isExpenseCard = data.title === 'Total Expenses';
     if (isExpenseCard) {
-      // For expenses, 'up' trend (increased expenses) is red, 'down' trend (decreased expenses) is green.
       trendColorClass = data.trendDirection === 'up' ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400';
     } else {
-      // For income and net savings, 'up' trend is green, 'down' trend is red.
       trendColorClass = data.trendDirection === 'up' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
     }
   }
@@ -61,7 +59,7 @@ export function SummaryCard({ data, index }: SummaryCardProps) {
 
   return (
     <motion.div
-      custom={index}
+      // custom prop removed
       variants={cardVariants}
       initial="hidden"
       animate="visible"
@@ -96,4 +94,3 @@ export function SummaryCard({ data, index }: SummaryCardProps) {
     </motion.div>
   );
 }
-
