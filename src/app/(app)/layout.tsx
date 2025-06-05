@@ -19,8 +19,8 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CurrencyProvider, useCurrency } from "@/contexts/currency-context";
-import { NotificationProvider, useNotification } from "@/contexts/notification-context";
+import { useCurrency } from "@/contexts/currency-context"; // CurrencyProvider removed, useCurrency still used
+import { useNotification } from "@/contexts/notification-context"; // NotificationProvider removed, useNotification still used
 import { NotificationBell } from "@/components/layout/notification-bell";
 import { TransactionProvider, useTransactionContext } from "@/contexts/transaction-context";
 import { BudgetProvider, useBudgetContext } from "@/contexts/budget-context";
@@ -60,7 +60,7 @@ function BudgetNotificationEffect() {
     const currentMonthBudgets = getBudgetsByMonth(currentYear, currentMonth);
 
     currentMonthBudgets.forEach(budget => {
-      const budgetTransactions = getTransactionsByCategoryAndMonth(budget.category, currentYear, currentMonth);
+      const budgetTransactions = getTransactionsByCategoryAndMonth(budget.category.toLowerCase(), currentYear, currentMonth);
       const currentSpent = budget.spent; 
 
       const percentageSpent = budget.allocated > 0 ? (currentSpent / budget.allocated) * 100 : 0;
@@ -182,61 +182,58 @@ export default function AuthenticatedAppLayout({
 
 
   return (
-    <NotificationProvider>
-      <CurrencyProvider>
-        <TransactionProvider>
-          <BudgetProvider>
-            <BudgetNotificationEffect />
-            <SidebarProvider defaultOpen>
-              <Sidebar variant="sidebar" collapsible="icon" side="left" className="border-r">
-                <SidebarHeader className="p-4 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-2 transition-all duration-200 ease-linear">
-                  <Link href="/dashboard" className="flex items-center gap-2 group-data-[collapsible=icon]:gap-0 transition-all duration-200 ease-linear">
-                    <AppLogo className="h-10 w-10 text-primary transition-all duration-200 ease-linear transform -translate-y-0.5" />
-                    <span className="font-headline text-xl font-semibold whitespace-nowrap overflow-hidden transition-all duration-200 ease-linear group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:max-w-0">
-                      FinSight
-                    </span>
-                  </Link>
-                </SidebarHeader>
-                <SidebarContent>
-                  <SidebarNav />
-                </SidebarContent>
-                <SidebarFooter className="p-4">
-                  {/* You can add footer items like settings or help here */}
-                </SidebarFooter>
-              </Sidebar>
-              <SidebarRail />
-              <SidebarInset>
-                {/* Top Navigation Bar */}
-                <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background/80 px-4 backdrop-blur-md sm:px-6">
-                  <div className="flex items-center gap-2">
-                    <SidebarTrigger />
-                  </div>
+    // NotificationProvider and CurrencyProvider are now in the root layout
+    <TransactionProvider>
+      <BudgetProvider>
+        <BudgetNotificationEffect />
+        <SidebarProvider defaultOpen>
+          <Sidebar variant="sidebar" collapsible="icon" side="left" className="border-r">
+            <SidebarHeader className="p-4 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-2 transition-all duration-200 ease-linear">
+              <Link href="/dashboard" className="flex items-center gap-2 group-data-[collapsible=icon]:gap-0 transition-all duration-200 ease-linear">
+                <AppLogo className="h-10 w-10 text-primary transition-all duration-200 ease-linear transform -translate-y-0.5" />
+                <span className="font-headline text-xl font-semibold whitespace-nowrap overflow-hidden transition-all duration-200 ease-linear group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:max-w-0">
+                  FinSight
+                </span>
+              </Link>
+            </SidebarHeader>
+            <SidebarContent>
+              <SidebarNav />
+            </SidebarContent>
+            <SidebarFooter className="p-4">
+              {/* You can add footer items like settings or help here */}
+            </SidebarFooter>
+          </Sidebar>
+          <SidebarRail />
+          <SidebarInset>
+            {/* Top Navigation Bar */}
+            <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background/80 px-4 backdrop-blur-md sm:px-6">
+              <div className="flex items-center gap-2">
+                <SidebarTrigger />
+              </div>
 
-                  <div className="flex items-center gap-4">
-                    <NotificationBell />
-                    <UserNav />
-                  </div>
-                </header>
+              <div className="flex items-center gap-4">
+                <NotificationBell />
+                <UserNav />
+              </div>
+            </header>
 
-                {/* Page Content */}
-                <AnimatePresence mode="wait">
-                  <motion.main
-                    key={pathname}
-                    initial={{ opacity: 0, y: 15 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -15 }}
-                    transition={{ duration: 0.25 }}
-                    className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8"
-                  >
-                    {children}
-                  </motion.main>
-                </AnimatePresence>
-              </SidebarInset>
-            </SidebarProvider>
-          </BudgetProvider>
-        </TransactionProvider>
-      </CurrencyProvider>
-    </NotificationProvider>
+            {/* Page Content */}
+            <AnimatePresence mode="wait">
+              <motion.main
+                key={pathname}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                transition={{ duration: 0.25 }}
+                className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8"
+              >
+                {children}
+              </motion.main>
+            </AnimatePresence>
+          </SidebarInset>
+        </SidebarProvider>
+      </BudgetProvider>
+    </TransactionProvider>
   );
 }
 

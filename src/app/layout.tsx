@@ -1,3 +1,4 @@
+
 "use client"; // Required for useEffect
 
 import './globals.css';
@@ -5,6 +6,8 @@ import { Toaster } from '@/components/ui/toaster';
 import { ThemeProvider } from '@/components/theme-provider';
 import React, { useEffect } from 'react'; // Import useEffect
 import { Inter } from 'next/font/google';
+import { CurrencyProvider } from "@/contexts/currency-context";
+import { NotificationProvider } from "@/contexts/notification-context";
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
@@ -47,8 +50,12 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
-          <Toaster />
+          <NotificationProvider>
+            <CurrencyProvider>
+              {children}
+              <Toaster />
+            </CurrencyProvider>
+          </NotificationProvider>
         </ThemeProvider>
       </body>
     </html>
