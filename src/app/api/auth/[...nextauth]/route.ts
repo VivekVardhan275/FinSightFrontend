@@ -40,6 +40,7 @@ if (!authSecret) {
 let providers = [];
 
 if (googleClientId && googleClientSecret) {
+  console.info("\x1b[36m%s\x1b[0m", `NextAuth.js: Using Google Client ID: ${googleClientId}`);
   providers.push(
     GoogleProvider({
       clientId: googleClientId,
@@ -57,9 +58,12 @@ if (googleClientId && googleClientSecret) {
     "\x1b[33m%s\x1b[0m", // Yellow color for warning
     "WARNING: Missing Google OAuth environment variables (GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET). Google login will be disabled."
   );
+  if (!googleClientId) console.warn("\x1b[33m%s\x1b[0m", "  - GOOGLE_CLIENT_ID is missing.");
+  if (!googleClientSecret) console.warn("\x1b[33m%s\x1b[0m", "  - GOOGLE_CLIENT_SECRET is missing.");
 }
 
 if (githubClientId && githubClientSecret) {
+  console.info("\x1b[36m%s\x1b[0m", `NextAuth.js: Using GitHub Client ID: ${githubClientId}`);
   providers.push(
     GithubProvider({
       clientId: githubClientId,
@@ -77,17 +81,19 @@ if (githubClientId && githubClientSecret) {
     "\x1b[33m%s\x1b[0m",
     "WARNING: Missing GitHub OAuth environment variables (GITHUB_CLIENT_ID or GITHUB_CLIENT_SECRET). GitHub login will be disabled."
   );
+  if (!githubClientId) console.warn("\x1b[33m%s\x1b[0m", "  - GITHUB_CLIENT_ID is missing.");
+  if (!githubClientSecret) console.warn("\x1b[33m%s\x1b[0m", "  - GITHUB_CLIENT_SECRET is missing.");
 }
 
 if (providers.length === 0) {
     console.error(
     "\x1b[31m%s\x1b[0m",
-    "CRITICAL ERROR: No authentication providers are configured due to missing environment variables. Authentication will not work."
+    "CRITICAL ERROR: No authentication providers are configured due to missing environment variables. Authentication will not work. Please check your .env.local file."
   );
   // Add a placeholder provider if none are configured to prevent NextAuth from erroring out on initialization
   // This provider will not actually work but allows the app to start for easier debugging of env vars.
   providers.push(
-    GoogleProvider({ clientId: "placeholder", clientSecret: "placeholder" })
+    GoogleProvider({ clientId: "placeholder_id_check_env", clientSecret: "placeholder_secret_check_env" })
   );
 }
 
