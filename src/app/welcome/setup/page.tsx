@@ -135,16 +135,14 @@ export default function SetupPage() {
     setIsSaving(true);
 
     const setupPayload = {
-      email: user.email, // Primary identifier for backend
-      displayName: displayName || user.name, // Fallback to original name if display name is empty
-      phoneNumber: phoneNumber || null, // Send null if empty
-      dateOfBirth: dateOfBirth || null, // Send null if empty
-      gender: gender || null, // Send null if empty
-      preferences: {
-        theme: currentTheme,
-        fontSize: fontSize,
-        currency: currentSelectedCurrency,
-      }
+      email: user.email, 
+      displayName: displayName || user.name, 
+      phoneNumber: phoneNumber || null, 
+      dateOfBirth: dateOfBirth || null, 
+      gender: gender || null, 
+      theme: currentTheme,
+      fontSize: fontSize,
+      currency: currentSelectedCurrency,
     };
 
     try {
