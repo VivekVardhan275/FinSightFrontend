@@ -1,14 +1,14 @@
 
 "use client";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"; // Removed AvatarImage
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuthState } from "@/hooks/use-auth-state";
-import { User as UserIconLucide, Mail, Edit3, Save, XCircle } from "lucide-react"; // Renamed UserIcon to UserIconLucide
+import { User as UserIconLucide, Mail, Edit3, Save, XCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import React, { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -40,17 +40,17 @@ export default function ProfilePage() {
     if (user) {
       const initialName = user.name || "";
       setDisplayName(initialName);
-      setInitialDisplayNameForEdit(initialName); 
-      
-      const initialPhone = ""; 
-      setPhoneNumber(initialPhone); 
+      setInitialDisplayNameForEdit(initialName);
+
+      const initialPhone = "";
+      setPhoneNumber(initialPhone);
       setInitialPhoneNumberForEdit(initialPhone);
 
-      const initialDob = ""; 
+      const initialDob = "";
       setDateOfBirth(initialDob);
       setInitialDateOfBirthForEdit(initialDob);
 
-      const initialGen = ""; 
+      const initialGen = "";
       setGender(initialGen);
       setInitialGenderForEdit(initialGen);
     }
@@ -73,7 +73,7 @@ export default function ProfilePage() {
   }
 
   const getInitials = (name: string) => {
-    if (!name) return "?"; // Fallback for empty name
+    if (!name) return "?";
     const names = name.split(' ');
     let initials = names[0].substring(0, 1).toUpperCase();
     if (names.length > 1) {
@@ -99,29 +99,22 @@ export default function ProfilePage() {
   };
 
   const handleSaveChanges = () => {
-    // In a real app, you'd call an API to save these changes.
-    // For now, we'll just update the local state and show a toast.
-    // If using a global state management like Zustand or Redux for user profile,
-    // you'd dispatch an action here.
-    // For this prototype, the changes are local to this component and `useAuthState`'s user object
-    // isn't directly updated from here.
     console.log("Saving profile:", { displayName, phoneNumber, dateOfBirth, gender });
     toast({
       title: "Profile Updated",
       description: "Your personal information has been (simulated) saved.",
     });
     setIsEditingPersonalInfo(false);
-    // Update initial values for next edit session
     setInitialDisplayNameForEdit(displayName);
     setInitialPhoneNumberForEdit(phoneNumber);
     setInitialDateOfBirthForEdit(dateOfBirth);
     setInitialGenderForEdit(gender);
   };
-  
+
   const handleEmailClick = () => {
     toast({
       title: "Email Address",
-      description: "Your email address cannot be changed.", // Or, "Email is managed by your OAuth provider."
+      description: "Your email address cannot be changed.",
     });
   };
 
@@ -132,10 +125,11 @@ export default function ProfilePage() {
 
   return (
     <div className="space-y-8">
-      <motion.div 
-        initial={{ opacity: 0, x: -20 }} 
-        animate={{ opacity: 1, x: 0 }} 
+      <motion.div
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.5 }}
+        viewport={{ once: true }}
       >
         <h1 className="font-headline text-3xl font-bold tracking-tight">
           Profile
@@ -150,11 +144,11 @@ export default function ProfilePage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.2 }}
         className="grid gap-8 md:grid-cols-3"
+        viewport={{ once: true }}
       >
         <Card className="md:col-span-1 shadow-lg">
           <CardHeader className="items-center text-center">
             <Avatar className="h-24 w-24 mb-4 border-2 border-primary">
-              {/* AvatarImage removed */}
               <AvatarFallback className="text-3xl">{getInitials(displayName || user.name)}</AvatarFallback>
             </Avatar>
             <CardTitle className="text-2xl font-headline">{displayName || user.name}</CardTitle>
@@ -164,8 +158,7 @@ export default function ProfilePage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">
-            {/* Button to edit profile picture can be removed or kept disabled as image functionality is removed */}
-            <Button variant="outline" disabled> 
+            <Button variant="outline" disabled>
               <Edit3 className="mr-2 h-4 w-4" /> Edit Profile Picture
             </Button>
           </CardContent>
@@ -185,9 +178,9 @@ export default function ProfilePage() {
             <div className="space-y-2">
               <Label htmlFor="fullName">Full Name</Label>
               {isEditingPersonalInfo ? (
-                <Input 
-                  id="fullName" 
-                  value={displayName} 
+                <Input
+                  id="fullName"
+                  value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                 />
               ) : (
@@ -202,7 +195,7 @@ export default function ProfilePage() {
                 onClick={handleEmailClick}
                 className={cn(
                   "flex h-10 w-full items-center rounded-md border border-transparent bg-transparent px-3 py-2 text-sm",
-                  "cursor-not-allowed opacity-70" // Made it look more disabled
+                  "cursor-not-allowed opacity-70"
                 )}
               >
                 {user.email}
@@ -212,12 +205,12 @@ export default function ProfilePage() {
             <div className="space-y-2">
               <Label htmlFor="phone">Phone Number</Label>
               {isEditingPersonalInfo ? (
-                <Input 
-                  id="phone" 
-                  type="tel" 
-                  placeholder="e.g., (123) 456-7890" 
-                  value={phoneNumber} 
-                  onChange={(e) => setPhoneNumber(e.target.value)} 
+                <Input
+                  id="phone"
+                  type="tel"
+                  placeholder="e.g., (123) 456-7890"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
                 />
               ) : (
                 <ReadOnlyFieldDisplay value={phoneNumber} placeholder="Add phone number" />
@@ -227,17 +220,17 @@ export default function ProfilePage() {
             <div className="space-y-2">
               <Label htmlFor="dateOfBirth">Date of Birth</Label>
               {isEditingPersonalInfo ? (
-                <Input 
-                  id="dateOfBirth" 
-                  type="date" 
-                  value={dateOfBirth} 
-                  onChange={(e) => setDateOfBirth(e.target.value)} 
+                <Input
+                  id="dateOfBirth"
+                  type="date"
+                  value={dateOfBirth}
+                  onChange={(e) => setDateOfBirth(e.target.value)}
                 />
               ) : (
                  <ReadOnlyFieldDisplay value={dateOfBirth ? new Date(dateOfBirth + 'T00:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : null} placeholder="Select date of birth" />
               )}
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="gender">Gender</Label>
               {isEditingPersonalInfo ? (

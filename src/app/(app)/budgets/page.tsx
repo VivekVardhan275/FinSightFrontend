@@ -41,19 +41,19 @@ const gridMotionVariants = {
     transition: {
       delay: 0.2,
       when: "beforeChildren",
-      staggerChildren: 0.05, // Small stagger for cards within the grid
+      staggerChildren: 0.05,
     },
   },
 };
 
 const budgetCardVariants = {
   hidden: { opacity: 0, y: 20, scale: 0.95 },
-  visible: (i: number) => ({ // Accept custom prop for dynamic delay
+  visible: (i: number) => ({
     opacity: 1,
     y: 0,
     scale: 1,
     transition: {
-      delay: i * 0.07, // Stagger based on index
+      delay: i * 0.07,
       duration: 0.4,
       ease: "easeOut",
     },
@@ -174,7 +174,7 @@ export default function BudgetsPage() {
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <motion.div initial="initial" animate="animate" variants={pageMotionVariants}>
+        <motion.div initial="initial" animate="animate" variants={pageMotionVariants} viewport={{ once: true }}>
           <h1
             className="font-headline text-3xl font-bold tracking-tight"
           >
@@ -186,7 +186,7 @@ export default function BudgetsPage() {
             Set and track your monthly spending goals.
           </p>
         </motion.div>
-        <motion.div initial="initial" animate="animate" variants={buttonMotionVariants}>
+        <motion.div initial="initial" animate="animate" variants={buttonMotionVariants} viewport={{ once: true }}>
           <Button onClick={handleAddBudget}>
             <PlusCircle className="mr-2 h-5 w-5" />
             Add Budget
@@ -200,6 +200,7 @@ export default function BudgetsPage() {
           initial="hidden"
           animate="visible"
           variants={gridMotionVariants}
+          viewport={{ once: true }}
         >
           {budgets.map((budget, index) => (
             <BudgetCard
@@ -208,7 +209,7 @@ export default function BudgetsPage() {
               onEdit={handleEditBudget}
               onDelete={confirmDeleteBudget}
               variants={budgetCardVariants}
-              custom={index} // Pass index for staggered delay
+              custom={index}
             />
           ))}
         </motion.div>
@@ -218,6 +219,7 @@ export default function BudgetsPage() {
           initial="initial"
           animate="animate"
           variants={emptyStateMotionVariants}
+          viewport={{ once: true }}
         >
             <Target className="mx-auto h-12 w-12 text-muted-foreground" />
             <h3 className="mt-4 text-xl font-semibold">No budgets yet</h3>

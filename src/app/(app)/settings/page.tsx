@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useTheme } from "next-themes";
 import { useToast } from "@/hooks/use-toast";
-import { Palette, Globe, Save, User as UserIconLucide } from "lucide-react"; 
+import { Palette, Globe, Save, User as UserIconLucide } from "lucide-react";
 import { motion } from "framer-motion";
 import { useCurrency, type Currency as AppCurrency } from "@/contexts/currency-context";
 
@@ -26,8 +26,8 @@ const FONT_SIZE_CLASSES: Record<FontSizeSetting, string> = {
 
 // Helper to initialize state from localStorage
 const initializeFromLocalStorage = <T,>(
-  key: string, 
-  defaultValue: T, 
+  key: string,
+  defaultValue: T,
   validator?: (value: any) => boolean,
   parser?: (storedValue: string) => T
 ): T => {
@@ -65,7 +65,7 @@ export default function SettingsPage() {
       !!FONT_SIZE_CLASSES[v as FontSizeSetting]
     )
   );
-  
+
   // Effect to align currentTheme with next-themes' activeTheme if "app-theme" was not initially set from localStorage
   useEffect(() => {
     const storedAppTheme = localStorage.getItem("app-theme");
@@ -73,11 +73,11 @@ export default function SettingsPage() {
       setCurrentTheme(activeTheme as ThemeSetting);
     }
   }, [activeTheme]);
-  
+
   // Persist settings to localStorage AND apply them whenever they change
   useEffect(() => {
     localStorage.setItem("app-theme", currentTheme);
-    setTheme(currentTheme); 
+    setTheme(currentTheme);
   }, [currentTheme, setTheme]);
 
   useEffect(() => {
@@ -99,10 +99,11 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-8">
-      <motion.div 
-        initial={{ opacity: 0, x: -20 }} 
-        animate={{ opacity: 1, x: 0 }} 
+      <motion.div
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.5 }}
+        viewport={{ once: true }}
       >
         <h1 className="font-headline text-3xl font-bold tracking-tight">
           Settings
@@ -113,7 +114,7 @@ export default function SettingsPage() {
       </motion.div>
 
       {/* Appearance Settings */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }}>
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }} viewport={{ once: true }}>
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center font-headline">
@@ -159,7 +160,7 @@ export default function SettingsPage() {
       </motion.div>
 
       {/* Regional Preferences */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}>
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }} viewport={{ once: true }}>
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center font-headline">
@@ -187,9 +188,9 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       </motion.div>
-      
+
       {/* Account Settings Placeholder */}
-       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }}>
+       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }} viewport={{ once: true }}>
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center font-headline">
@@ -208,7 +209,7 @@ export default function SettingsPage() {
       </motion.div>
 
 
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.4 }} className="flex justify-end pt-4">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.4 }} className="flex justify-end pt-4" viewport={{ once: true }}>
         <Button onClick={handleSaveSettings} size="lg">
           <Save className="mr-2 h-5 w-5" />
           Save All Settings
@@ -221,4 +222,3 @@ export default function SettingsPage() {
 const UserIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
 );
-

@@ -11,17 +11,17 @@ import { useCurrency } from "@/contexts/currency-context";
 
 interface SummaryCardProps {
   data: SummaryCardData;
-  index: number; 
+  index: number;
 }
 
 const cardVariants = {
   hidden: { opacity: 0, y: 20, scale: 0.98 },
-  visible: (i: number) => ({ 
+  visible: (i: number) => ({
     opacity: 1,
     y: 0,
     scale: 1,
     transition: {
-      delay: 0.1 + i * 0.1, 
+      delay: 0.1 + i * 0.1, // Staggered delay based on index
       duration: 0.4,
       ease: "easeOut",
     },
@@ -30,10 +30,10 @@ const cardVariants = {
 
 export function SummaryCard({ data, index }: SummaryCardProps) {
   const { selectedCurrency, convertAmount } = useCurrency();
-  const [animatedRawValue, setAnimatedRawValue] = useState(0); 
+  const [animatedRawValue, setAnimatedRawValue] = useState(0);
 
   useEffect(() => {
-    const controls = animate(0, data.rawValue, { 
+    const controls = animate(0, data.rawValue, {
       duration: 1.5,
       ease: "easeOut",
       onUpdate: (value) => {
@@ -64,6 +64,7 @@ export function SummaryCard({ data, index }: SummaryCardProps) {
       initial="hidden"
       animate="visible"
       whileHover={{ y: -5, transition: { duration: 0.2 } }}
+      viewport={{ once: true }}
     >
       <Card className="shadow-lg transition-shadow hover:shadow-xl h-full">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

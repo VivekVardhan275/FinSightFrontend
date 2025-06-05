@@ -244,11 +244,11 @@ export default function TransactionsPage() {
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <motion.div initial="initial" animate="animate" variants={pageMotionVariants}>
+        <motion.div initial="initial" animate="animate" variants={pageMotionVariants} viewport={{ once: true }}>
           <h1 className="font-headline text-3xl font-bold tracking-tight">Transactions</h1>
           <p className="text-muted-foreground">Manage your income and expenses.</p>
         </motion.div>
-        <motion.div initial="initial" animate="animate" variants={buttonMotionVariants}>
+        <motion.div initial="initial" animate="animate" variants={buttonMotionVariants} viewport={{ once: true }}>
           <Button onClick={handleAddTransaction}>
             <PlusCircle className="mr-2 h-5 w-5" />
             Add Transaction
@@ -256,7 +256,7 @@ export default function TransactionsPage() {
         </motion.div>
       </div>
 
-      <motion.div initial="initial" animate="animate" variants={tableMotionVariants}>
+      <motion.div initial="initial" animate="animate" variants={tableMotionVariants} viewport={{ once: true }}>
         <DataTable columns={columns} data={transactions} />
       </motion.div>
 

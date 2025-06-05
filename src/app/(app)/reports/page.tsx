@@ -28,7 +28,7 @@ export default function ReportsPage() {
       });
     }, 3000);
   };
-  
+
   // Create a list of months for the select dropdown (e.g., last 12 months)
   const monthOptions = Array.from({ length: 12 }, (_, i) => {
     const d = new Date();
@@ -39,10 +39,11 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-8">
-      <motion.div 
-        initial={{ opacity: 0, x: -20 }} 
-        animate={{ opacity: 1, x: 0 }} 
+      <motion.div
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.5 }}
+        viewport={{ once: true }}
       >
         <h1 className="font-headline text-3xl font-bold tracking-tight">
           Generate Reports
@@ -57,6 +58,7 @@ export default function ReportsPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.2 }}
+        viewport={{ once: true }}
       >
         <Card className="shadow-lg">
           <CardHeader>

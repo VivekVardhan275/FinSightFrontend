@@ -13,14 +13,14 @@ import { useBudgetContext } from '@/contexts/budget-context';
 import type { SummaryCardData, Transaction, Budget } from '@/types';
 import { DollarSign, CreditCard, TrendingUp, PiggyBank } from 'lucide-react';
 
-const cardVariants = { // This was for the CHARTS in the original version
+const cardVariants = {
   hidden: { opacity: 0, y: 20, scale: 0.98 },
   visible: {
     opacity: 1,
     y: 0,
     scale: 1,
     transition: {
-      delay: 0.15, // Uniform delay for charts
+      delay: 0.15,
       duration: 0.4,
       ease: "easeOut",
     },
@@ -29,9 +29,9 @@ const cardVariants = { // This was for the CHARTS in the original version
 
 const calculatePercentageChange = (current: number, previous: number): number | null => {
   if (previous === 0) {
-    if (current > 0) return Infinity; 
-    if (current < 0) return -Infinity; 
-    return 0; 
+    if (current > 0) return Infinity;
+    if (current < 0) return -Infinity;
+    return 0;
   }
   if (Math.abs(previous) < 0.00001) return current === 0 ? 0 : (current > 0 ? Infinity : -Infinity);
 
@@ -42,8 +42,8 @@ const formatTrendText = (percentage: number | null, type: "income" | "expense" |
   if (percentage === null || isNaN(percentage)) return "Data unavailable";
   if (percentage === Infinity) return `Increased (was 0)`;
   if (percentage === -Infinity) return `Decreased (was 0)`;
-  
-  const prefix = percentage >= 0 ? "+" : ""; // Ensure + for 0.0%
+
+  const prefix = percentage >= 0 ? "+" : "";
   return `${prefix}${percentage.toFixed(1)}% from last month`;
 };
 
@@ -75,7 +75,7 @@ export default function DashboardPage() {
     const currentMonthTotalIncome = currentMonthTransactions
       .filter(t => t.type === 'income')
       .reduce((sum, t) => sum + t.amount, 0);
-    
+
     const previousMonthTotalIncome = previousMonthTransactions
       .filter(t => t.type === 'income')
       .reduce((sum, t) => sum + t.amount, 0);
@@ -90,20 +90,20 @@ export default function DashboardPage() {
 
     const incomePercentageChange = calculatePercentageChange(currentMonthTotalIncome, previousMonthTotalIncome);
     const expensePercentageChange = calculatePercentageChange(currentMonthTotalExpenses, previousMonthTotalExpenses);
-    
+
     const incomeTrendText = formatTrendText(incomePercentageChange, "income");
     const expenseTrendText = formatTrendText(expensePercentageChange, "expense");
 
     const currentMonthNetSavings = currentMonthTotalIncome - currentMonthTotalExpenses;
     const previousMonthNetSavings = previousMonthTotalIncome - previousMonthTotalExpenses;
-    
+
     const netSavingsPercentageChange = calculatePercentageChange(currentMonthNetSavings, previousMonthNetSavings);
     const netSavingsTrendText = formatTrendText(netSavingsPercentageChange, "savings");
-    
+
     const incomeTrendDirection: 'up' | 'down' = (incomePercentageChange === null || incomePercentageChange >= 0) ? 'up' : 'down';
-    
+
     const expenseIconTrendDirection: 'up' | 'down' = (expensePercentageChange === null || expensePercentageChange > 0) ? 'up' : 'down';
-    
+
     const netSavingsTrendDirection: 'up' | 'down' = (netSavingsPercentageChange === null || netSavingsPercentageChange >= 0) ? 'up' : 'down';
 
 
@@ -111,69 +111,71 @@ export default function DashboardPage() {
         const budgetMonthYear = b.month.split('-'); // YYYY-MM
         return parseInt(budgetMonthYear[0]) === currentYear && (parseInt(budgetMonthYear[1]) -1) === currentMonth;
     });
-    
+
     const budgetLeft = currentMonthBudgets.reduce((sum, b) => {
         return sum + (b.allocated - b.spent);
     }, 0);
-    
+
     const onTrackBudgetsCount = currentMonthBudgets.filter(b => {
         return b.spent <= b.allocated;
     }).length;
 
 
     return [
-      { 
-        title: 'Total Income', 
-        rawValue: currentMonthTotalIncome, 
+      {
+        title: 'Total Income',
+        rawValue: currentMonthTotalIncome,
         isCurrency: true,
-        icon: React.createElement(DollarSign, { className: "h-6 w-6 text-green-500" }), 
-        trend: incomeTrendText, 
+        icon: React.createElement(DollarSign, { className: "h-6 w-6 text-green-500" }),
+        trend: incomeTrendText,
         trendDirection: incomeTrendDirection
       },
-      { 
-        title: 'Total Expenses', 
-        rawValue: currentMonthTotalExpenses, 
+      {
+        title: 'Total Expenses',
+        rawValue: currentMonthTotalExpenses,
         isCurrency: true,
-        icon: React.createElement(CreditCard, { className: "h-6 w-6 text-red-500" }), 
-        trend: expenseTrendText, 
-        trendDirection: expenseIconTrendDirection 
+        icon: React.createElement(CreditCard, { className: "h-6 w-6 text-red-500" }),
+        trend: expenseTrendText,
+        trendDirection: expenseIconTrendDirection
       },
-      { 
-        title: 'Net Savings', 
-        rawValue: currentMonthNetSavings, 
+      {
+        title: 'Net Savings',
+        rawValue: currentMonthNetSavings,
         isCurrency: true,
-        icon: React.createElement(TrendingUp, { className: "h-6 w-6 text-primary" }), 
-        trend: netSavingsTrendText, 
-        trendDirection: netSavingsTrendDirection 
+        icon: React.createElement(TrendingUp, { className: "h-6 w-6 text-primary" }),
+        trend: netSavingsTrendText,
+        trendDirection: netSavingsTrendDirection
       },
-      { 
-        title: 'Budget Left', 
+      {
+        title: 'Budget Left',
         rawValue: budgetLeft > 0 ? budgetLeft : 0,
         isCurrency: true,
-        icon: React.createElement(PiggyBank, { className: "h-6 w-6 text-accent" }), 
+        icon: React.createElement(PiggyBank, { className: "h-6 w-6 text-accent" }),
         trend: `${onTrackBudgetsCount} budgets on track`,
-        isSimpleTrend: true, 
+        isSimpleTrend: true,
       },
     ] as SummaryCardData[];
 
   }, [transactions, budgets]);
-  
+
 
   return (
     <div className="space-y-8">
       <div>
-        <motion.h1 
-          initial={{ opacity: 0, x: -20 }} 
-          animate={{ opacity: 1, x: 0 }} 
+        <motion.h1
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5, delay: 0.05 }}
+          viewport={{ once: true }}
           className="font-headline text-3xl font-bold tracking-tight"
         >
           Dashboard
         </motion.h1>
-        <motion.p 
-          initial={{ opacity: 0, x: -20 }} 
-          animate={{ opacity: 1, x: 0 }} 
+        <motion.p
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
+          viewport={{ once: true }}
           className="text-muted-foreground"
         >
           Welcome back! Here's your financial overview.
@@ -187,16 +189,16 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <motion.div variants={cardVariants} initial="hidden" animate="visible">
+        <motion.div variants={cardVariants} initial="hidden" animate="visible" viewport={{ once: true }}>
           <IncomeOverviewChart />
         </motion.div>
-        <motion.div variants={cardVariants} initial="hidden" animate="visible">
+        <motion.div variants={cardVariants} initial="hidden" animate="visible" viewport={{ once: true }}>
           <ExpenseOverviewChart />
         </motion.div>
-        <motion.div variants={cardVariants} initial="hidden" animate="visible">
+        <motion.div variants={cardVariants} initial="hidden" animate="visible" viewport={{ once: true }}>
           <ExpenseBreakdownChart />
         </motion.div>
-         <motion.div variants={cardVariants} initial="hidden" animate="visible" className="md:col-span-2 lg:col-span-1">
+         <motion.div variants={cardVariants} initial="hidden" animate="visible" className="md:col-span-2 lg:col-span-1" viewport={{ once: true }}>
           <NetSavingsOverviewChart />
         </motion.div>
       </div>

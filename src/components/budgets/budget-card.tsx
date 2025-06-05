@@ -40,6 +40,7 @@ export function BudgetCard({ budget, onEdit, onDelete, variants, custom }: Budge
       custom={custom}
       className="h-full"
       whileHover={{ y: -5, scale: 1.03, transition: { duration: 0.2 } }}
+      viewport={{ once: true }}
     >
       <Card className="shadow-lg transition-shadow hover:shadow-xl h-full flex flex-col">
         <CardHeader>
