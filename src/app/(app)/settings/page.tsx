@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -10,9 +10,13 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useTheme } from "next-themes";
 import { useToast } from "@/hooks/use-toast";
-import { Palette, Globe, Save } from "lucide-react";
+import { Palette, Globe, Save, RotateCw } from "lucide-react";
 import { motion } from "framer-motion";
 import { useCurrency, type Currency as AppCurrency } from "@/contexts/currency-context";
+import { useAuthState } from "@/hooks/use-auth-state"; // Import useAuthState
+import axios from "axios"; // Import axios
+
+const SETTINGS_API_URL = "http://localhost:8080/api/user/settings";
 
 const pageHeaderBlockMotionVariants = {
   initial: { opacity: 0, x: -20 },
@@ -59,11 +63,12 @@ const initializeFromLocalStorage = <T,>(
 
 
 export default function SettingsPage() {
+  const { user, isLoading: authLoading } = useAuthState(); // Get user and auth loading state
   const { theme: activeTheme, setTheme } = useTheme();
   const { toast } = useToast();
   const { selectedCurrency, setSelectedCurrency } = useCurrency();
 
-  // Appearance
+  // Settings states
   const [currentTheme, setCurrentTheme] = useState<ThemeSetting>(() =>
     initializeFromLocalStorage<ThemeSetting>("app-theme", "system", (v) =>
       ["light", "dark", "system"].includes(v)
@@ -74,8 +79,57 @@ export default function SettingsPage() {
       !!FONT_SIZE_CLASSES[v as FontSizeSetting]
     )
   );
+  // Local selectedCurrency is now primarily driven by useCurrency hook,
+  // but we fetch it and set it via setSelectedCurrency
 
-  // Effect to align currentTheme with next-themes' activeTheme if "app-theme" was not initially set from localStorage
+  const [isSettingsLoading, setIsSettingsLoading] = useState(true); // For API loading state
+
+  // Fetch settings from API
+  const fetchSettings = useCallback(async (userEmail: string) => {
+    setIsSettingsLoading(true);
+    try {
+      const response = await axios.get(`${SETTINGS_API_URL}?email=${encodeURIComponent(userEmail)}`);
+      const fetchedSettings = response.data;
+
+      if (fetchedSettings.theme && ["light", "dark", "system"].includes(fetchedSettings.theme)) {
+        setCurrentTheme(fetchedSettings.theme);
+      }
+      if (fetchedSettings.fontSize && FONT_SIZE_CLASSES[fetchedSettings.fontSize as FontSizeSetting]) {
+        setFontSize(fetchedSettings.fontSize);
+      }
+      if (fetchedSettings.currency) {
+        setSelectedCurrency(fetchedSettings.currency as AppCurrency);
+      }
+
+      toast({
+        title: "Settings Loaded",
+        description: "Your preferences have been loaded from the server.",
+        variant: "default",
+      });
+    } catch (error) {
+      console.error("Error fetching settings:", error);
+      toast({
+        title: "Error Loading Settings",
+        description: "Could not fetch your settings. Using local or default values.",
+        variant: "destructive",
+      });
+      // Fallback to localStorage/defaults is handled by initial useState values
+    } finally {
+      setIsSettingsLoading(false);
+    }
+  }, [setSelectedCurrency, toast]);
+
+  useEffect(() => {
+    if (user && user.email && !authLoading) {
+      fetchSettings(user.email);
+    } else if (!authLoading) {
+      // No user or email, so we rely on localStorage/defaults
+      setIsSettingsLoading(false);
+    }
+  }, [user, authLoading, fetchSettings]);
+
+
+  // Effect to align currentTheme with next-themes' activeTheme if "app-theme" was not initially set from localStorage or API
   useEffect(() => {
     const storedAppTheme = localStorage.getItem("app-theme");
     if (!storedAppTheme && activeTheme && ["light", "dark", "system"].includes(activeTheme)) {
@@ -86,7 +140,7 @@ export default function SettingsPage() {
   // Persist settings to localStorage AND apply them whenever they change
   useEffect(() => {
     localStorage.setItem("app-theme", currentTheme);
-    setTheme(currentTheme);
+    setTheme(currentTheme); // Applies theme using next-themes
   }, [currentTheme, setTheme]);
 
   useEffect(() => {
@@ -94,17 +148,36 @@ export default function SettingsPage() {
     const htmlElement = document.documentElement;
     Object.values(FONT_SIZE_CLASSES).forEach(cls => htmlElement.classList.remove(cls));
     if (FONT_SIZE_CLASSES[fontSize]) {
-      htmlElement.classList.add(FONT_SIZE_CLASSES[fontSize]);
+      htmlElement.classList.add(FONT_SIZE_CLASSES[fontSize]); // Applies font size class
     }
   }, [fontSize]);
 
+  // Currency is managed by CurrencyProvider, which handles localStorage
+
 
   const handleSaveSettings = () => {
+    // This function currently only saves to localStorage (implicitly via useEffects)
+    // and shows a toast. It does not yet make an API call to save settings to backend.
+    // TODO: If needed, implement PUT request to backend here.
+    localStorage.setItem("app-theme", currentTheme);
+    localStorage.setItem("app-font-size", fontSize);
+    // selectedCurrency is already updated in context and localStorage by setSelectedCurrency
+
     toast({
       title: "Settings Applied",
-      description: "Your preferences have been updated and saved.",
+      description: "Your preferences have been updated locally.",
     });
   };
+
+  if (authLoading || isSettingsLoading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <RotateCw className="mr-2 h-6 w-6 animate-spin text-primary" />
+        <p>Loading settings...</p>
+      </div>
+    );
+  }
+
 
   return (
     <div className="space-y-8">
@@ -207,3 +280,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+
