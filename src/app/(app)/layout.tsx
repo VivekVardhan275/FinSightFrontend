@@ -17,7 +17,7 @@ import {
 import { useAuthState } from "@/hooks/use-auth-state";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import React, { useEffect } from "react";
+import React, { useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCurrency } from "@/contexts/currency-context";
 import { useNotification } from "@/contexts/notification-context";
@@ -29,7 +29,7 @@ import { formatCurrency } from "@/lib/utils";
 
 function BudgetNotificationEffect() {
   const { budgets, getBudgetsByMonth } = useBudgetContext();
-  const { transactions, getTransactionsByCategoryAndMonth } = useTransactionContext();
+  // transactions context is not directly used for calculation here as budget.spent is the source of truth from BudgetContext
   const { addNotification } = useNotification();
   const { selectedCurrency, convertAmount } = useCurrency();
   const [notifiedLayoutBudgets, setNotifiedLayoutBudgets] = React.useState<Set<string>>(new Set());
@@ -40,7 +40,7 @@ function BudgetNotificationEffect() {
       try {
         setNotifiedLayoutBudgets(new Set(JSON.parse(storedNotified)));
       } catch (e) {
-        console.error("Error parsing layout notified budgets from localStorage", e);
+        // console.error("Error parsing layout notified budgets from localStorage", e); // Keep console clean
       }
     }
   }, []);
@@ -49,29 +49,31 @@ function BudgetNotificationEffect() {
     localStorage.setItem('app-layout-notified-budgets', JSON.stringify(Array.from(notifiedLayoutBudgets)));
   }, [notifiedLayoutBudgets]);
 
-  const checkAndNotifyGlobalBudgets = React.useCallback(() => {
+  const checkAndNotifyGlobalBudgets = useCallback(() => {
     if (!budgets || budgets.length === 0) return;
 
     const currentDate = new Date();
     const currentYear = currentDate.getFullYear();
-    const currentMonth = currentDate.getMonth() + 1; 
+    const currentMonth = currentDate.getMonth() + 1; // 1-indexed
 
     const currentMonthBudgets = getBudgetsByMonth(currentYear, currentMonth);
 
     currentMonthBudgets.forEach(budget => {
-      // const budgetTransactions = getTransactionsByCategoryAndMonth(budget.category.toLowerCase(), currentYear, currentMonth); // Not needed if using budget.spent directly
-      const currentSpent = budget.spent; 
-
-      const percentageSpent = budget.allocated > 0 ? (currentSpent / budget.allocated) * 100 : 0;
+      const currentSpentUSD = budget.spent;
+      const allocatedUSD = budget.allocated;
+      const percentageSpent = allocatedUSD > 0 ? (currentSpentUSD / allocatedUSD) * 100 : 0;
       const budgetId = budget.id;
 
-      const displaySpent = convertAmount(currentSpent, selectedCurrency);
-      const displayAllocated = convertAmount(budget.allocated, selectedCurrency);
+      const displaySpent = convertAmount(currentSpentUSD, selectedCurrency);
+      const displayAllocated = convertAmount(allocatedUSD, selectedCurrency);
 
       const exceededKey = `layout-${budgetId}-exceeded`;
-      const nearingKey = `layout-${budgetId}-nearing`;
+      const nearingKey = `layout-${budgetId}-nearing`; // Nearing 85%
 
-      if (currentSpent > budget.allocated) {
+      let newSet = new Set(notifiedLayoutBudgets);
+      let changed = false;
+
+      if (currentSpentUSD > allocatedUSD) { // Exceeded
         if (!notifiedLayoutBudgets.has(exceededKey)) {
           addNotification({
             title: "Budget Exceeded!",
@@ -79,14 +81,11 @@ function BudgetNotificationEffect() {
             type: "error",
             href: "/budgets"
           });
-          setNotifiedLayoutBudgets(prev => {
-            const newSet = new Set(prev);
-            newSet.add(exceededKey);
-            newSet.delete(nearingKey); 
-            return newSet;
-          });
+          newSet.add(exceededKey);
+          if (newSet.has(nearingKey)) newSet.delete(nearingKey);
+          changed = true;
         }
-      } else if (percentageSpent >= 85) {
+      } else if (percentageSpent >= 85) { // Nearing limit (but not exceeded)
         if (!notifiedLayoutBudgets.has(nearingKey) && !notifiedLayoutBudgets.has(exceededKey)) {
           addNotification({
             title: "Budget Nearing Limit",
@@ -94,32 +93,31 @@ function BudgetNotificationEffect() {
             type: "warning",
             href: "/budgets"
           });
-          setNotifiedLayoutBudgets(prev => new Set(prev).add(nearingKey));
+          newSet.add(nearingKey);
+          changed = true;
         }
-      } else {
-        
-        let changed = false;
-        const newSet = new Set(notifiedLayoutBudgets);
+      } else { // Neither exceeded nor nearing 85% - reset notification state for this budget
         if (newSet.has(nearingKey)) {
           newSet.delete(nearingKey);
           changed = true;
         }
         if (newSet.has(exceededKey)) {
           newSet.delete(exceededKey);
+          // Optionally, add a "back on track" notification here if desired
           changed = true;
         }
-        if (changed) {
-          setNotifiedLayoutBudgets(newSet);
-        }
+      }
+
+      if (changed) {
+        setNotifiedLayoutBudgets(newSet);
       }
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [budgets, transactions, selectedCurrency, addNotification, convertAmount, notifiedLayoutBudgets, getBudgetsByMonth, getTransactionsByCategoryAndMonth]);
+  }, [budgets, notifiedLayoutBudgets, getBudgetsByMonth, convertAmount, selectedCurrency, addNotification, formatCurrency]);
 
 
   useEffect(() => {
     checkAndNotifyGlobalBudgets();
-  }, [checkAndNotifyGlobalBudgets]);
+  }, [budgets, selectedCurrency, checkAndNotifyGlobalBudgets]); // checkAndNotifyGlobalBudgets will change if its deps change (incl. notifiedLayoutBudgets)
   
   return null; 
 }
@@ -155,7 +153,6 @@ export default function AuthenticatedAppLayout({
   }
   
   if (status === 'unauthenticated' && pathname !== '/welcome/setup') { 
-     // router.replace('/login'); // useAuthState handles this.
      return (
         <div className="flex h-screen items-center justify-center bg-background">
           <p>Redirecting to login...</p>
