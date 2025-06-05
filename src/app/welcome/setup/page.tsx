@@ -140,12 +140,11 @@ export default function SetupPage() {
       phoneNumber: phoneNumber || null, // Send null if empty
       dateOfBirth: dateOfBirth || null, // Send null if empty
       gender: gender || null, // Send null if empty
-      // We can also send theme/currency/font preferences if backend stores them
-      // preferences: {
-      //   theme: currentTheme,
-      //   fontSize: fontSize,
-      //   currency: currentSelectedCurrency
-      // }
+      preferences: {
+        theme: currentTheme,
+        fontSize: fontSize,
+        currency: currentSelectedCurrency,
+      }
     };
 
     try {
@@ -155,7 +154,7 @@ export default function SetupPage() {
       // Step 2: Persist app settings to localStorage (these are client-side preferences)
       localStorage.setItem("app-theme", currentTheme);
       localStorage.setItem("app-font-size", fontSize);
-      setGlobalCurrency(currentSelectedCurrency);
+      setGlobalCurrency(currentSelectedCurrency); // This updates context and localStorage
 
       // Step 3: Update the NextAuth session to mark setup as complete and update name
       await updateSession({ user: { ...user, name: displayName, hasCompletedSetup: true } }); 
