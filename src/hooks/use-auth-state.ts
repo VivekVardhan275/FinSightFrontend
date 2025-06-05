@@ -26,17 +26,22 @@ export function useAuthState() {
 
   useEffect(() => {
     // Simulate checking auth status
-    const authStatus = localStorage.getItem('isLoggedInForesight');
-    if (authStatus === 'true') {
-      setUser(mockUser);
-    }
-    setIsLoading(false);
+    setIsLoading(true); // Ensure loading state is true initially
+    const authStatusTimer = setTimeout(() => {
+      const authStatus = localStorage.getItem('isLoggedInForesight');
+      if (authStatus === 'true') {
+        setUser(mockUser);
+      }
+      setIsLoading(false);
+    }, 750); // Slight delay to simulate initial auth check
+
+    return () => clearTimeout(authStatusTimer);
   }, []);
 
   const login = useCallback(async () => {
     setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Simulate API call and OAuth redirect/processing time
+    await new Promise(resolve => setTimeout(resolve, 1500)); // Increased delay
     localStorage.setItem('isLoggedInForesight', 'true');
     setUser(mockUser);
     setIsLoading(false);
@@ -45,8 +50,8 @@ export function useAuthState() {
 
   const loginWithGitHub = useCallback(async () => {
     setIsLoading(true);
-    // Simulate API call (same as Google for now)
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Simulate API call and OAuth redirect/processing time
+    await new Promise(resolve => setTimeout(resolve, 1500)); // Increased delay
     localStorage.setItem('isLoggedInForesight', 'true');
     setUser({...mockUser, name: "GitHub User", email: "github@example.com"}); // Slightly different mock user
     setIsLoading(false);
