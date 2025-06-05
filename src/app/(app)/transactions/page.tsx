@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { PlusCircle, RotateCw } from "lucide-react";
 import { DataTable } from "@/components/transactions/data-table";
 import { getColumns } from "@/components/transactions/transaction-table-columns";
-import type { Transaction } from "@/types";
+import type { Transaction, TransactionFormData } from "@/types";
 import { TransactionFormDialog } from "@/components/transactions/transaction-form-dialog";
 import { useNotification } from '@/contexts/notification-context';
 import {
@@ -46,7 +46,7 @@ export default function TransactionsPage() {
   const { user } = useAuthState();
   const { transactions, addTransaction, updateTransaction, deleteTransaction: deleteTransactionFromContext, isLoading: isLoadingTransactions } = useTransactionContext();
   const { budgets, updateBudgetSpentAmount } = useBudgetContext();
-  const { selectedCurrency, convertAmount } = useCurrency();
+  const { selectedCurrency, convertAmount, conversionRates } = useCurrency();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -75,7 +75,6 @@ export default function TransactionsPage() {
     });
 
     affectedBudgets.forEach(budget => {
-      // Pass the latest transactions list for accurate calculation
       updateBudgetSpentAmount(budget.id, transactions); 
     });
   };
@@ -133,28 +132,30 @@ export default function TransactionsPage() {
     }
   };
 
-  const handleSaveTransaction = async (transactionDataFromForm: Transaction) => {
+  const handleSaveTransaction = async (formData: TransactionFormData) => {
     if (!user || !user.email) {
       addNotification({ title: "Error", description: "User not authenticated. Cannot save transaction.", type: "error" });
       return;
     }
     setIsSaving(true);
 
-    const formTxDate = transactionDataFromForm.date;
-    const formTxDescriptionLower = transactionDataFromForm.description.toLowerCase();
-    const formTxCategoryLower = transactionDataFromForm.category.toLowerCase();
-    const formTxAmountUSD = transactionDataFromForm.amount;
-    const formTxType = transactionDataFromForm.type;
+    const amountInUSD = formData.amount / (conversionRates[selectedCurrency] || 1);
+    const formattedDate = format(formData.date, "yyyy-MM-dd");
 
-    const isActualEditOperation = editingTransaction && transactions.some(t => t.id === transactionDataFromForm.id);
+    const formTxDescriptionLower = formData.description.toLowerCase();
+    const formTxCategoryLower = formData.category.toLowerCase();
+    const formTxType = formData.type;
 
+    const isActualEditOperation = editingTransaction !== null;
+
+    // Duplicate and similarity checks
     if (!isActualEditOperation) {
         const similarExistingTx = transactions.find(existingTx =>
-            existingTx.date === formTxDate &&
+            existingTx.date === formattedDate &&
             existingTx.description.toLowerCase() === formTxDescriptionLower &&
             existingTx.category.toLowerCase() === formTxCategoryLower &&
             existingTx.type === formTxType &&
-            existingTx.amount !== formTxAmountUSD
+            existingTx.amount !== amountInUSD // Compare USD amounts for backend consistency
         );
 
         if (similarExistingTx) {
@@ -162,7 +163,7 @@ export default function TransactionsPage() {
             const formattedOldAmount = formatCurrency(oldAmountInSelectedCurrency, selectedCurrency);
             addNotification({
                 title: "Review Transaction",
-                description: `A transaction for '${transactionDataFromForm.description}' (${transactionDataFromForm.category}, ${formTxType}) on ${format(parseISO(formTxDate), "PPP")} already exists with amount ${formattedOldAmount}. If this is a correction, please edit the existing one. To add as new, consider altering the description.`,
+                description: `A transaction for '${formData.description}' (${formData.category}, ${formTxType}) on ${format(formData.date, "PPP")} already exists with amount ${formattedOldAmount}. If this is a correction, please edit the existing one.`,
                 type: "warning",
             });
             setIsFormOpen(false);
@@ -170,22 +171,23 @@ export default function TransactionsPage() {
             return;
         }
     }
-
+    
+    // Exact duplicate check (for new items, or for edits if all values match another existing item)
     const exactDuplicateTx = transactions.find(existingTx => {
-        if (isActualEditOperation && existingTx.id === transactionDataFromForm.id) {
-            return false;
+        if (isActualEditOperation && existingTx.id === editingTransaction!.id) {
+            return false; // Don't compare against itself during an edit
         }
-        return existingTx.date === formTxDate &&
+        return existingTx.date === formattedDate &&
                existingTx.description.toLowerCase() === formTxDescriptionLower &&
                existingTx.category.toLowerCase() === formTxCategoryLower &&
-               existingTx.amount === formTxAmountUSD &&
+               existingTx.amount === amountInUSD && // Compare USD amounts
                existingTx.type === formTxType;
     });
 
     if (exactDuplicateTx) {
         addNotification({
             title: "Duplicate Transaction",
-            description: "An identical transaction already exists. The current operation was not saved.",
+            description: "An identical transaction already exists.",
             type: "error",
         });
         setIsFormOpen(false);
@@ -195,48 +197,67 @@ export default function TransactionsPage() {
 
     let originalTransactionDetailsForEdit: { category: string; date: string; type: 'income' | 'expense', amount: number } | undefined = undefined;
 
+    const dataForApi = {
+        date: formattedDate,
+        description: formData.description,
+        category: formData.category,
+        amount: amountInUSD,
+        type: formData.type,
+    };
+
     try {
-      if (isActualEditOperation) {
-        const originalTx = transactions.find(t => t.id === transactionDataFromForm.id);
-        if (originalTx) {
-            originalTransactionDetailsForEdit = { category: originalTx.category, date: originalTx.date, type: originalTx.type, amount: originalTx.amount };
-        }
-        await axios.put(`${TRANSACTION_API_BASE_URL}/${transactionDataFromForm.id}?email=${encodeURIComponent(user.email)}`, transactionDataFromForm);
-        updateTransaction(transactionDataFromForm);
+      if (isActualEditOperation && editingTransaction) {
+        originalTransactionDetailsForEdit = { 
+            category: editingTransaction.category, 
+            date: editingTransaction.date, 
+            type: editingTransaction.type, 
+            amount: editingTransaction.amount 
+        };
+        const transactionToUpdate: Transaction = { ...dataForApi, id: editingTransaction.id };
+        await axios.put(`${TRANSACTION_API_BASE_URL}/${editingTransaction.id}?email=${encodeURIComponent(user.email)}`, transactionToUpdate);
+        updateTransaction(transactionToUpdate); // Or use response.data if backend returns the updated object
         addNotification({
             title: `Transaction Updated`,
-            description: `${transactionDataFromForm.description} successfully updated.`,
+            description: `${formData.description} successfully updated.`,
             type: "success",
             href: "/transactions"
         });
 
       } else {
-        await axios.post(`${TRANSACTION_API_BASE_URL}?email=${encodeURIComponent(user.email)}`, transactionDataFromForm);
-        addTransaction(transactionDataFromForm);
+        // For new transactions, backend generates ID and returns the full object
+        const response = await axios.post(`${TRANSACTION_API_BASE_URL}?email=${encodeURIComponent(user.email)}`, dataForApi);
+        const newTransactionWithId = response.data as Transaction; // Assume backend returns Transaction
+        addTransaction(newTransactionWithId);
         addNotification({
             title: `Transaction Added`,
-            description: `${transactionDataFromForm.description} successfully added.`,
+            description: `${newTransactionWithId.description} successfully added.`,
             type: "success",
             href: "/transactions"
         });
       }
 
       setIsFormOpen(false);
+      setEditingTransaction(null);
       
+      // Refresh budget if category/date/type changed or if it's a new expense
+      const affectedTransactionDetails = isActualEditOperation && editingTransaction 
+        ? { ...dataForApi, id: editingTransaction.id } as Transaction 
+        : transactions.find(t => t.description === formData.description && t.date === formattedDate && t.amount === amountInUSD); // find the newly added one for refresh logic
+
       if (isActualEditOperation && originalTransactionDetailsForEdit) {
           const oldCat = originalTransactionDetailsForEdit.category;
           const oldDate = originalTransactionDetailsForEdit.date;
           const oldType = originalTransactionDetailsForEdit.type;
 
           if (oldType === 'expense' &&
-              (oldCat.toLowerCase() !== transactionDataFromForm.category.toLowerCase() ||
-               oldDate.substring(0,7) !== transactionDataFromForm.date.substring(0,7) ||
-               transactionDataFromForm.type !== 'expense')) {
+              (oldCat.toLowerCase() !== formData.category.toLowerCase() ||
+               oldDate.substring(0,7) !== formattedDate.substring(0,7) ||
+               formData.type !== 'expense')) {
               refreshAffectedBudgets({ category: oldCat, date: oldDate, type: 'expense' });
           }
       }
-      if (transactionDataFromForm.type === 'expense') {
-          refreshAffectedBudgets(transactionDataFromForm);
+      if (affectedTransactionDetails && affectedTransactionDetails.type === 'expense') {
+          refreshAffectedBudgets(affectedTransactionDetails);
       }
 
     } catch (error) {

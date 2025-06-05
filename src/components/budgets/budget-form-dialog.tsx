@@ -19,14 +19,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "framer-motion";
 import { useCurrency } from "@/contexts/currency-context";
-import { v4 as uuidv4 } from 'uuid';
 import { RotateCw } from "lucide-react";
 
 interface BudgetFormDialogProps {
   budget?: Budget | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (budgetData: Budget) => void; // Now expects a full Budget object
+  onSave: (budgetData: BudgetFormData) => void; // Changed to pass BudgetFormData
   isSaving?: boolean;
 }
 
@@ -45,7 +44,7 @@ export function BudgetFormDialog({
   onSave,
   isSaving = false,
 }: BudgetFormDialogProps) {
-  const { selectedCurrency, convertAmount, conversionRates } = useCurrency();
+  const { selectedCurrency, convertAmount } = useCurrency(); // Removed conversionRates
 
   const budgetSchema = getBudgetSchema(selectedCurrency);
 
@@ -59,7 +58,7 @@ export function BudgetFormDialog({
     resolver: zodResolver(budgetSchema),
     defaultValues: {
       category: "",
-      allocated: 0,
+      allocated: 0, // Amount is in selectedCurrency for the form
       month: getDefaultMonth(),
     },
   });
@@ -67,37 +66,27 @@ export function BudgetFormDialog({
   useEffect(() => {
     if (open) {
       if (budget) {
+        // When editing, convert amount from USD (stored) to selectedCurrency for display
         const displayAllocated = convertAmount(budget.allocated, selectedCurrency);
         reset({
           category: budget.category,
-          allocated: parseFloat(displayAllocated.toFixed(2)),
+          allocated: parseFloat(displayAllocated.toFixed(2)), // Amount is in selectedCurrency
           month: budget.month,
         });
       } else {
         reset({
           category: "",
-          allocated: 0,
+          allocated: 0, // Amount is in selectedCurrency
           month: getDefaultMonth(),
         });
       }
     }
   }, [budget, open, reset, selectedCurrency, convertAmount]);
 
+  // Passes validated form data (amounts in selectedCurrency) to the parent.
+  // Parent component (BudgetsPage) will handle USD conversion for API calls.
   const processSubmit = (data: BudgetFormData) => {
-    const allocatedInUSD = data.allocated / (conversionRates[selectedCurrency] || 1);
-
-    const budgetDataToSave: Budget = budget
-      ? { ...budget, category: data.category, allocated: allocatedInUSD, month: data.month }
-      : {
-          id: uuidv4(),
-          category: data.category,
-          allocated: allocatedInUSD,
-          month: data.month,
-          spent: 0, // Initialize spent to 0 for new budgets
-        };
-
-    onSave(budgetDataToSave);
-    // onOpenChange(false); // Parent component will handle closing on successful save
+    onSave(data);
   };
 
   const finalIsSaving = isSaving || formIsSubmitting;

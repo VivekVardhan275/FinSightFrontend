@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Target, RotateCw } from "lucide-react";
-import type { Budget } from "@/types";
+import type { Budget, BudgetFormData } from "@/types"; // Added BudgetFormData
 import { BudgetCard } from '@/components/budgets/budget-card';
 import { BudgetFormDialog } from '@/components/budgets/budget-form-dialog';
 import { useNotification } from '@/contexts/notification-context';
@@ -68,7 +68,7 @@ export default function BudgetsPage() {
   const { user } = useAuthState();
   const { budgets, isLoading: isLoadingBudgets, addBudget, updateBudget, deleteBudget: deleteBudgetFromContext, updateBudgetSpentAmount } = useBudgetContext();
   const { transactions } = useTransactionContext();
-  const { selectedCurrency, convertAmount } = useCurrency();
+  const { selectedCurrency, convertAmount, conversionRates } = useCurrency(); // Added conversionRates
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
@@ -123,22 +123,22 @@ export default function BudgetsPage() {
     }
   };
 
-  const handleSaveBudget = async (budgetDataFromForm: Budget) => {
+  const handleSaveBudget = async (formData: BudgetFormData) => { // Changed to BudgetFormData
     if (!user || !user.email) {
       addNotification({ title: "Error", description: "User not authenticated. Cannot save budget.", type: "error" });
       return;
     }
     setIsSaving(true);
 
-    const newBudgetCategoryLower = budgetDataFromForm.category.toLowerCase();
-    const newBudgetMonth = budgetDataFromForm.month;
-    const newBudgetAllocatedUSD = budgetDataFromForm.allocated; // This is already in USD
+    const allocatedInUSD = formData.allocated / (conversionRates[selectedCurrency] || 1);
+    const newBudgetCategoryLower = formData.category.toLowerCase();
+    const newBudgetMonth = formData.month;
 
-    const isActualEditOperation = editingBudget !== null && budgets.some(b => b.id === budgetDataFromForm.id);
+    const isActualEditOperation = editingBudget !== null;
 
-    // Duplicate check
+    // Duplicate check logic (using USD for comparison with stored data)
     const existingBudgetWithSameCategoryMonth = budgets.find(existingBudget => {
-      if (isActualEditOperation && existingBudget.id === budgetDataFromForm.id) {
+      if (isActualEditOperation && editingBudget && existingBudget.id === editingBudget.id) {
         return false; // Don't compare against itself during an edit
       }
       return existingBudget.category.toLowerCase() === newBudgetCategoryLower &&
@@ -146,10 +146,11 @@ export default function BudgetsPage() {
     });
 
     if (existingBudgetWithSameCategoryMonth) {
-      if (existingBudgetWithSameCategoryMonth.allocated === newBudgetAllocatedUSD) {
+      // This logic may need adjustment if backend handles conflicts differently
+      if (existingBudgetWithSameCategoryMonth.allocated === allocatedInUSD) {
         addNotification({
           title: "Duplicate Budget",
-          description: `A budget for ${budgetDataFromForm.category} in ${newBudgetMonth} with the same allocated amount already exists.`,
+          description: `A budget for ${formData.category} in ${newBudgetMonth} with the same allocated amount already exists.`,
           type: "error",
         });
       } else {
@@ -157,7 +158,7 @@ export default function BudgetsPage() {
         const formattedOldAmount = formatCurrency(oldAllocatedInSelectedCurrency, selectedCurrency);
         addNotification({
           title: "Update Existing Budget?",
-          description: `A budget for ${budgetDataFromForm.category} in ${newBudgetMonth} already exists with allocated amount ${formattedOldAmount}. If you want to change the allocation, please edit the existing budget.`,
+          description: `A budget for ${formData.category} in ${newBudgetMonth} already exists with allocated amount ${formattedOldAmount}. If you want to change the allocation, please edit the existing budget.`,
           type: "warning",
         });
       }
@@ -166,28 +167,44 @@ export default function BudgetsPage() {
       return;
     }
     
-    let savedCategory = "";
+    const dataForApi = {
+      category: formData.category,
+      allocated: allocatedInUSD, // Send USD to backend
+      month: formData.month,
+    };
+
     let notificationAction = isActualEditOperation ? "Updated" : "Added";
 
     try {
-      if (isActualEditOperation) {
-        await axios.put(`${BUDGET_API_BASE_URL}/${budgetDataFromForm.id}?email=${encodeURIComponent(user.email)}`, budgetDataFromForm);
-        updateBudget(budgetDataFromForm);
+      if (isActualEditOperation && editingBudget) {
+        const budgetToUpdate: Budget = { 
+            ...dataForApi, 
+            id: editingBudget.id, 
+            spent: editingBudget.spent // Preserve current spent amount for PUT
+        };
+        await axios.put(`${BUDGET_API_BASE_URL}/${editingBudget.id}?email=${encodeURIComponent(user.email)}`, budgetToUpdate);
+        updateBudget(budgetToUpdate); // Or use response.data if backend returns updated object
       } else {
-        await axios.post(`${BUDGET_API_BASE_URL}?email=${encodeURIComponent(user.email)}`, budgetDataFromForm);
-        addBudget(budgetDataFromForm); // Context addBudget now expects full budget
+        // For new budgets, backend generates ID and returns the full object
+        const response = await axios.post(`${BUDGET_API_BASE_URL}?email=${encodeURIComponent(user.email)}`, dataForApi);
+        const newBudgetWithId = response.data as Budget; // Assume backend returns Budget
+        addBudget(newBudgetWithId);
       }
-      savedCategory = budgetDataFromForm.category;
-      updateBudgetSpentAmount(budgetDataFromForm.id, transactions); // Recalculate spent after save
-
+      
       addNotification({
           title: `Budget ${notificationAction}`,
-          description: `Budget for ${savedCategory} successfully ${notificationAction.toLowerCase()}.`,
+          description: `Budget for ${formData.category} successfully ${notificationAction.toLowerCase()}.`,
           type: 'success',
           href: '/budgets'
         });
       setIsFormOpen(false);
       setEditingBudget(null);
+      // Refresh affected budget's spent amount (especially if it was a new budget the context needs to know about)
+      const budgetToRefresh = isActualEditOperation && editingBudget ? editingBudget.id : budgets.find(b => b.category === formData.category && b.month === formData.month)?.id;
+      if (budgetToRefresh) {
+        updateBudgetSpentAmount(budgetToRefresh, transactions);
+      }
+
 
     } catch (error) {
        console.error(`Error ${notificationAction.toLowerCase()} budget:`, error);

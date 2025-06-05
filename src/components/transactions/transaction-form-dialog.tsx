@@ -24,21 +24,20 @@ import React, { useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { CalendarIcon, RotateCw } from "lucide-react"; // Added RotateCw
+import { CalendarIcon, RotateCw } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { useCurrency } from "@/contexts/currency-context";
-import { v4 as uuidv4 } from 'uuid';
 
 interface TransactionFormDialogProps {
   transaction?: Transaction | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (transactionData: Transaction) => void; // Expects full Transaction object
-  isSaving?: boolean; // Added prop to reflect saving state
+  onSave: (data: TransactionFormData) => void; // Changed to pass TransactionFormData
+  isSaving?: boolean;
 }
 
 const getTransactionSchema = (selectedCurrency: string) => z.object({
@@ -55,9 +54,9 @@ export function TransactionFormDialog({
   open,
   onOpenChange,
   onSave,
-  isSaving = false, // Default isSaving to false
+  isSaving = false,
 }: TransactionFormDialogProps) {
-  const { selectedCurrency, convertAmount, conversionRates } = useCurrency();
+  const { selectedCurrency, convertAmount } = useCurrency(); // Removed conversionRates as it's handled in page
 
   const transactionSchema = getTransactionSchema(selectedCurrency);
 
@@ -66,7 +65,7 @@ export function TransactionFormDialog({
     register,
     handleSubmit,
     reset,
-    formState: { errors, isSubmitting }, // Use isSubmitting from react-hook-form
+    formState: { errors, isSubmitting },
     setValue,
   } = useForm<TransactionFormData>({
     resolver: zodResolver(transactionSchema),
@@ -82,12 +81,13 @@ export function TransactionFormDialog({
   useEffect(() => {
     if (open) {
       if (transaction) {
+        // When editing, convert amount from USD (stored) to selectedCurrency for display
         const displayAmount = convertAmount(transaction.amount, selectedCurrency);
         reset({
           date: parseISO(transaction.date),
           description: transaction.description,
           category: transaction.category,
-          amount: parseFloat(displayAmount.toFixed(2)),
+          amount: parseFloat(displayAmount.toFixed(2)), // Amount is in selectedCurrency for the form
           type: transaction.type,
         });
       } else {
@@ -95,31 +95,17 @@ export function TransactionFormDialog({
           date: new Date(),
           description: "",
           category: "",
-          amount: 0,
+          amount: 0, // Amount is in selectedCurrency for the form
           type: "expense",
         });
       }
     }
   }, [transaction, open, reset, selectedCurrency, convertAmount]);
 
+  // Passes validated form data (amounts in selectedCurrency) to the parent.
+  // Parent component (TransactionsPage) will handle USD conversion for API calls.
   const processSubmit = (data: TransactionFormData) => {
-    const amountInUSD = data.amount / (conversionRates[selectedCurrency] || 1);
-
-    const baseTransactionData = {
-      ...data,
-      date: format(data.date, "yyyy-MM-dd"),
-      amount: amountInUSD, // Amount is now in USD
-    };
-    
-    // ID is generated here for new transactions, or preserved for edits.
-    // This full Transaction object (with ID) is passed to onSave.
-    const transactionDataToSave: Transaction = transaction
-        ? { ...baseTransactionData, id: transaction.id } 
-        : { ...baseTransactionData, id: uuidv4() }; 
-
-
-    onSave(transactionDataToSave);
-    // onOpenChange(false); // Moved to parent component after successful save
+    onSave(data);
   };
   
   const finalIsSaving = isSaving || isSubmitting;
@@ -249,4 +235,3 @@ export function TransactionFormDialog({
     </Dialog>
   );
 }
-
