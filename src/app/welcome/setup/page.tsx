@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
-import { useAuthState, type AppUser } from "@/hooks/use-auth-state"; // Updated useAuthState
+import { useAuthState, type AppUser } from "@/hooks/use-auth-state";
 import { useTheme } from "next-themes";
 import { useCurrency, type Currency as AppCurrency } from "@/contexts/currency-context";
 import { useToast } from "@/hooks/use-toast";
@@ -30,8 +30,8 @@ const FONT_SIZE_CLASSES: Record<FontSizeSetting, string> = {
 
 // Helper to initialize state from localStorage
 const initializeFromLocalStorage = <T,>(
-  key: string, 
-  defaultValue: T, 
+  key: string,
+  defaultValue: T,
   validator?: (value: any) => boolean,
   parser?: (storedValue: string) => T
 ): T => {
@@ -47,15 +47,14 @@ const initializeFromLocalStorage = <T,>(
       }
     }
   } catch (error) {
-    console.error(`Error reading ${key} from localStorage`, error);
+    // console.error(`Error reading ${key} from localStorage`, error); // Keep console clean
   }
   return defaultValue;
 };
 
 
 export default function SetupPage() {
-  // useAuthState now uses next-auth's useSession internally
-  const { user, isLoading: authLoading, status, isAuthenticated } = useAuthState();
+  const { user, isLoading: authLoading, status, isAuthenticated, updateSession } = useAuthState();
   const router = useRouter();
   const pathname = usePathname();
   const { theme: activeTheme, setTheme } = useTheme();
@@ -84,23 +83,20 @@ export default function SetupPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    // Redirect if not authenticated and not loading
-    if (!authLoading && status === 'unauthenticated') {
+    if (!authLoading && status === 'unauthenticated' && pathname !== '/login') {
       router.replace('/login');
       return;
     }
-    // If authenticated and setup already complete, redirect to dashboard
-    if (status === 'authenticated' && localStorage.getItem('foresight_hasCompletedSetup') === 'true') {
+    // If authenticated and setup already complete (from session), redirect to dashboard
+    if (status === 'authenticated' && user?.hasCompletedSetup) {
       router.replace('/dashboard');
       return;
     }
 
     if (user) {
-      // User object from useAuthState (via NextAuth) is used here
       setDisplayName(user.name || "");
-      // Email is pre-filled if available, phone, dob, gender are optional for setup
     }
-  }, [user, authLoading, status, router]);
+  }, [user, authLoading, status, router, pathname]);
 
 
   useEffect(() => {
@@ -128,38 +124,48 @@ export default function SetupPage() {
 
 
   const handleSaveSetup = useCallback(async () => {
-    if (!user) { // User should be available if on this page and authenticated
+    if (!user) {
       toast({ title: "Error", description: "User not found. Please try logging in again.", variant: "destructive" });
       router.push('/login');
       return;
     }
     setIsSaving(true);
 
-    console.log("Saving profile setup:", { displayName, email: user.email, phoneNumber, dateOfBirth, gender });
-    // In a real app, you might make an API call here to save profile details to your database,
-    // associating them with the authenticated user (e.g., user.id or user.email from session).
-    // For this frontend-only auth, we'll primarily rely on localStorage for settings.
+    // Persist display name & other profile info (simulation, as no backend for these fields yet)
+    // console.log("Saving profile setup:", { displayName, email: user.email, phoneNumber, dateOfBirth, gender });
 
+    // Persist app settings to localStorage
     localStorage.setItem("app-theme", currentTheme);
     localStorage.setItem("app-font-size", fontSize);
-    setGlobalCurrency(currentSelectedCurrency); 
+    setGlobalCurrency(currentSelectedCurrency);
 
-    localStorage.setItem('foresight_hasCompletedSetup', 'true');
+    // Update the session to mark setup as complete
+    try {
+      await updateSession({ user: { ...user, name: displayName, hasCompletedSetup: true } }); // Update name in session too
+      toast({
+        title: "Setup Complete!",
+        description: "Your profile and preferences have been saved.",
+        variant: "default"
+      });
+      // No longer need to set localStorage item for 'foresight_hasCompletedSetup'
+      // localStorage.setItem('foresight_hasCompletedSetup', 'true');
+      
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Give toast time to show
+      router.push('/dashboard');
+    } catch (error) {
+      console.error("Failed to update session for setup completion:", error);
+      toast({
+        title: "Error Saving Setup",
+        description: "Could not save your setup preferences. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
 
-    toast({
-      title: "Setup Complete!",
-      description: "Your profile and preferences have been saved.",
-      variant: "default"
-    });
-    
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    router.push('/dashboard');
-    setIsSaving(false);
-
-  }, [user, displayName, phoneNumber, dateOfBirth, gender, currentTheme, fontSize, currentSelectedCurrency, setGlobalCurrency, router, toast]);
+  }, [user, displayName, phoneNumber, dateOfBirth, gender, currentTheme, fontSize, currentSelectedCurrency, setGlobalCurrency, router, toast, updateSession]);
 
   if (authLoading || status === 'loading' || (status === 'unauthenticated' && pathname === '/welcome/setup')) {
-    // Show loading if auth state is loading, or if unauthenticated but on setup page (which implies a redirect or auth process is pending)
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <p>Loading setup...</p>
@@ -167,9 +173,8 @@ export default function SetupPage() {
     );
   }
   
-  // If still not authenticated by this point and not loading (should have been redirected by useEffect or hook)
   if (!isAuthenticated && status !== 'loading') {
-     router.replace('/login'); // Fallback redirect
+     router.replace('/login');
      return (
         <div className="flex min-h-screen items-center justify-center bg-background p-4">
           <p>Redirecting to login...</p>
@@ -207,7 +212,7 @@ export default function SetupPage() {
                   <Label htmlFor="fullName">Full Name</Label>
                   <Input 
                     id="fullName" 
-                    value={displayName}  // Pre-filled from user.name via useEffect
+                    value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     placeholder="Your full name"
                   />
@@ -216,7 +221,7 @@ export default function SetupPage() {
                   <Label htmlFor="email">Email Address</Label>
                   <Input 
                     id="email" 
-                    value={user?.email || ""} // Pre-filled from user.email
+                    value={user?.email || ""}
                     readOnly 
                     className="cursor-not-allowed bg-muted/50"
                   />
@@ -340,3 +345,5 @@ export default function SetupPage() {
     </div>
   );
 }
+
+    

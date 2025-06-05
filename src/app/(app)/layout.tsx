@@ -26,10 +26,8 @@ import { TransactionProvider, useTransactionContext } from "@/contexts/transacti
 import { BudgetProvider, useBudgetContext } from "@/contexts/budget-context";
 import { formatCurrency } from "@/lib/utils";
 
-
 function BudgetNotificationEffect() {
   const { budgets, getBudgetsByMonth } = useBudgetContext();
-  // transactions context is not directly used for calculation here as budget.spent is the source of truth from BudgetContext
   const { addNotification } = useNotification();
   const { selectedCurrency, convertAmount } = useCurrency();
   const [notifiedLayoutBudgets, setNotifiedLayoutBudgets] = React.useState<Set<string>>(new Set());
@@ -103,7 +101,6 @@ function BudgetNotificationEffect() {
         }
         if (newSet.has(exceededKey)) {
           newSet.delete(exceededKey);
-          // Optionally, add a "back on track" notification here if desired
           changed = true;
         }
       }
@@ -114,34 +111,48 @@ function BudgetNotificationEffect() {
     });
   }, [budgets, notifiedLayoutBudgets, getBudgetsByMonth, convertAmount, selectedCurrency, addNotification, formatCurrency]);
 
-
   useEffect(() => {
     checkAndNotifyGlobalBudgets();
-  }, [budgets, selectedCurrency, checkAndNotifyGlobalBudgets]); // checkAndNotifyGlobalBudgets will change if its deps change (incl. notifiedLayoutBudgets)
+  }, [budgets, selectedCurrency, checkAndNotifyGlobalBudgets]);
   
-  return null; 
+  return null;
 }
-
 
 export default function AuthenticatedAppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isLoading, isAuthenticated, status } = useAuthState(); 
+  const { user, isLoading, isAuthenticated, status } = useAuthState();
   const router = useRouter();
   const pathname = usePathname();
 
+  // This useEffect handles redirection based on auth status and setup completion from session
+  // It replaces the one in useAuthState for clarity and directness in the layout.
   useEffect(() => {
+    if (isLoading || status === 'loading') return; // Wait for auth status to resolve
+
+    const setupCompleted = user?.hasCompletedSetup === true;
+
     if (status === 'authenticated') {
-      const hasCompletedSetup = localStorage.getItem('foresight_hasCompletedSetup') === 'true';
-      if (!hasCompletedSetup && pathname !== '/welcome/setup') {
-         router.replace('/welcome/setup');
-      } else if (hasCompletedSetup && pathname === '/welcome/setup') {
-         router.replace('/dashboard');
+      if (setupCompleted) {
+        if (pathname === '/login' || pathname === '/welcome/setup') {
+          router.replace('/dashboard');
+        }
+        // If authenticated and setup complete, and on any other app page, stay.
+      } else {
+        // Authenticated but setup not complete
+        if (pathname !== '/welcome/setup') {
+          router.replace('/welcome/setup');
+        }
+      }
+    } else if (status === 'unauthenticated') {
+      // Unauthenticated
+      if (pathname !== '/login' && pathname !== '/welcome/setup') { // Allow /welcome/setup for potential OAuth redirect interim state
+        router.replace('/login');
       }
     }
-  }, [status, pathname, router]);
+  }, [user, isLoading, status, pathname, router]);
 
 
   if (isLoading || status === 'loading') {
@@ -152,7 +163,8 @@ export default function AuthenticatedAppLayout({
     );
   }
   
-  if (status === 'unauthenticated' && pathname !== '/welcome/setup') { 
+  // If unauthenticated and not trying to go to login or setup (initial load before useEffect kicks in, or direct navigation)
+  if (status === 'unauthenticated' && pathname !== '/login' && pathname !== '/welcome/setup') {
      return (
         <div className="flex h-screen items-center justify-center bg-background">
           <p>Redirecting to login...</p>
@@ -160,22 +172,32 @@ export default function AuthenticatedAppLayout({
      );
   }
 
-  if (status === 'authenticated') {
-    const hasCompletedSetup = localStorage.getItem('foresight_hasCompletedSetup') === 'true';
-    if (!hasCompletedSetup && pathname !== '/welcome/setup') {
+  // If authenticated, but setup not complete, and not on setup page (initial load)
+  if (status === 'authenticated' && !user?.hasCompletedSetup && pathname !== '/welcome/setup') {
        return (
         <div className="flex h-screen items-center justify-center bg-background">
           <p>Redirecting to setup...</p>
         </div>
       );
-    }
   }
 
-
+  // If we are on login or setup page, but authentication and setup are complete, let useEffect handle redirect.
+  // Otherwise, render the main layout.
+  if ((pathname === '/login' || pathname === '/welcome/setup') && status === 'authenticated' && user?.hasCompletedSetup) {
+    return (
+        <div className="flex h-screen items-center justify-center bg-background">
+          <p>Redirecting to dashboard...</p>
+        </div>
+      );
+  }
+  
+  // For users who are authenticated and have completed setup, or are on the setup page itself.
+  // Or unauthenticated users on the login page.
+  // Basically, if not covered by the loading/redirect conditions above.
   return (
     <TransactionProvider>
       <BudgetProvider>
-        <BudgetNotificationEffect />
+        {isAuthenticated && user?.hasCompletedSetup && <BudgetNotificationEffect />}
         <SidebarProvider defaultOpen>
           <Sidebar variant="sidebar" collapsible="icon" side="left" className="border-r">
             <SidebarHeader className="p-4 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-2 transition-all duration-200 ease-linear">
@@ -202,8 +224,8 @@ export default function AuthenticatedAppLayout({
               </div>
 
               <div className="flex items-center gap-4">
-                <NotificationBell />
-                <UserNav />
+                {isAuthenticated && user?.hasCompletedSetup && <NotificationBell />}
+                {isAuthenticated && <UserNav />}
               </div>
             </header>
 
@@ -226,3 +248,5 @@ export default function AuthenticatedAppLayout({
     </TransactionProvider>
   );
 }
+
+    

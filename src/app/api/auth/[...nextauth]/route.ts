@@ -1,7 +1,27 @@
 
-import NextAuth, { type NextAuthOptions } from "next-auth";
+import NextAuth, { type NextAuthOptions, type DefaultSession, type User as DefaultUser } from "next-auth";
+import type { JWT as DefaultJWT } from 'next-auth/jwt';
 import GoogleProvider from "next-auth/providers/google";
 import GithubProvider from "next-auth/providers/github";
+
+// --- Type Augmentation for NextAuth ---
+declare module 'next-auth' {
+  interface Session extends DefaultSession {
+    user?: {
+      hasCompletedSetup?: boolean;
+    } & DefaultSession['user'];
+  }
+  interface User extends DefaultUser {
+    hasCompletedSetup?: boolean; // For initial population if needed from DB in future
+  }
+}
+
+declare module 'next-auth/jwt' {
+  interface JWT extends DefaultJWT {
+    hasCompletedSetup?: boolean;
+  }
+}
+// --- End Type Augmentation ---
 
 // Ensure environment variables are being accessed correctly
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
@@ -15,18 +35,17 @@ const envNextAuthUrl = process.env.NEXTAUTH_URL;
 // --- CRITICAL ENVIRONMENT VARIABLE CHECKS ---
 let criticalEnvError = false;
 const guidanceMessages: string[] = [];
-let effectiveAuthUrlForLogging = envAuthUrl; // Default to AUTH_URL for initial logging
+let effectiveAuthUrlForLogging = envAuthUrl;
 
 console.info("\x1b[34m%s\x1b[0m", "--- NextAuth.js Configuration & Environment Check ---");
 
-// Check AUTH_URL and NEXTAUTH_URL coexistence and values
 if (envAuthUrl && envNextAuthUrl && envAuthUrl !== envNextAuthUrl) {
   console.warn(
-    "\x1b[33m%s\x1b[0m", // Yellow color for warning
+    "\x1b[33m%s\x1b[0m",
     `WARNING: Both \`AUTH_URL\` ("${envAuthUrl}") and \`NEXTAUTH_URL\` ("${envNextAuthUrl}") are set, and they differ. ` +
     "NextAuth.js v4 (used here) might prioritize `NEXTAUTH_URL`. It's strongly recommended to use only `AUTH_URL` (set to your app's base URL like http://localhost:9002) and remove `NEXTAUTH_URL` from your .env.local file."
   );
-  effectiveAuthUrlForLogging = envNextAuthUrl; // NextAuth v4 might prioritize this
+  effectiveAuthUrlForLogging = envNextAuthUrl;
 } else if (envAuthUrl && envNextAuthUrl && envAuthUrl === envNextAuthUrl) {
     console.info(
         "\x1b[36m%s\x1b[0m",
@@ -49,7 +68,6 @@ if (envAuthUrl && envNextAuthUrl && envAuthUrl !== envNextAuthUrl) {
   effectiveAuthUrlForLogging = envAuthUrl;
 }
 
-// Validate the effectiveAuthUrlForLogging
 if (!effectiveAuthUrlForLogging) {
   console.error(
     "\x1b[31m%s\x1b[0m",
@@ -81,7 +99,6 @@ if (!effectiveAuthUrlForLogging) {
   guidanceMessages.push(`\x1b[36mNextAuth.js: Effective auth URL for constructing callbacks: ${effectiveAuthUrlForLogging}\x1b[0m`);
 }
 
-
 if (!authSecret) {
   console.error(
     "\x1b[31m%s\x1b[0m",
@@ -91,7 +108,6 @@ if (!authSecret) {
   criticalEnvError = true;
 }
 // --- END CRITICAL ENVIRONMENT VARIABLE CHECKS ---
-
 
 const providers = [];
 
@@ -154,12 +170,9 @@ if (providers.length === 0 && !criticalEnvError) {
     "\x1b[31m%s\x1b[0m",
     "CRITICAL ERROR: No OAuth providers (Google, GitHub) are configured due to missing Client IDs/Secrets in .env.local. Authentication will NOT work for these providers."
   );
-  criticalEnvError = true; // Mark as critical if no providers are set up
+  criticalEnvError = true;
 }
 
-
-// Programmatic adjustment to ensure NEXTAUTH_URL is aligned with AUTH_URL for NextAuth.js v4.
-// This helps if AUTH_URL is set correctly (e.g. http://localhost:9002) but NEXTAUTH_URL is missing or different.
 if (process.env.AUTH_URL) {
     const currentAuthUrl = process.env.AUTH_URL;
     const currentNextAuthUrl = process.env.NEXTAUTH_URL;
@@ -178,15 +191,14 @@ if (process.env.AUTH_URL) {
                 "Setting `NEXTAUTH_URL` to match `AUTH_URL` for NextAuth.js v4."
             );
         }
-        process.env.NEXTAUTH_URL = currentAuthUrl; // THIS IS THE KEY LINE for the programmatic fix
+        process.env.NEXTAUTH_URL = currentAuthUrl;
         console.info(
             "\x1b[36m%s\x1b[0m",
             `RUNTIME ADJUSTMENT: \`process.env.NEXTAUTH_URL\` is NOW "${process.env.NEXTAUTH_URL}". NextAuth.js will use this as its base URL.`
         );
-        // Update effectiveAuthUrlForLogging if it was based on a different NEXTAUTH_URL initially
         if (effectiveAuthUrlForLogging !== process.env.NEXTAUTH_URL) {
              guidanceMessages.push(`\x1b[36mNextAuth.js: Effective auth URL for callbacks was updated by runtime adjustment to: ${process.env.NEXTAUTH_URL}\x1b[0m`);
-             effectiveAuthUrlForLogging = process.env.NEXTAUTH_URL; // Update for subsequent log lines if needed
+             effectiveAuthUrlForLogging = process.env.NEXTAUTH_URL;
         }
     } else {
          console.info(
@@ -195,13 +207,11 @@ if (process.env.AUTH_URL) {
         );
     }
 } else if (process.env.NEXTAUTH_URL) {
-    // If only NEXTAUTH_URL is set, that's what v4 will use.
     console.info(
         "\x1b[36m%s\x1b[0m",
         `INFO: Only \`NEXTAUTH_URL\` ("${process.env.NEXTAUTH_URL}") is set. NextAuth.js v4 will use this as its base URL.`
     );
 }
-
 
 if (guidanceMessages.length > 0) {
     guidanceMessages.forEach(msg => console.info(msg));
@@ -215,7 +225,6 @@ if (criticalEnvError) {
 }
 console.info("\x1b[34m%s\x1b[0m", "--- End of NextAuth.js Configuration Check ---");
 
-
 export const authOptions: NextAuthOptions = {
   providers: providers,
   session: {
@@ -228,10 +237,21 @@ export const authOptions: NextAuthOptions = {
   debug: process.env.NODE_ENV === 'development',
 
   callbacks: {
-    async jwt({ token, user, account }) {
+    async jwt({ token, user, account, trigger, session: newSessionData }) {
+      // Initial sign in
+      if (account && user) {
+        token.hasCompletedSetup = user.hasCompletedSetup || false; // Initialize from user object if available, else false
+      }
+      // Session update trigger (e.g., from client-side useSession().update())
+      if (trigger === "update" && newSessionData?.user?.hasCompletedSetup !== undefined) {
+        token.hasCompletedSetup = newSessionData.user.hasCompletedSetup;
+      }
       return token;
     },
     async session({ session, token }) {
+      if (session.user) {
+        session.user.hasCompletedSetup = token.hasCompletedSetup;
+      }
       return session;
     },
   },
@@ -240,3 +260,5 @@ export const authOptions: NextAuthOptions = {
 const handler = NextAuth(authOptions);
 
 export { handler as GET, handler as POST };
+
+    
