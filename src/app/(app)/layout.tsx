@@ -14,7 +14,7 @@ import {
   SidebarInset,
   SidebarRail
 } from "@/components/ui/sidebar";
-import { useAuthState } from "@/hooks/use-auth-state"; // This will now use next-auth's useSession internally
+import { useAuthState } from "@/hooks/use-auth-state";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import React, { useEffect } from "react";
@@ -130,20 +130,13 @@ export default function AuthenticatedAppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // useAuthState now uses next-auth's useSession internally
   const { user, isLoading, isAuthenticated, status } = useAuthState(); 
   const router = useRouter();
   const pathname = usePathname();
 
-  // The redirection logic is now primarily handled within useAuthState.
-  // This layout assumes that if it's rendered, the user is authenticated
-  // OR isLoading is true (in which case we show a loading screen).
-  // useAuthState will redirect to /login if not authenticated and not loading.
-
   useEffect(() => {
-    // Additional check specifically for the setup page within this layout
-    // This is a bit redundant if useAuthState handles all cases perfectly,
-    // but can serve as a safeguard.
+    // This useEffect handles redirection for setup completion status if the user is authenticated.
+    // Redirection for unauthenticated users is handled by useAuthState.
     if (status === 'authenticated') {
       const hasCompletedSetup = localStorage.getItem('foresight_hasCompletedSetup') === 'true';
       if (!hasCompletedSetup && pathname !== '/welcome/setup') {
@@ -165,11 +158,11 @@ export default function AuthenticatedAppLayout({
     );
   }
   
-  // If not authenticated and not loading, useAuthState should have redirected.
-  // If we reach here and status is 'unauthenticated', it's an unexpected state for this layout.
+  // If not authenticated and not loading, useAuthState hook should handle the redirect.
+  // This layout shows a placeholder message.
   if (status === 'unauthenticated' && pathname !== '/welcome/setup') { // Allow setup page to handle its own auth check
-     console.warn("AuthenticatedAppLayout: Reached with unauthenticated status. This should be handled by useAuthState. Forcing redirect to /login.");
-     router.replace('/login'); // Fallback redirect
+     console.warn("AuthenticatedAppLayout: Unauthenticated. Redirect should be handled by useAuthState.");
+     // router.replace('/login'); // REMOVED: This was causing the error. useAuthState handles this.
      return (
         <div className="flex h-screen items-center justify-center bg-background">
           <p>Redirecting to login...</p>
@@ -178,7 +171,7 @@ export default function AuthenticatedAppLayout({
   }
 
   // If authenticated but setup is not complete, and current path is not the setup page,
-  // useAuthState should redirect. This check ensures child components don't render prematurely.
+  // the useEffect above will handle the redirect. This shows a placeholder.
   if (status === 'authenticated') {
     const hasCompletedSetup = localStorage.getItem('foresight_hasCompletedSetup') === 'true';
     if (!hasCompletedSetup && pathname !== '/welcome/setup') {
