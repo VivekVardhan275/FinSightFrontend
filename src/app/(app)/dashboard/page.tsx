@@ -18,7 +18,7 @@ const pageHeaderBlockMotionVariants = {
   animate: {
     opacity: 1,
     x: 0,
-    transition: { duration: 0.5, delay: 0.1 },
+    transition: { duration: 0.5 }, // Delay removed
   },
 };
 
@@ -29,7 +29,7 @@ const chartWrapperMotionVariants = {
     y: 0,
     scale: 1,
     transition: {
-      delay: 0.15, // This can be slightly after the header
+      delay: 0.15,
       duration: 0.4,
       ease: "easeOut",
     },

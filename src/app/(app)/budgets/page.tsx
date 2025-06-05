@@ -26,7 +26,7 @@ import { motion } from "framer-motion";
 
 const pageHeaderBlockMotionVariants = {
   initial: { opacity: 0, x: -20 },
-  animate: { opacity: 1, x: 0, transition: { duration: 0.5, delay: 0.1 } },
+  animate: { opacity: 1, x: 0, transition: { duration: 0.5 } }, // Delay removed
 };
 
 const buttonMotionVariants = {
@@ -34,14 +34,12 @@ const buttonMotionVariants = {
   animate: { opacity: 1, scale: 1, transition: { duration: 0.4, delay: 0.2 } },
 };
 
-// Simplified grid variants: The grid container itself animates in.
-// Staggering is handled by individual BudgetCards using their `custom` prop.
 const gridContainerMotionVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
     transition: {
-      delay: 0.3, // Grid container animates in after a small delay
+      delay: 0.3,
       duration: 0.5,
     },
   },
@@ -54,7 +52,7 @@ const budgetCardVariants = {
     y: 0,
     scale: 1,
     transition: {
-      delay: i * 0.07, // Each card staggers itself based on its index
+      delay: i * 0.07,
       duration: 0.4,
       ease: "easeOut",
     },
@@ -200,7 +198,7 @@ export default function BudgetsPage() {
           className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
           initial="hidden"
           animate="visible"
-          variants={gridContainerMotionVariants} // Use simplified variants for the container
+          variants={gridContainerMotionVariants}
           viewport={{ once: true }}
         >
           {budgets.map((budget, index) => (
@@ -209,8 +207,8 @@ export default function BudgetsPage() {
               budget={budget}
               onEdit={handleEditBudget}
               onDelete={confirmDeleteBudget}
-              variants={budgetCardVariants} // BudgetCard uses these for its own animation
-              custom={index} // Used by BudgetCard's variants for delay
+              variants={budgetCardVariants}
+              custom={index}
             />
           ))}
         </motion.div>

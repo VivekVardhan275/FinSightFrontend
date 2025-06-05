@@ -16,7 +16,7 @@ import { useCurrency, type Currency as AppCurrency } from "@/contexts/currency-c
 
 const pageHeaderBlockMotionVariants = {
   initial: { opacity: 0, x: -20 },
-  animate: { opacity: 1, x: 0, transition: { duration: 0.5, delay: 0.1 } },
+  animate: { opacity: 1, x: 0, transition: { duration: 0.5 } }, // Delay removed
 };
 
 const cardMotionVariants = (delay: number) => ({
