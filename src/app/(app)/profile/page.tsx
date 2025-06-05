@@ -249,11 +249,8 @@ export default function ProfilePage() {
               {user.email}
             </CardDescription>
           </CardHeader>
-          <CardContent className="text-center">
-            <Button variant="outline" disabled>
-              <Edit3 className="mr-2 h-4 w-4" /> Edit Profile Picture
-            </Button>
-            <p className="text-xs text-muted-foreground mt-2">Feature coming soon</p>
+          <CardContent className="text-center pt-0">
+            {/* Edit Profile Picture button removed */}
           </CardContent>
         </Card>
 
