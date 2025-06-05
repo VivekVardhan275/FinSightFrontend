@@ -9,10 +9,7 @@ import { motion } from "framer-motion";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 
-const pageHeaderBlockMotionVariants = {
-  initial: { opacity: 0, x: -20 },
-  animate: { opacity: 1, x: 0, transition: { duration: 0.3, ease: "easeOut" } },
-};
+// Removed pageHeaderBlockMotionVariants
 
 const contentMotionVariants = {
   initial: { opacity: 0, y: 20 },
@@ -49,19 +46,14 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-8">
-      <motion.div
-        initial="initial"
-        animate="animate"
-        variants={pageHeaderBlockMotionVariants}
-        viewport={{ once: true }}
-      >
+      <div>
         <h1 className="font-headline text-3xl font-bold tracking-tight">
           Generate Reports
         </h1>
         <p className="text-muted-foreground">
           Download monthly summaries of your financial activity.
         </p>
-      </motion.div>
+      </div>
 
       <motion.div
         className="grid gap-6 md:grid-cols-2"

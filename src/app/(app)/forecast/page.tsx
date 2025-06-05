@@ -5,10 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { LineChart as ChartIcon } from "lucide-react";
 import { motion } from "framer-motion";
 
-const pageHeaderBlockMotionVariants = {
-  initial: { opacity: 0, x: -20 },
-  animate: { opacity: 1, x: 0, transition: { duration: 0.3, ease: "easeOut" } },
-};
+// Removed pageHeaderBlockMotionVariants
 
 const contentMotionVariants = {
   initial: { opacity: 0, y: 20 },
@@ -18,19 +15,14 @@ const contentMotionVariants = {
 export default function ForecastPage() {
   return (
     <div className="space-y-8">
-      <motion.div
-        initial="initial"
-        animate="animate"
-        variants={pageHeaderBlockMotionVariants}
-        viewport={{ once: true }}
-      >
+      <div>
         <h1 className="font-headline text-3xl font-bold tracking-tight">
           Financial Forecast
         </h1>
         <p className="text-muted-foreground">
           View your projected income, expenses, and net balance.
         </p>
-      </motion.div>
+      </div>
 
       <motion.div
         initial="initial"

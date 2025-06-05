@@ -24,10 +24,7 @@ import { useCurrency } from '@/contexts/currency-context';
 import { formatCurrency } from '@/lib/utils';
 import { motion } from "framer-motion";
 
-const pageHeaderBlockMotionVariants = {
-  initial: { opacity: 0, x: -20 },
-  animate: { opacity: 1, x: 0, transition: { duration: 0.3, ease: "easeOut" } },
-};
+// Removed pageHeaderBlockMotionVariants
 
 const buttonMotionVariants = {
   initial: { opacity: 0, scale: 0.9 },
@@ -173,7 +170,7 @@ export default function BudgetsPage() {
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <motion.div initial="initial" animate="animate" variants={pageHeaderBlockMotionVariants} viewport={{ once: true }}>
+        <div>
           <h1
             className="font-headline text-3xl font-bold tracking-tight"
           >
@@ -184,7 +181,7 @@ export default function BudgetsPage() {
           >
             Set and track your monthly spending goals.
           </p>
-        </motion.div>
+        </div>
         <motion.div initial="initial" animate="animate" variants={buttonMotionVariants} viewport={{ once: true }}>
           <Button onClick={handleAddBudget}>
             <PlusCircle className="mr-2 h-5 w-5" />
