@@ -14,8 +14,8 @@ interface BudgetCardProps {
   budget: Budget;
   onEdit: (budget: Budget) => void;
   onDelete: (budgetId: string) => void;
-  variants?: Variants;
-  custom?: number;
+  variants?: Variants; // These variants define hidden/visible states for self-animation
+  custom?: number;    // This is typically an index, used by the variants for delay
 }
 
 export function BudgetCard({ budget, onEdit, onDelete, variants, custom }: BudgetCardProps) {
@@ -36,11 +36,13 @@ export function BudgetCard({ budget, onEdit, onDelete, variants, custom }: Budge
 
   return (
     <motion.div
-      variants={variants}
-      custom={custom}
+      initial="hidden" // Ensures the card starts from its 'hidden' variant state
+      animate="visible" // Animates to its 'visible' variant state
+      variants={variants} // Uses the variants passed from BudgetsPage (budgetCardVariants)
+      custom={custom} // Passes the index to the variants for staggered delay
       className="h-full"
       whileHover={{ y: -5, scale: 1.03, transition: { duration: 0.2 } }}
-      viewport={{ once: true }}
+      viewport={{ once: true }} // Ensures this card animates in only once when it enters viewport
     >
       <Card className="shadow-lg transition-shadow hover:shadow-xl h-full flex flex-col">
         <CardHeader>
