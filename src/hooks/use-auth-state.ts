@@ -1,130 +1,90 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter, usePathname } from 'next/navigation'; // Added usePathname
+import { useEffect, useCallback } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
+import { useSession, signIn, signOut } from 'next-auth/react';
+import type { User as NextAuthUser } from 'next-auth'; // Using NextAuth's User type
 
-export interface User {
-  name: string;
-  email: string;
-  // imageUrl removed as per previous request
+// Define our app's User type, which might be a subset or extension of NextAuth's
+export interface AppUser {
+  name?: string | null;
+  email?: string | null;
+  image?: string | null; // NextAuth user includes image
+  // Add any other custom fields you expect in your app's user object
 }
 
-const mockUser: User = {
-  name: 'Demo User',
-  email: 'demo@example.com',
-  // imageUrl removed
-};
-
 export function useAuthState() {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true); // Reflects initial auth check status
-  const [initialAuthPerformed, setInitialAuthPerformed] = useState(false);
+  const { data: session, status } = useSession();
   const router = useRouter();
   const pathname = usePathname();
 
-  const navigateBasedOnSetup = useCallback(() => {
+  const isLoading = status === 'loading';
+  const user: AppUser | null = session?.user ? {
+    name: session.user.name,
+    email: session.user.email,
+    image: session.user.image,
+  } : null;
+
+  const navigateBasedOnAuthAndSetup = useCallback(() => {
+    if (isLoading) return; // Don't navigate while session status is loading
+
     const hasCompletedSetup = localStorage.getItem('foresight_hasCompletedSetup') === 'true';
-    if (user) { // Only navigate if user is determined
+
+    if (status === 'authenticated') {
+      console.log("useAuthState: Authenticated. Checking setup...");
       if (hasCompletedSetup) {
-        if (pathname === '/welcome/setup' || pathname === '/login') {
+        if (pathname === '/login' || pathname === '/welcome/setup') {
+          console.log("useAuthState: Setup complete, redirecting to /dashboard");
           router.replace('/dashboard');
         }
       } else {
         if (pathname !== '/welcome/setup') {
+          console.log("useAuthState: Setup incomplete, redirecting to /welcome/setup");
           router.replace('/welcome/setup');
         }
       }
-    }
-  }, [user, router, pathname]);
-
-  // Effect for initial authentication check
-  useEffect(() => {
-    const performInitialAuthCheck = async () => {
-      // setIsLoading(true) is already the default state
-      // Simulate API call for initial auth
-      await new Promise(resolve => setTimeout(resolve, 750));
-      
-      const authStatus = localStorage.getItem('isLoggedInForesight');
-      if (authStatus === 'true') {
-        const storedUserString = localStorage.getItem('foresight_user');
-        let resolvedUser = mockUser; // Default
-        if (storedUserString) {
-          try {
-            resolvedUser = JSON.parse(storedUserString);
-          } catch (e) { /* use mockUser as fallback */ }
-        }
-        setUser(resolvedUser);
-      } else {
-        setUser(null);
-      }
-      setIsLoading(false); // Initial auth check complete
-      setInitialAuthPerformed(true);
-    };
-
-    if (!initialAuthPerformed) {
-      performInitialAuthCheck();
-    }
-  }, [initialAuthPerformed]); // Only re-run if initialAuthPerformed changes
-
-  // Effect for handling navigation and redirection based on auth and setup status
-  useEffect(() => {
-    // Don't do anything if initial auth hasn't been performed yet,
-    // or if we are still in the process of the initial load (isLoading is true).
-    if (!initialAuthPerformed || isLoading) {
-      return;
-    }
-
-    if (user) { // User is authenticated
-      navigateBasedOnSetup();
-    } else { // User is not authenticated
-      // Redirect to login if not on a public page (login or setup)
+    } else if (status === 'unauthenticated') {
+      console.log("useAuthState: Unauthenticated.");
+      // Allow access to login and setup page even if unauthenticated (setup page handles its own auth check)
       if (pathname !== '/login' && pathname !== '/welcome/setup') {
+        console.log("useAuthState: Redirecting to /login");
         router.replace('/login');
       }
     }
-  }, [user, initialAuthPerformed, isLoading, pathname, router, navigateBasedOnSetup]);
+  }, [status, isLoading, pathname, router]);
 
-  const performLoginAction = useCallback(async (loggedInUser: User) => {
-    // No setIsLoading(true) here; UI transition handled by Next.js router
-    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate login API call
-    
-    localStorage.setItem('isLoggedInForesight', 'true');
-    localStorage.setItem('foresight_user', JSON.stringify(loggedInUser));
-    setUser(loggedInUser);
-    // If initialAuthPerformed was false, this login means auth state is now known.
-    // If it was true, user state simply changes.
-    if (!initialAuthPerformed) {
-        setInitialAuthPerformed(true);
-        setIsLoading(false); // Ensure isLoading is false if login completes initial auth
-    }
-    // Subsequent navigation is handled by the second useEffect reacting to `user` change.
-  }, [initialAuthPerformed]);
+  useEffect(() => {
+    navigateBasedOnAuthAndSetup();
+  }, [status, isLoading, pathname, navigateBasedOnAuthAndSetup]);
 
 
-  const login = useCallback(async () => {
-    performLoginAction(mockUser);
-  }, [performLoginAction]);
+  const loginWithGoogle = useCallback(async () => {
+    // The { callbackUrl } option can be used to redirect after sign-in.
+    // Auth.js by default tries to redirect to the page the user was on, or to the root.
+    // We can explicitly set it if needed, e.g., to '/welcome/setup' or '/dashboard'
+    // depending on setup status, but often the default behavior is fine.
+    await signIn('google', { callbackUrl: '/welcome/setup' });
+  }, []);
 
   const loginWithGitHub = useCallback(async () => {
-    performLoginAction({...mockUser, name: "GitHub User", email: "github@example.com"});
-  }, [performLoginAction]);
+    await signIn('github', { callbackUrl: '/welcome/setup' });
+  }, []);
 
-
-  const logout = useCallback(async () => {
-    // No setIsLoading(true) here
-    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate logout API call
-    localStorage.removeItem('isLoggedInForesight');
-    localStorage.removeItem('foresight_user');
+  const appLogout = useCallback(async () => {
+    // Clear local setup flag before signing out from NextAuth
     localStorage.removeItem('foresight_hasCompletedSetup');
-    setUser(null);
-    // Auth state is now known (null). If initialAuthPerformed was false, it should become true.
-    if (!initialAuthPerformed) {
-        setInitialAuthPerformed(true);
-        setIsLoading(false);
-    }
-    // Subsequent navigation to /login is handled by the second useEffect.
-  }, [initialAuthPerformed]);
+    await signOut({ callbackUrl: '/login' }); // Redirect to login page after sign out
+  }, []);
 
-  return { user, isLoading, login, loginWithGitHub, logout };
+  return { 
+    user, 
+    isLoading, 
+    login: loginWithGoogle, // Default login to Google
+    loginWithGoogle,
+    loginWithGitHub, 
+    logout: appLogout,
+    isAuthenticated: status === 'authenticated',
+    status
+  };
 }

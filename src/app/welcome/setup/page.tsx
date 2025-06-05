@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { AppLogo } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
-import { useAuthState } from "@/hooks/use-auth-state";
+import { useAuthState, type AppUser } from "@/hooks/use-auth-state"; // Updated useAuthState
 import { useTheme } from "next-themes";
 import { useCurrency, type Currency as AppCurrency } from "@/contexts/currency-context";
 import { useToast } from "@/hooks/use-toast";
@@ -54,8 +54,10 @@ const initializeFromLocalStorage = <T,>(
 
 
 export default function SetupPage() {
-  const { user, isLoading: authLoading } = useAuthState();
+  // useAuthState now uses next-auth's useSession internally
+  const { user, isLoading: authLoading, status, isAuthenticated } = useAuthState();
   const router = useRouter();
+  const pathname = usePathname();
   const { theme: activeTheme, setTheme } = useTheme();
   const { selectedCurrency, setSelectedCurrency: setGlobalCurrency } = useCurrency();
   const { toast } = useToast();
@@ -81,22 +83,33 @@ export default function SetupPage() {
   
   const [isSaving, setIsSaving] = useState(false);
 
-
   useEffect(() => {
-    if (user) {
-      setDisplayName(user.name || "");
+    // Redirect if not authenticated and not loading
+    if (!authLoading && status === 'unauthenticated') {
+      router.replace('/login');
+      return;
     }
-  }, [user]);
+    // If authenticated and setup already complete, redirect to dashboard
+    if (status === 'authenticated' && localStorage.getItem('foresight_hasCompletedSetup') === 'true') {
+      router.replace('/dashboard');
+      return;
+    }
+
+    if (user) {
+      // User object from useAuthState (via NextAuth) is used here
+      setDisplayName(user.name || "");
+      // Email is pre-filled if available, phone, dob, gender are optional for setup
+    }
+  }, [user, authLoading, status, router]);
+
 
   useEffect(() => {
-    // Align local theme state with next-themes if "app-theme" wasn't initially set
     const storedAppTheme = localStorage.getItem("app-theme");
     if (!storedAppTheme && activeTheme && ["light", "dark", "system"].includes(activeTheme)) {
       setCurrentTheme(activeTheme as ThemeSetting);
     }
   }, [activeTheme]);
 
-  // Apply settings locally as they change on this page
   useEffect(() => {
     setTheme(currentTheme);
   }, [currentTheme, setTheme]);
@@ -115,25 +128,22 @@ export default function SetupPage() {
 
 
   const handleSaveSetup = useCallback(async () => {
-    if (!user) {
+    if (!user) { // User should be available if on this page and authenticated
       toast({ title: "Error", description: "User not found. Please try logging in again.", variant: "destructive" });
       router.push('/login');
       return;
     }
     setIsSaving(true);
 
-    // Simulate saving profile information (in a real app, this would be an API call)
     console.log("Saving profile setup:", { displayName, email: user.email, phoneNumber, dateOfBirth, gender });
-    // For simulation, we could update the user object in useAuthState if it was globally managed,
-    // or store these in localStorage if needed for other parts of the prototype without a backend.
-    // For now, just logging.
+    // In a real app, you might make an API call here to save profile details to your database,
+    // associating them with the authenticated user (e.g., user.id or user.email from session).
+    // For this frontend-only auth, we'll primarily rely on localStorage for settings.
 
-    // Save settings to localStorage
     localStorage.setItem("app-theme", currentTheme);
     localStorage.setItem("app-font-size", fontSize);
-    setGlobalCurrency(currentSelectedCurrency); // This updates context and localStorage
+    setGlobalCurrency(currentSelectedCurrency); 
 
-    // Mark setup as complete
     localStorage.setItem('foresight_hasCompletedSetup', 'true');
 
     toast({
@@ -142,20 +152,31 @@ export default function SetupPage() {
       variant: "default"
     });
     
-    // Give toast time to show before navigating
     await new Promise(resolve => setTimeout(resolve, 1000));
     router.push('/dashboard');
     setIsSaving(false);
 
-  }, [user, displayName, phoneNumber, dateOfBirth, gender, currentTheme, fontSize, currentSelectedCurrency, setTheme, setGlobalCurrency, router, toast]);
+  }, [user, displayName, phoneNumber, dateOfBirth, gender, currentTheme, fontSize, currentSelectedCurrency, setGlobalCurrency, router, toast]);
 
-  if (authLoading || !user) {
+  if (authLoading || status === 'loading' || (status === 'unauthenticated' && pathname === '/welcome/setup')) {
+    // Show loading if auth state is loading, or if unauthenticated but on setup page (which implies a redirect or auth process is pending)
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <p>Loading setup...</p>
       </div>
     );
   }
+  
+  // If still not authenticated by this point and not loading (should have been redirected by useEffect or hook)
+  if (!isAuthenticated && status !== 'loading') {
+     router.replace('/login'); // Fallback redirect
+     return (
+        <div className="flex min-h-screen items-center justify-center bg-background p-4">
+          <p>Redirecting to login...</p>
+        </div>
+     );
+  }
+
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-background to-secondary p-4">
@@ -171,7 +192,7 @@ export default function SetupPage() {
               <AppLogo className="h-10 w-10 text-primary transform -translate-y-0.5" />
               <h1 className="font-headline text-3xl font-bold text-primary">FinSight</h1>
             </div>
-            <CardTitle className="font-headline text-2xl">Welcome! Let's get you set up.</CardTitle>
+            <CardTitle className="font-headline text-2xl">Welcome{user?.name ? `, ${user.name.split(' ')[0]}` : ''}! Let's get you set up.</CardTitle>
             <CardDescription>Please provide some initial information to personalize your experience.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-8 py-8 px-6 md:px-10">
@@ -186,7 +207,7 @@ export default function SetupPage() {
                   <Label htmlFor="fullName">Full Name</Label>
                   <Input 
                     id="fullName" 
-                    value={displayName} 
+                    value={displayName}  // Pre-filled from user.name via useEffect
                     onChange={(e) => setDisplayName(e.target.value)}
                     placeholder="Your full name"
                   />
@@ -195,7 +216,7 @@ export default function SetupPage() {
                   <Label htmlFor="email">Email Address</Label>
                   <Input 
                     id="email" 
-                    value={user.email || ""} 
+                    value={user?.email || ""} // Pre-filled from user.email
                     readOnly 
                     className="cursor-not-allowed bg-muted/50"
                   />
@@ -305,7 +326,7 @@ export default function SetupPage() {
             <Separator className="my-6"/>
             
             <div className="flex justify-end">
-              <Button onClick={handleSaveSetup} size="lg" disabled={isSaving}>
+              <Button onClick={handleSaveSetup} size="lg" disabled={isSaving || authLoading || status === 'loading'}>
                 <Save className="mr-2 h-5 w-5" />
                 {isSaving? "Saving..." : "Save and Continue"}
               </Button>
@@ -319,5 +340,3 @@ export default function SetupPage() {
     </div>
   );
 }
-
-    

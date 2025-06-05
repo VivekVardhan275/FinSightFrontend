@@ -8,6 +8,7 @@ import React, { useEffect } from 'react'; // Import useEffect
 import { Inter } from 'next/font/google';
 import { CurrencyProvider } from "@/contexts/currency-context";
 import { NotificationProvider } from "@/contexts/notification-context";
+import { SessionProvider } from "next-auth/react"; // Import SessionProvider
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
@@ -44,19 +45,21 @@ export default function RootLayout({
         {/* Removed preconnect links for Google Fonts as next/font handles it */}
       </head>
       <body className={`${inter.variable} font-body antialiased`}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <NotificationProvider>
-            <CurrencyProvider>
-              {children}
-              <Toaster />
-            </CurrencyProvider>
-          </NotificationProvider>
-        </ThemeProvider>
+        <SessionProvider> {/* Wrap with SessionProvider */}
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <NotificationProvider>
+              <CurrencyProvider>
+                {children}
+                <Toaster />
+              </CurrencyProvider>
+            </NotificationProvider>
+          </ThemeProvider>
+        </SessionProvider>
       </body>
     </html>
   );

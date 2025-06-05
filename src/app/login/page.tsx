@@ -30,17 +30,22 @@ const GoogleLogo = () => (
 );
 
 export default function LoginPage() {
-  const { login, loginWithGitHub, user, isLoading } = useAuthState();
+  const { loginWithGoogle, loginWithGitHub, isAuthenticated, isLoading, status } = useAuthState();
   const router = useRouter();
 
   useEffect(() => {
-    if (user) {
-      router.replace('/dashboard');
+    // useAuthState hook now handles redirection logic based on auth status and setup completion.
+    // This useEffect can be simplified or removed if all redirection is handled by the hook.
+    // For now, keeping a basic check.
+    if (isAuthenticated && status === 'authenticated') {
+      // The hook should ideally redirect to /dashboard or /welcome/setup
+      // but as a fallback, we can push to dashboard here if somehow missed.
+      // router.replace('/dashboard'); // This might conflict with hook's logic. Best to let hook manage.
     }
-  }, [user, router]);
+  }, [isAuthenticated, status, router]);
 
-  if (isLoading || user) {
-    // Show a loading state or null if redirecting
+  if (isLoading || (isAuthenticated && status === 'authenticated')) {
+    // Show a loading state or null if redirecting (Auth.js status 'loading' or already 'authenticated')
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <p>Loading...</p>
@@ -68,10 +73,10 @@ export default function LoginPage() {
             </CardHeader>
             <CardContent className="py-16 space-y-4">
               <Button 
-                onClick={login} 
+                onClick={loginWithGoogle} 
                 className="w-full transition-all hover:shadow-lg hover:scale-105" 
                 size="lg"
-                disabled={isLoading}
+                disabled={isLoading} // status === 'loading'
                 asChild
               >
                 <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
@@ -84,7 +89,7 @@ export default function LoginPage() {
                 variant="outline"
                 className="w-full transition-all hover:shadow-lg hover:scale-105 border-foreground/20 hover:bg-accent/10 hover:text-foreground" 
                 size="lg"
-                disabled={isLoading}
+                disabled={isLoading} // status === 'loading'
                 asChild
               >
                 <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>

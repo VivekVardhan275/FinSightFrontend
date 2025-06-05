@@ -14,17 +14,16 @@ import {
   SidebarInset,
   SidebarRail
 } from "@/components/ui/sidebar";
-import { useAuthState } from "@/hooks/use-auth-state";
+import { useAuthState } from "@/hooks/use-auth-state"; // This will now use next-auth's useSession internally
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useCurrency } from "@/contexts/currency-context"; // CurrencyProvider removed, useCurrency still used
-import { useNotification } from "@/contexts/notification-context"; // NotificationProvider removed, useNotification still used
+import { useCurrency } from "@/contexts/currency-context";
+import { useNotification } from "@/contexts/notification-context";
 import { NotificationBell } from "@/components/layout/notification-bell";
 import { TransactionProvider, useTransactionContext } from "@/contexts/transaction-context";
 import { BudgetProvider, useBudgetContext } from "@/contexts/budget-context";
-import type { Budget } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 
 
@@ -33,7 +32,7 @@ function BudgetNotificationEffect() {
   const { transactions, getTransactionsByCategoryAndMonth } = useTransactionContext();
   const { addNotification } = useNotification();
   const { selectedCurrency, convertAmount } = useCurrency();
-  const [notifiedLayoutBudgets, setNotifiedLayoutBudgets] = useState<Set<string>>(new Set());
+  const [notifiedLayoutBudgets, setNotifiedLayoutBudgets] = React.useState<Set<string>>(new Set());
 
   useEffect(() => {
     const storedNotified = localStorage.getItem('app-layout-notified-budgets');
@@ -131,37 +130,34 @@ export default function AuthenticatedAppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isLoading } = useAuthState();
+  // useAuthState now uses next-auth's useSession internally
+  const { user, isLoading, isAuthenticated, status } = useAuthState(); 
   const router = useRouter();
   const pathname = usePathname();
 
+  // The redirection logic is now primarily handled within useAuthState.
+  // This layout assumes that if it's rendered, the user is authenticated
+  // OR isLoading is true (in which case we show a loading screen).
+  // useAuthState will redirect to /login if not authenticated and not loading.
+
   useEffect(() => {
-    if (!isLoading && !user) {
-      // If not loading and no user, redirect to login
-      // This check is now primarily handled by useAuthState's main effect
-      // but kept here as a fallback.
-      if (pathname !== '/login') {
-         router.replace('/login');
-      }
-      return;
-    }
-
-    if (!isLoading && user) {
-      // If user is loaded, check if setup is complete
+    // Additional check specifically for the setup page within this layout
+    // This is a bit redundant if useAuthState handles all cases perfectly,
+    // but can serve as a safeguard.
+    if (status === 'authenticated') {
       const hasCompletedSetup = localStorage.getItem('foresight_hasCompletedSetup') === 'true';
-      if (!hasCompletedSetup) {
-        if (pathname !== '/welcome/setup') {
-          router.replace('/welcome/setup');
-        }
-      } else if (pathname === '/welcome/setup') { 
-        // If setup IS complete but user is somehow on setup page, redirect to dashboard
-        router.replace('/dashboard');
+      if (!hasCompletedSetup && pathname !== '/welcome/setup') {
+         console.log("AuthenticatedAppLayout: User authenticated, setup not complete, redirecting to /welcome/setup");
+         router.replace('/welcome/setup');
+      } else if (hasCompletedSetup && pathname === '/welcome/setup') {
+         console.log("AuthenticatedAppLayout: User authenticated, setup complete, but on setup page, redirecting to /dashboard");
+         router.replace('/dashboard');
       }
     }
-  }, [user, isLoading, router, pathname]);
+  }, [status, pathname, router]);
 
 
-  if (isLoading || !user) {
+  if (isLoading || status === 'loading') {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <p>Loading application...</p>
@@ -169,20 +165,33 @@ export default function AuthenticatedAppLayout({
     );
   }
   
-  // If user exists but setup is not complete, and current path is not the setup page,
-  // useAuthState should redirect. This check ensures child components don't render prematurely.
-  const hasCompletedSetup = localStorage.getItem('foresight_hasCompletedSetup') === 'true';
-  if (!hasCompletedSetup && pathname !== '/welcome/setup') {
+  // If not authenticated and not loading, useAuthState should have redirected.
+  // If we reach here and status is 'unauthenticated', it's an unexpected state for this layout.
+  if (status === 'unauthenticated' && pathname !== '/welcome/setup') { // Allow setup page to handle its own auth check
+     console.warn("AuthenticatedAppLayout: Reached with unauthenticated status. This should be handled by useAuthState. Forcing redirect to /login.");
+     router.replace('/login'); // Fallback redirect
      return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <p>Redirecting to setup...</p>
-      </div>
-    );
+        <div className="flex h-screen items-center justify-center bg-background">
+          <p>Redirecting to login...</p>
+        </div>
+     );
+  }
+
+  // If authenticated but setup is not complete, and current path is not the setup page,
+  // useAuthState should redirect. This check ensures child components don't render prematurely.
+  if (status === 'authenticated') {
+    const hasCompletedSetup = localStorage.getItem('foresight_hasCompletedSetup') === 'true';
+    if (!hasCompletedSetup && pathname !== '/welcome/setup') {
+       return (
+        <div className="flex h-screen items-center justify-center bg-background">
+          <p>Redirecting to setup...</p>
+        </div>
+      );
+    }
   }
 
 
   return (
-    // NotificationProvider and CurrencyProvider are now in the root layout
     <TransactionProvider>
       <BudgetProvider>
         <BudgetNotificationEffect />
@@ -236,5 +245,3 @@ export default function AuthenticatedAppLayout({
     </TransactionProvider>
   );
 }
-
-    
