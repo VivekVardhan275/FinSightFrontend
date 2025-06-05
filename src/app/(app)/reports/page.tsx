@@ -9,6 +9,16 @@ import { motion } from "framer-motion";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 
+const pageHeaderMotionVariants = {
+  initial: { opacity: 0, x: -20 },
+  animate: { opacity: 1, x: 0, transition: { duration: 0.5 } },
+};
+
+const contentMotionVariants = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.5, delay: 0.2 } },
+};
+
 export default function ReportsPage() {
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().slice(0,7)); // Default to current month YYYY-MM
   const [selectedFormat, setSelectedFormat] = useState<string>("pdf");
@@ -40,9 +50,9 @@ export default function ReportsPage() {
   return (
     <div className="space-y-8">
       <motion.div
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.5 }}
+        initial="initial"
+        animate="animate"
+        variants={pageHeaderMotionVariants}
         viewport={{ once: true }}
       >
         <h1 className="font-headline text-3xl font-bold tracking-tight">
@@ -55,9 +65,9 @@ export default function ReportsPage() {
 
       <motion.div
         className="grid gap-6 md:grid-cols-2"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
+        initial="initial"
+        animate="animate"
+        variants={contentMotionVariants}
         viewport={{ once: true }}
       >
         <Card className="shadow-lg">

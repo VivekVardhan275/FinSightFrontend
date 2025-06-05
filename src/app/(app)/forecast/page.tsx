@@ -5,13 +5,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { LineChart as ChartIcon } from "lucide-react";
 import { motion } from "framer-motion";
 
+const pageHeaderMotionVariants = {
+  initial: { opacity: 0, x: -20 },
+  animate: { opacity: 1, x: 0, transition: { duration: 0.5 } },
+};
+
+const contentMotionVariants = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.5, delay: 0.2 } },
+};
+
 export default function ForecastPage() {
   return (
     <div className="space-y-8">
       <motion.div
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.5 }}
+        initial="initial"
+        animate="animate"
+        variants={pageHeaderMotionVariants}
         viewport={{ once: true }}
       >
         <h1 className="font-headline text-3xl font-bold tracking-tight">
@@ -23,9 +33,9 @@ export default function ForecastPage() {
       </motion.div>
 
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
+        initial="initial"
+        animate="animate"
+        variants={contentMotionVariants}
         viewport={{ once: true }}
       >
         <Card className="shadow-lg">

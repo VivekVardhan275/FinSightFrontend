@@ -15,6 +15,16 @@ import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
+const pageHeaderMotionVariants = {
+  initial: { opacity: 0, x: -20 },
+  animate: { opacity: 1, x: 0, transition: { duration: 0.5 } },
+};
+
+const contentMotionVariants = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.5, delay: 0.2 } },
+};
+
 const ReadOnlyFieldDisplay = ({ value, placeholder = "Not set" }: { value: string | null | undefined, placeholder?: string }) => (
   <div className="flex h-10 w-full items-center rounded-md border border-transparent bg-transparent px-3 py-2 text-sm">
     {value || <span className="text-muted-foreground">{placeholder}</span>}
@@ -42,15 +52,15 @@ export default function ProfilePage() {
       setDisplayName(initialName);
       setInitialDisplayNameForEdit(initialName);
 
-      const initialPhone = "";
+      const initialPhone = ""; // Replace with actual data if/when available from backend
       setPhoneNumber(initialPhone);
       setInitialPhoneNumberForEdit(initialPhone);
 
-      const initialDob = "";
+      const initialDob = ""; // Replace with actual data
       setDateOfBirth(initialDob);
       setInitialDateOfBirthForEdit(initialDob);
 
-      const initialGen = "";
+      const initialGen = ""; // Replace with actual data
       setGender(initialGen);
       setInitialGenderForEdit(initialGen);
     }
@@ -100,6 +110,7 @@ export default function ProfilePage() {
 
   const handleSaveChanges = () => {
     console.log("Saving profile:", { displayName, phoneNumber, dateOfBirth, gender });
+    // Here, you would typically make an API call to save the data
     toast({
       title: "Profile Updated",
       description: "Your personal information has been (simulated) saved.",
@@ -117,7 +128,7 @@ export default function ProfilePage() {
       description: "Your email address cannot be changed.",
     });
   };
-
+  
   const getFormattedGender = (genderValue: string) => {
     if (!genderValue) return "";
     return genderValue.charAt(0).toUpperCase() + genderValue.slice(1).replace(/_/g, " ");
@@ -126,9 +137,9 @@ export default function ProfilePage() {
   return (
     <div className="space-y-8">
       <motion.div
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.5 }}
+        initial="initial"
+        animate="animate"
+        variants={pageHeaderMotionVariants}
         viewport={{ once: true }}
       >
         <h1 className="font-headline text-3xl font-bold tracking-tight">
@@ -140,9 +151,9 @@ export default function ProfilePage() {
       </motion.div>
 
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
+        initial="initial"
+        animate="animate"
+        variants={contentMotionVariants}
         className="grid gap-8 md:grid-cols-3"
         viewport={{ once: true }}
       >

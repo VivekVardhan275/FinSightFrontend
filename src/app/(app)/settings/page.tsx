@@ -14,6 +14,15 @@ import { Palette, Globe, Save, User as UserIconLucide } from "lucide-react";
 import { motion } from "framer-motion";
 import { useCurrency, type Currency as AppCurrency } from "@/contexts/currency-context";
 
+const pageHeaderMotionVariants = {
+  initial: { opacity: 0, x: -20 },
+  animate: { opacity: 1, x: 0, transition: { duration: 0.5 } },
+};
+
+const cardMotionVariants = (delay: number) => ({
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.5, delay } },
+});
 
 type ThemeSetting = "light" | "dark" | "system";
 type FontSizeSetting = "small" | "medium" | "large";
@@ -100,9 +109,9 @@ export default function SettingsPage() {
   return (
     <div className="space-y-8">
       <motion.div
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.5 }}
+        initial="initial"
+        animate="animate"
+        variants={pageHeaderMotionVariants}
         viewport={{ once: true }}
       >
         <h1 className="font-headline text-3xl font-bold tracking-tight">
@@ -114,7 +123,7 @@ export default function SettingsPage() {
       </motion.div>
 
       {/* Appearance Settings */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }} viewport={{ once: true }}>
+      <motion.div initial="initial" animate="animate" variants={cardMotionVariants(0.1)} viewport={{ once: true }}>
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center font-headline">
@@ -160,7 +169,7 @@ export default function SettingsPage() {
       </motion.div>
 
       {/* Regional Preferences */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }} viewport={{ once: true }}>
+      <motion.div initial="initial" animate="animate" variants={cardMotionVariants(0.2)} viewport={{ once: true }}>
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center font-headline">
@@ -190,7 +199,7 @@ export default function SettingsPage() {
       </motion.div>
 
       {/* Account Settings Placeholder */}
-       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }} viewport={{ once: true }}>
+       <motion.div initial="initial" animate="animate" variants={cardMotionVariants(0.3)} viewport={{ once: true }}>
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center font-headline">
@@ -209,7 +218,7 @@ export default function SettingsPage() {
       </motion.div>
 
 
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.4 }} className="flex justify-end pt-4" viewport={{ once: true }}>
+      <motion.div initial="initial" animate="animate" variants={cardMotionVariants(0.4)} className="flex justify-end pt-4" viewport={{ once: true }}>
         <Button onClick={handleSaveSettings} size="lg">
           <Save className="mr-2 h-5 w-5" />
           Save All Settings
