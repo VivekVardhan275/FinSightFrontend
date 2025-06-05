@@ -13,14 +13,7 @@ import { useBudgetContext } from '@/contexts/budget-context';
 import type { SummaryCardData, Transaction, Budget } from '@/types';
 import { DollarSign, CreditCard, TrendingUp, PiggyBank } from 'lucide-react';
 
-const pageHeaderBlockMotionVariants = {
-  initial: { opacity: 0, x: -20 },
-  animate: {
-    opacity: 1,
-    x: 0,
-    transition: { duration: 0.3, ease: "easeOut" },
-  },
-};
+// Removed pageHeaderBlockMotionVariants
 
 const chartWrapperMotionVariants = {
   hidden: { opacity: 0, y: 20, scale: 0.98 },
@@ -29,7 +22,7 @@ const chartWrapperMotionVariants = {
     y: 0,
     scale: 1,
     transition: {
-      delay: 0.15,
+      delay: 0.15, // Keep a small delay for charts after page entry
       duration: 0.4,
       ease: "easeOut",
     },
@@ -171,12 +164,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <motion.div
-        initial="initial"
-        animate="animate"
-        variants={pageHeaderBlockMotionVariants}
-        viewport={{ once: true }}
-      >
+      <div>
         <h1
           className="font-headline text-3xl font-bold tracking-tight"
         >
@@ -187,7 +175,7 @@ export default function DashboardPage() {
         >
           Welcome back! Here's your financial overview.
         </p>
-      </motion.div>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {currentMonthDashboardData.map((data, index) => (
