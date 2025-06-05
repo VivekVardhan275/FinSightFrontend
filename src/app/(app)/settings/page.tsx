@@ -14,9 +14,9 @@ import { Palette, Globe, Save, User as UserIconLucide } from "lucide-react";
 import { motion } from "framer-motion";
 import { useCurrency, type Currency as AppCurrency } from "@/contexts/currency-context";
 
-const pageHeaderMotionVariants = {
+const pageHeaderBlockMotionVariants = {
   initial: { opacity: 0, x: -20 },
-  animate: { opacity: 1, x: 0, transition: { duration: 0.5 } },
+  animate: { opacity: 1, x: 0, transition: { duration: 0.5, delay: 0.1 } },
 };
 
 const cardMotionVariants = (delay: number) => ({
@@ -111,7 +111,7 @@ export default function SettingsPage() {
       <motion.div
         initial="initial"
         animate="animate"
-        variants={pageHeaderMotionVariants}
+        variants={pageHeaderBlockMotionVariants}
         viewport={{ once: true }}
       >
         <h1 className="font-headline text-3xl font-bold tracking-tight">

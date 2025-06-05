@@ -26,7 +26,7 @@ import { useCurrency } from '@/contexts/currency-context';
 import { formatCurrency } from '@/lib/utils';
 import { motion } from "framer-motion";
 
-const pageMotionVariants = {
+const pageHeaderBlockMotionVariants = {
   initial: { opacity: 0, x: -20 },
   animate: { opacity: 1, x: 0, transition: { duration: 0.5, delay: 0.1 } },
 };
@@ -244,7 +244,7 @@ export default function TransactionsPage() {
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <motion.div initial="initial" animate="animate" variants={pageMotionVariants} viewport={{ once: true }}>
+        <motion.div initial="initial" animate="animate" variants={pageHeaderBlockMotionVariants} viewport={{ once: true }}>
           <h1 className="font-headline text-3xl font-bold tracking-tight">Transactions</h1>
           <p className="text-muted-foreground">Manage your income and expenses.</p>
         </motion.div>
