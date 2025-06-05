@@ -8,22 +8,21 @@ import GithubProvider from "next-auth/providers/github";
 declare module 'next-auth' {
   interface Session extends DefaultSession {
     user?: {
-      hasCompletedSetup?: boolean;
+      hasCompletedSetup?: boolean | undefined; // Can be undefined until fetched by API
     } & DefaultSession['user'];
   }
   interface User extends DefaultUser {
-    hasCompletedSetup?: boolean; // For initial population if needed from DB in future
+    hasCompletedSetup?: boolean | undefined; // For initial population if needed
   }
 }
 
 declare module 'next-auth/jwt' {
   interface JWT extends DefaultJWT {
-    hasCompletedSetup?: boolean;
+    hasCompletedSetup?: boolean | undefined; // Can be undefined until fetched by API
   }
 }
 // --- End Type Augmentation ---
 
-// Ensure environment variables are being accessed correctly
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
 const githubClientId = process.env.GITHUB_CLIENT_ID;
@@ -32,7 +31,6 @@ const authSecret = process.env.AUTH_SECRET;
 let envAuthUrl = process.env.AUTH_URL;
 const envNextAuthUrl = process.env.NEXTAUTH_URL;
 
-// --- CRITICAL ENVIRONMENT VARIABLE CHECKS ---
 let criticalEnvError = false;
 const guidanceMessages: string[] = [];
 let effectiveAuthUrlForLogging = envAuthUrl;
@@ -68,6 +66,7 @@ if (envAuthUrl && envNextAuthUrl && envAuthUrl !== envNextAuthUrl) {
   effectiveAuthUrlForLogging = envAuthUrl;
 }
 
+
 if (!effectiveAuthUrlForLogging) {
   console.error(
     "\x1b[31m%s\x1b[0m",
@@ -86,13 +85,13 @@ if (!effectiveAuthUrlForLogging) {
   if (process.env.NODE_ENV === 'development' && effectiveAuthUrlForLogging.startsWith('https://')) {
     console.warn(
       "\x1b[33m%s\x1b[0m",
-      `WARNING: Your effective auth URL ("${effectiveAuthUrlForLogging}") starts with 'https://'. ` +
-      "For LOCAL DEVELOPMENT, this should typically be 'http://' (e.g., 'http://localhost:9002') as the Next.js dev server runs on HTTP. Using HTTPS locally can lead to ERR_SSL_PROTOCOL_ERROR. Please verify your .env.local file."
+      `DEVELOPMENT WARNING: Your effective auth URL ("${effectiveAuthUrlForLogging}") starts with 'https://'. ` +
+      "For LOCAL DEVELOPMENT, this should typically be 'http://' (e.g., 'http://localhost:9002') as the Next.js dev server runs on HTTP. Using HTTPS locally can lead to ERR_SSL_PROTOCOL_ERROR. Please verify your .env.local file and ensure AUTH_URL starts with 'http://'."
     );
   } else if (process.env.NODE_ENV !== 'development' && !effectiveAuthUrlForLogging.startsWith('https://')) {
      console.warn(
       "\x1b[33m%s\x1b[0m",
-      `WARNING: Your effective auth URL ("${effectiveAuthUrlForLogging}") starts with 'http://'. ` +
+      `PRODUCTION WARNING: Your effective auth URL ("${effectiveAuthUrlForLogging}") starts with 'http://'. ` +
       "For PRODUCTION environments, this should typically be 'https://' for security."
     );
   }
@@ -107,7 +106,6 @@ if (!authSecret) {
   );
   criticalEnvError = true;
 }
-// --- END CRITICAL ENVIRONMENT VARIABLE CHECKS ---
 
 const providers = [];
 
@@ -177,41 +175,66 @@ if (process.env.AUTH_URL) {
     const currentAuthUrl = process.env.AUTH_URL;
     const currentNextAuthUrl = process.env.NEXTAUTH_URL;
 
-    if (currentNextAuthUrl !== currentAuthUrl) {
-        if (currentNextAuthUrl) {
-            console.warn(
-                "\x1b[33m%s\x1b[0m",
-                `RUNTIME ADJUSTMENT: \`AUTH_URL\` is "${currentAuthUrl}" and \`NEXTAUTH_URL\` is "${currentNextAuthUrl}". ` +
-                "Since they differ and NextAuth.js v4 can prioritize `NEXTAUTH_URL`, forcing `NEXTAUTH_URL` to match `AUTH_URL` for consistency."
-            );
-        } else {
-            console.info(
-                "\x1b[36m%s\x1b[0m",
-                `RUNTIME ADJUSTMENT: \`AUTH_URL\` is "${currentAuthUrl}" and \`NEXTAUTH_URL\` is not set. ` +
-                "Setting `NEXTAUTH_URL` to match `AUTH_URL` for NextAuth.js v4."
-            );
-        }
-        process.env.NEXTAUTH_URL = currentAuthUrl;
+    let authUrlToUse = currentAuthUrl;
+
+    if (process.env.NODE_ENV === 'development' && currentAuthUrl.startsWith('https://')) {
+        console.warn(
+            "\x1b[33m%s\x1b[0m",
+            `RUNTIME DEVELOPMENT WARNING: \`AUTH_URL\` ("${currentAuthUrl}") starts with 'https://'. This is typically for production. ` +
+            "For local development, NextAuth.js expects 'http://' (e.g., 'http://localhost:9002') to avoid SSL errors. " +
+            "If you see ERR_SSL_PROTOCOL_ERROR in your browser, this is likely the cause. Ensure AUTH_URL in .env.local is 'http://localhost:9002'."
+        );
+    }
+
+
+    if (currentNextAuthUrl && currentNextAuthUrl !== authUrlToUse) {
+        console.warn(
+            "\x1b[33m%s\x1b[0m",
+            `RUNTIME ADJUSTMENT: \`AUTH_URL\` is "${authUrlToUse}" and \`NEXTAUTH_URL\` is "${currentNextAuthUrl}". ` +
+            "Since they differ and NextAuth.js v4 can prioritize `NEXTAUTH_URL`, forcing `NEXTAUTH_URL` to match `AUTH_URL` for consistency."
+        );
+        process.env.NEXTAUTH_URL = authUrlToUse;
+         console.info(
+            "\x1b[36m%s\x1b[0m",
+            `RUNTIME ADJUSTMENT: \`process.env.NEXTAUTH_URL\` is NOW "${process.env.NEXTAUTH_URL}". NextAuth.js will use this as its base URL.`
+        );
+    } else if (!currentNextAuthUrl) {
+        console.info(
+            "\x1b[36m%s\x1b[0m",
+            `RUNTIME ADJUSTMENT: \`AUTH_URL\` is "${authUrlToUse}" and \`NEXTAUTH_URL\` is not set. ` +
+            "Setting `NEXTAUTH_URL` to match `AUTH_URL` for NextAuth.js v4."
+        );
+        process.env.NEXTAUTH_URL = authUrlToUse;
         console.info(
             "\x1b[36m%s\x1b[0m",
             `RUNTIME ADJUSTMENT: \`process.env.NEXTAUTH_URL\` is NOW "${process.env.NEXTAUTH_URL}". NextAuth.js will use this as its base URL.`
         );
-        if (effectiveAuthUrlForLogging !== process.env.NEXTAUTH_URL) {
-             guidanceMessages.push(`\x1b[36mNextAuth.js: Effective auth URL for callbacks was updated by runtime adjustment to: ${process.env.NEXTAUTH_URL}\x1b[0m`);
-             effectiveAuthUrlForLogging = process.env.NEXTAUTH_URL;
-        }
     } else {
          console.info(
             "\x1b[36m%s\x1b[0m",
-            `INFO: \`AUTH_URL\` and \`NEXTAUTH_URL\` are both set and identical ("${currentAuthUrl}"). No runtime adjustment needed for this. NextAuth.js will use this as its base URL.`
+            `INFO: \`AUTH_URL\` and \`NEXTAUTH_URL\` are both set and identical ("${authUrlToUse}"). No runtime adjustment needed for this. NextAuth.js will use this as its base URL.`
         );
     }
+    if (effectiveAuthUrlForLogging !== process.env.NEXTAUTH_URL) {
+         guidanceMessages.push(`\x1b[36mNextAuth.js: Effective auth URL for callbacks was updated by runtime adjustment to: ${process.env.NEXTAUTH_URL}\x1b[0m`);
+         effectiveAuthUrlForLogging = process.env.NEXTAUTH_URL; // Update for subsequent logging
+    }
+
 } else if (process.env.NEXTAUTH_URL) {
     console.info(
         "\x1b[36m%s\x1b[0m",
         `INFO: Only \`NEXTAUTH_URL\` ("${process.env.NEXTAUTH_URL}") is set. NextAuth.js v4 will use this as its base URL.`
     );
+     if (process.env.NODE_ENV === 'development' && process.env.NEXTAUTH_URL.startsWith('https://')) {
+        console.warn(
+            "\x1b[33m%s\x1b[0m",
+            `RUNTIME DEVELOPMENT WARNING: \`NEXTAUTH_URL\` ("${process.env.NEXTAUTH_URL}") starts with 'https://'. This is typically for production. ` +
+            "For local development, ensure this is 'http://' (e.g., 'http://localhost:9002') to avoid SSL errors. Consider using AUTH_URL instead."
+        );
+    }
+    effectiveAuthUrlForLogging = process.env.NEXTAUTH_URL; // Update for subsequent logging
 }
+
 
 if (guidanceMessages.length > 0) {
     guidanceMessages.forEach(msg => console.info(msg));
@@ -238,11 +261,18 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     async jwt({ token, user, account, trigger, session: newSessionData }) {
-      // Initial sign in
+      // Initial sign in: user object from provider might contain hasCompletedSetup
+      // if the provider is custom or somehow returns it.
+      // For Google/GitHub, it won't. So, token.hasCompletedSetup will be undefined.
+      // This undefined state will be the trigger for useAuthState to call the external API.
       if (account && user) {
-        token.hasCompletedSetup = user.hasCompletedSetup || false; // Initialize from user object if available, else false
+        if (user.hasCompletedSetup !== undefined) {
+          token.hasCompletedSetup = user.hasCompletedSetup;
+        }
+        // If user.hasCompletedSetup is undefined, token.hasCompletedSetup remains undefined.
       }
-      // Session update trigger (e.g., from client-side useSession().update())
+
+      // Session update trigger (e.g., from client-side useSession().update() after API call)
       if (trigger === "update" && newSessionData?.user?.hasCompletedSetup !== undefined) {
         token.hasCompletedSetup = newSessionData.user.hasCompletedSetup;
       }
@@ -250,6 +280,8 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       if (session.user) {
+        // Ensure hasCompletedSetup from token is passed to session.
+        // If token.hasCompletedSetup is undefined, session.user.hasCompletedSetup will also be undefined.
         session.user.hasCompletedSetup = token.hasCompletedSetup;
       }
       return session;
@@ -260,5 +292,3 @@ export const authOptions: NextAuthOptions = {
 const handler = NextAuth(authOptions);
 
 export { handler as GET, handler as POST };
-
-    
