@@ -23,10 +23,9 @@ const APP_LOCAL_STORAGE_KEYS = [
   'app-font-size',
   'app-layout-notified-budgets',
   'sidebar_state',
-  // 'foresight_hasCompletedSetup', // No longer used
 ];
 
-const EXTERNAL_API_FIRST_CHECK_URL = "http://localhost:8080/api/users/first-check";
+const EXTERNAL_API_FIRST_CHECK_URL = "http://localhost:8080/api/user/first-check";
 
 export function useAuthState() {
   const { data: session, status, update: updateNextAuthSession } = useSession();
@@ -55,7 +54,6 @@ export function useAuthState() {
           if (response.data && typeof response.data.hasCompletedSetup === 'boolean') {
             updateSession({ user: { ...session.user, hasCompletedSetup: response.data.hasCompletedSetup } });
           } else {
-            console.warn("API 'first-check' did not return expected boolean for hasCompletedSetup, defaulting to false.", response.data);
             updateSession({ user: { ...session.user, hasCompletedSetup: false } });
           }
         })
@@ -104,7 +102,7 @@ export function useAuthState() {
   const loginWithGoogle = useCallback(async () => {
     try {
       const result = await signIn('google', { callbackUrl: '/welcome/setup', redirect: false });
-      if (result?.url) router.push(result.url); // Manually redirect if redirect:false
+      if (result?.url) router.push(result.url); 
       else if (result?.error) console.error("NextAuth signIn error (Google):", result.error);
     } catch (error) {
       console.error("Catastrophic error during Google signIn:", error);
@@ -114,7 +112,7 @@ export function useAuthState() {
   const loginWithGitHub = useCallback(async () => {
     try {
       const result = await signIn('github', { callbackUrl: '/welcome/setup', redirect: false });
-      if (result?.url) router.push(result.url); // Manually redirect if redirect:false
+      if (result?.url) router.push(result.url); 
       else if (result?.error) console.error("NextAuth signIn error (GitHub):", result.error);
     } catch (error) {
       console.error("Catastrophic error during GitHub signIn:", error);

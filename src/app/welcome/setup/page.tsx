@@ -53,7 +53,7 @@ const initializeFromLocalStorage = <T,>(
   return defaultValue;
 };
 
-const USER_SETUP_API_URL = "http://localhost:8080/api/users/setup";
+const USER_SETUP_API_URL = "http://localhost:8080/api/user/setup";
 
 
 export default function SetupPage() {
