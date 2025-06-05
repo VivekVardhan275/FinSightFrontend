@@ -13,6 +13,7 @@ const authUrl = process.env.AUTH_URL;
 
 // --- CRITICAL ENVIRONMENT VARIABLE CHECKS ---
 let criticalEnvError = false;
+let guidanceMessages: string[] = [];
 
 if (!authUrl) {
   console.error(
@@ -29,7 +30,11 @@ if (!authUrl) {
     `WARNING: Your \`AUTH_URL\` ("${authUrl}") in .env.local has a trailing slash. ` +
     "It is strongly recommended to remove it (e.g., use 'http://localhost:9002' instead of 'http://localhost:9002/')."
   );
+  // Do not set criticalEnvError = true for this, it's just a warning.
+} else {
+    guidanceMessages.push(`\x1b[36mNextAuth.js is using AUTH_URL: ${authUrl}\x1b[0m`);
 }
+
 
 if (!authSecret) {
   console.error(
@@ -52,15 +57,14 @@ if (googleClientId && googleClientSecret) {
       clientSecret: googleClientSecret,
     })
   );
-  if (authUrl) {
+  if (authUrl && !authUrl.endsWith('/')) { // Only provide guidance if authUrl is correctly formatted
     const expectedGoogleCallback = `${authUrl}/api/auth/callback/google`;
-    console.info(
-      "\x1b[36m%s\x1b[0m",
-      `NextAuth.js: The EXPECTED Google callback URL for THIS application is: ${expectedGoogleCallback}`
+    guidanceMessages.push(
+      `\x1b[32mGOOGLE DEBUG ACTION:\x1b[0m In your Google Cloud Console, for the OAuth Client ID \x1b[33m'${googleClientId}'\x1b[0m, ensure the following URL is listed EXACTLY under "Authorized redirect URIs": \x1b[33m${expectedGoogleCallback}\x1b[0m`
     );
-    console.info(
-      "\x1b[36m%s\x1b[0m",
-      `           ACTION: In your Google Cloud Console, for Client ID '${googleClientId}', ensure this EXACT URL is listed as an 'Authorized redirect URI'.`
+  } else if (authUrl) {
+    guidanceMessages.push(
+        `\x1b[33mWARNING: Cannot generate precise Google callback URL guidance because AUTH_URL ("${authUrl}") has issues. Please fix AUTH_URL first.\x1b[0m`
     );
   }
 } else {
@@ -80,15 +84,14 @@ if (githubClientId && githubClientSecret) {
       clientSecret: githubClientSecret,
     })
   );
-  if (authUrl) {
+  if (authUrl && !authUrl.endsWith('/')) { // Only provide guidance if authUrl is correctly formatted
     const expectedGitHubCallback = `${authUrl}/api/auth/callback/github`;
-    console.info(
-      "\x1b[36m%s\x1b[0m",
-      `NextAuth.js: The EXPECTED GitHub callback URL for THIS application is: ${expectedGitHubCallback}`
+     guidanceMessages.push(
+      `\x1b[32mGITHUB DEBUG ACTION:\x1b[0m In your GitHub OAuth App settings, for the Client ID \x1b[33m'${githubClientId}'\x1b[0m, ensure the following URL is set EXACTLY as the "Authorization callback URL": \x1b[33m${expectedGitHubCallback}\x1b[0m`
     );
-    console.info(
-      "\x1b[36m%s\x1b[0m",
-      `           ACTION: In your GitHub OAuth App settings, for Client ID '${githubClientId}', ensure this EXACT URL is set as the 'Authorization callback URL'.`
+  } else if (authUrl) {
+     guidanceMessages.push(
+        `\x1b[33mWARNING: Cannot generate precise GitHub callback URL guidance because AUTH_URL ("${authUrl}") has issues. Please fix AUTH_URL first.\x1b[0m`
     );
   }
 } else {
@@ -113,6 +116,12 @@ if (criticalEnvError) {
     "\x1b[31m%s\x1b[0m",
     "NextAuth.js Initialization Errors: Due to the critical errors listed above, authentication may not function correctly. Please review your .env.local file and OAuth provider configurations."
   );
+}
+
+if (guidanceMessages.length > 0) {
+    console.info("\n\x1b[34m%s\x1b[0m", "--- NextAuth.js Configuration Summary & Actions ---");
+    guidanceMessages.forEach(msg => console.info(msg));
+    console.info("\x1b[34m%s\x1b[0m", "-------------------------------------------------");
 }
 
 
