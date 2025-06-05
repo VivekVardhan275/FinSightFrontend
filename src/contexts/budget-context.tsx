@@ -3,18 +3,20 @@
 
 import type { Budget, Transaction } from '@/types';
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { sampleBudgets } from '@/lib/placeholder-data';
-import { v4 as uuidv4 } from 'uuid';
+import { sampleBudgets } from '@/lib/placeholder-data'; // Used for fallback
 import axios from 'axios';
 import { useAuthState } from '@/hooks/use-auth-state';
 
 const BUDGET_API_BASE_URL = "http://localhost:8080/api/user/budgets";
 
+// Type for budget data received from API (without 'spent')
+type BudgetFromApi = Omit<Budget, 'spent'>;
+
 interface BudgetContextType {
   budgets: Budget[];
   isLoading: boolean;
-  addBudget: (budget: Budget) => Budget; // Expects a full budget object
-  updateBudget: (budgetData: Budget) => void;
+  addBudget: (budgetFromApi: BudgetFromApi) => Budget; // Expects API response (no spent), returns full Budget
+  updateBudget: (budgetDataFromApi: BudgetFromApi) => void; // Expects API response (no spent)
   deleteBudget: (budgetId: string) => void;
   getBudgetById: (budgetId: string) => Budget | undefined;
   updateBudgetSpentAmount: (budgetId: string, transactions: Transaction[]) => void;
@@ -34,24 +36,29 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
       setIsLoading(true);
       setHasAttemptedApiFetch(true);
 
-      axios.get(`${BUDGET_API_BASE_URL}?email=${encodeURIComponent(user.email)}`)
+      axios.get<{ budgets: BudgetFromApi[] }>(`${BUDGET_API_BASE_URL}?email=${encodeURIComponent(user.email)}`)
         .then(response => {
-          if (Array.isArray(response.data)) {
-            setBudgets(response.data.sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category)));
+          // Assuming backend now returns { budgets: [...] }
+          const apiData = response.data.budgets || response.data; // Adjust if backend root is the array
+          if (Array.isArray(apiData)) {
+            const initializedBudgets = apiData.map(b => ({ ...b, spent: 0 }))
+              .sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category));
+            setBudgets(initializedBudgets);
+            // Note: updateBudgetSpentAmount will need to be called for these once transactions are available
           } else {
             console.warn("API did not return an array for budgets, falling back to localStorage.");
             const stored = localStorage.getItem('app-budgets');
-            setBudgets(stored ? JSON.parse(stored) : sampleBudgets);
+            setBudgets(stored ? JSON.parse(stored) : sampleBudgets.map(b => ({...b, spent: b.spent || 0}))); // sampleBudgets might have spent
           }
         })
         .catch(error => {
           console.error("Error fetching budgets from API, falling back to localStorage:", error);
           const stored = localStorage.getItem('app-budgets');
           try {
-            setBudgets(stored ? JSON.parse(stored) : sampleBudgets);
+            setBudgets(stored ? JSON.parse(stored) : sampleBudgets.map(b => ({...b, spent: b.spent || 0})));
           } catch (e) {
             console.error("Error parsing budgets from localStorage during fallback", e);
-            setBudgets(sampleBudgets);
+            setBudgets(sampleBudgets.map(b => ({...b, spent: b.spent || 0})));
           }
         })
         .finally(() => {
@@ -60,9 +67,9 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
     } else if (authStatus === 'unauthenticated' && !hasAttemptedApiFetch && !isLoading) {
       const stored = localStorage.getItem('app-budgets');
       try {
-        setBudgets(stored ? JSON.parse(stored) : sampleBudgets);
+        setBudgets(stored ? JSON.parse(stored) : sampleBudgets.map(b => ({...b, spent: b.spent || 0})));
       } catch (e) {
-        setBudgets(sampleBudgets);
+        setBudgets(sampleBudgets.map(b => ({...b, spent: b.spent || 0})));
       }
       setIsLoading(false);
     } else if (authStatus === 'loading') {
@@ -72,9 +79,9 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
     } else if (!user?.email && authStatus === 'authenticated' && !hasAttemptedApiFetch && !isLoading) {
        const stored = localStorage.getItem('app-budgets');
         try {
-            setBudgets(stored ? JSON.parse(stored) : sampleBudgets);
+            setBudgets(stored ? JSON.parse(stored) : sampleBudgets.map(b => ({...b, spent: b.spent || 0})));
         } catch (e) {
-            setBudgets(sampleBudgets);
+            setBudgets(sampleBudgets.map(b => ({...b, spent: b.spent || 0})));
         }
         setIsLoading(false);
     }
@@ -88,13 +95,20 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [budgets, isLoading, hasAttemptedApiFetch, authStatus]);
 
-  const addBudget = useCallback((newBudget: Budget): Budget => {
-    setBudgets(prev => [newBudget, ...prev].sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category)));
-    return newBudget;
+  const addBudget = useCallback((budgetFromApi: BudgetFromApi): Budget => {
+    const budgetWithSpent = { ...budgetFromApi, spent: 0 }; // Initialize spent
+    setBudgets(prev => [budgetWithSpent, ...prev].sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category)));
+    return budgetWithSpent; // Return the budget with spent initialized for immediate use
   }, []);
 
-  const updateBudget = useCallback((budgetData: Budget) => {
-    setBudgets(prev => prev.map(b => b.id === budgetData.id ? budgetData : b).sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category)));
+  const updateBudget = useCallback((budgetDataFromApi: BudgetFromApi) => {
+    setBudgets(prev => prev.map(b => {
+        if (b.id === budgetDataFromApi.id) {
+            // Preserve existing frontend-calculated spent, update other fields from API
+            return { ...budgetDataFromApi, spent: b.spent };
+        }
+        return b;
+    }).sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category)));
   }, []);
 
   const deleteBudget = useCallback((budgetId: string) => {
@@ -120,7 +134,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
       const budgetYear = parseInt(budgetMonthYear[0]);
       const budgetMonth = parseInt(budgetMonthYear[1]);
 
-      const newSpent = relatedTransactions
+      const newSpent = relatedTransactions // Ensure transactions amounts are in INR
         .filter(t => {
           const tDate = new Date(t.date);
           return t.category.toLowerCase() === targetBudget.category.toLowerCase() &&
@@ -128,9 +142,9 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
                  (tDate.getMonth() + 1) === budgetMonth &&
                  t.type === 'expense';
         })
-        .reduce((sum, t) => sum + t.amount, 0);
+        .reduce((sum, t) => sum + t.amount, 0); // Sum INR amounts
 
-      if (targetBudget.spent === newSpent) return prevBudgets;
+      if (targetBudget.spent === newSpent) return prevBudgets; // No change needed
 
       const updatedBudgets = [...prevBudgets];
       updatedBudgets[targetBudgetIndex] = { ...targetBudget, spent: newSpent };

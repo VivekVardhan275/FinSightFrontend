@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Target, RotateCw } from "lucide-react";
-import type { Budget, BudgetFormData } from "@/types";
+import type { Budget, BudgetFormData, Transaction } from "@/types";
 import { BudgetCard } from '@/components/budgets/budget-card';
 import { BudgetFormDialog } from '@/components/budgets/budget-form-dialog';
 import { useNotification } from '@/contexts/notification-context';
@@ -27,6 +27,10 @@ import { useAuthState } from '@/hooks/use-auth-state';
 import axios from 'axios';
 
 const BUDGET_API_BASE_URL = "http://localhost:8080/api/user/budgets";
+
+// Type for budget data received from API (without 'spent')
+type BudgetFromApi = Omit<Budget, 'spent'>;
+
 
 const buttonMotionVariants = {
   initial: { opacity: 0, scale: 0.9 },
@@ -67,7 +71,7 @@ const emptyStateMotionVariants = {
 export default function BudgetsPage() {
   const { user } = useAuthState();
   const { budgets, isLoading: isLoadingBudgets, addBudget, updateBudget, deleteBudget: deleteBudgetFromContext, updateBudgetSpentAmount } = useBudgetContext();
-  const { transactions } = useTransactionContext();
+  const { transactions } = useTransactionContext(); // For calculating spent amounts
   const { selectedCurrency, convertAmount, conversionRates } = useCurrency();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
@@ -77,6 +81,17 @@ export default function BudgetsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const { addNotification } = useNotification();
+
+  // Effect to recalculate all budget spent amounts when transactions change
+  // This ensures that budget cards are up-to-date if transactions are modified elsewhere
+  useEffect(() => {
+    if (budgets.length > 0 && transactions.length > 0) {
+      budgets.forEach(budget => {
+        updateBudgetSpentAmount(budget.id, transactions);
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transactions, budgets.length]); // Only re-run if transactions or number of budgets change
 
   const handleAddBudget = () => {
     setEditingBudget(null);
@@ -130,14 +145,12 @@ export default function BudgetsPage() {
     }
     setIsSaving(true);
 
-    // Convert formData.allocated (in selectedCurrency) to INR for backend storage
     const allocatedInINR = formData.allocated / (conversionRates[selectedCurrency] || 1);
     const newBudgetCategoryLower = formData.category.toLowerCase();
     const newBudgetMonth = formData.month;
 
     const isActualEditOperation = editingBudget !== null;
 
-    // Duplicate check logic (using INR for comparison with stored data)
     const existingBudgetWithSameCategoryMonth = budgets.find(existingBudget => {
       if (isActualEditOperation && editingBudget && existingBudget.id === editingBudget.id) {
         return false; 
@@ -147,14 +160,15 @@ export default function BudgetsPage() {
     });
 
     if (existingBudgetWithSameCategoryMonth) {
-      if (Math.abs(existingBudgetWithSameCategoryMonth.allocated - allocatedInINR) < 0.005) { // Compare INR amounts
+      if (Math.abs(existingBudgetWithSameCategoryMonth.allocated - allocatedInINR) < 0.005) {
+        const oldAllocatedInSelectedCurrency = convertAmount(existingBudgetWithSameCategoryMonth.allocated, selectedCurrency);
+        const formattedOldAmount = formatCurrency(oldAllocatedInSelectedCurrency, selectedCurrency);
         addNotification({
           title: "Duplicate Budget",
-          description: `A budget for ${formData.category} in ${newBudgetMonth} with the same allocated amount already exists.`,
+          description: `A budget for ${formData.category} in ${newBudgetMonth} with allocated amount ${formattedOldAmount} already exists.`,
           type: "error",
         });
       } else {
-        // Convert existing allocated (INR) to selected currency for display in message
         const oldAllocatedInSelectedCurrency = convertAmount(existingBudgetWithSameCategoryMonth.allocated, selectedCurrency);
         const formattedOldAmount = formatCurrency(oldAllocatedInSelectedCurrency, selectedCurrency);
         addNotification({
@@ -168,7 +182,8 @@ export default function BudgetsPage() {
       return;
     }
     
-    const dataForApi = { // Data to be sent to API (allocated in INR)
+    // Data for API: category, allocated (in INR), month. 'spent' and 'id' (for new) are handled by backend/context.
+    const dataForApi = { 
       category: formData.category,
       allocated: allocatedInINR, 
       month: formData.month,
@@ -177,35 +192,31 @@ export default function BudgetsPage() {
     let notificationAction = isActualEditOperation ? "Updated" : "Added";
 
     try {
-      let savedBudget: Budget;
+      let savedBudgetFromApi: BudgetFromApi; // Backend returns budget without 'spent'
+      let finalBudgetInContext: Budget;
+
       if (isActualEditOperation && editingBudget) {
-        const budgetToUpdate: Budget = { 
-            ...dataForApi, 
-            id: editingBudget.id, 
-            spent: editingBudget.spent // Preserve current spent amount (INR) for PUT
-        };
-        const response = await axios.put(`${BUDGET_API_BASE_URL}/${editingBudget.id}?email=${encodeURIComponent(user.email)}`, budgetToUpdate);
-        savedBudget = response.data as Budget;
-        updateBudget(savedBudget); 
+        const response = await axios.put<BudgetFromApi>(`${BUDGET_API_BASE_URL}/${editingBudget.id}?email=${encodeURIComponent(user.email)}`, dataForApi);
+        savedBudgetFromApi = response.data;
+        updateBudget(savedBudgetFromApi); // Context updates details, preserves old spent temporarily
+        finalBudgetInContext = budgets.find(b => b.id === savedBudgetFromApi.id)!; // Get the updated budget from context
       } else {
-        // For new budgets, backend generates ID and returns the full object
-        const response = await axios.post(`${BUDGET_API_BASE_URL}?email=${encodeURIComponent(user.email)}`, dataForApi); // Backend adds ID and spent: 0
-        savedBudget = response.data as Budget; 
-        addBudget(savedBudget);
+        const response = await axios.post<BudgetFromApi>(`${BUDGET_API_BASE_URL}?email=${encodeURIComponent(user.email)}`, dataForApi);
+        savedBudgetFromApi = response.data; // Backend adds ID
+        finalBudgetInContext = addBudget(savedBudgetFromApi); // Context adds, initializes spent to 0
       }
+      
+      // Recalculate spent amount for this specific budget
+      updateBudgetSpentAmount(finalBudgetInContext.id, transactions);
       
       addNotification({
           title: `Budget ${notificationAction}`,
-          description: `Budget for ${savedBudget.category} successfully ${notificationAction.toLowerCase()}.`,
+          description: `Budget for ${finalBudgetInContext.category} successfully ${notificationAction.toLowerCase()}.`,
           type: 'success',
           href: '/budgets'
         });
       setIsFormOpen(false);
       setEditingBudget(null);
-      
-      // Refresh budget's spent amount
-      updateBudgetSpentAmount(savedBudget.id, transactions);
-
 
     } catch (error) {
        console.error(`Error ${notificationAction.toLowerCase()} budget:`, error);
@@ -289,8 +300,8 @@ export default function BudgetsPage() {
       <BudgetFormDialog
         open={isFormOpen}
         onOpenChange={setIsFormOpen}
-        budget={editingBudget}
-        onSave={handleSaveBudget}
+        budget={editingBudget} // Pass full budget with frontend-calculated 'spent' for editing context
+        onSave={handleSaveBudget} // This receives BudgetFormData (no id, no spent)
         isSaving={isSaving}
       />
 

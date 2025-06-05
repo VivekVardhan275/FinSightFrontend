@@ -4,15 +4,15 @@ export type Transaction = {
   date: string; // ISO string date for simplicity
   description: string;
   category: string;
-  amount: number; // Stored in INR in the backend
+  amount: number; // Stored in INR in the backend/context
   type: 'income' | 'expense';
 };
 
 export type Budget = {
   id:string;
   category: string;
-  allocated: number; // Stored in INR in the backend
-  spent: number; // Stored in INR in the backend
+  allocated: number; // Stored in INR in the backend/context
+  spent: number; // Frontend-calculated: total expenses (in INR) for this budget's category & month. Initialized to 0.
   month: string; // Format: YYYY-MM
 };
 
