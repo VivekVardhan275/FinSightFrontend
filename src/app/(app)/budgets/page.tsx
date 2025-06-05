@@ -26,7 +26,7 @@ import { motion } from "framer-motion";
 
 const pageHeaderBlockMotionVariants = {
   initial: { opacity: 0, x: -20 },
-  animate: { opacity: 1, x: 0, transition: { duration: 0.5 } }, // Delay removed
+  animate: { opacity: 1, x: 0, transition: { duration: 0.3, ease: "easeOut" } },
 };
 
 const buttonMotionVariants = {
@@ -39,7 +39,7 @@ const gridContainerMotionVariants = {
   visible: {
     opacity: 1,
     transition: {
-      delay: 0.3,
+      delay: 0.3, // Delay for the grid container itself to appear
       duration: 0.5,
     },
   },
@@ -52,7 +52,7 @@ const budgetCardVariants = {
     y: 0,
     scale: 1,
     transition: {
-      delay: i * 0.07,
+      delay: i * 0.07, // Staggered delay for each card
       duration: 0.4,
       ease: "easeOut",
     },
@@ -207,8 +207,8 @@ export default function BudgetsPage() {
               budget={budget}
               onEdit={handleEditBudget}
               onDelete={confirmDeleteBudget}
-              variants={budgetCardVariants}
-              custom={index}
+              variants={budgetCardVariants} // Pass variants for individual card animation
+              custom={index} // Pass index for staggering
             />
           ))}
         </motion.div>

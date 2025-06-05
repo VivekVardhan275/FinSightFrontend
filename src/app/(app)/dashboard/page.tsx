@@ -18,7 +18,7 @@ const pageHeaderBlockMotionVariants = {
   animate: {
     opacity: 1,
     x: 0,
-    transition: { duration: 0.5 }, // Delay removed
+    transition: { duration: 0.3, ease: "easeOut" },
   },
 };
 
