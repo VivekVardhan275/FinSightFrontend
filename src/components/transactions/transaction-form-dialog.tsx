@@ -24,7 +24,7 @@ import React, { useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, RotateCw } from "lucide-react"; // Added RotateCw
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format, parseISO } from "date-fns";
@@ -37,7 +37,8 @@ interface TransactionFormDialogProps {
   transaction?: Transaction | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (transactionData: Omit<Transaction, 'id'> | Transaction) => void;
+  onSave: (transactionData: Transaction) => void; // Expects full Transaction object
+  isSaving?: boolean; // Added prop to reflect saving state
 }
 
 const getTransactionSchema = (selectedCurrency: string) => z.object({
@@ -54,6 +55,7 @@ export function TransactionFormDialog({
   open,
   onOpenChange,
   onSave,
+  isSaving = false, // Default isSaving to false
 }: TransactionFormDialogProps) {
   const { selectedCurrency, convertAmount, conversionRates } = useCurrency();
 
@@ -64,7 +66,7 @@ export function TransactionFormDialog({
     register,
     handleSubmit,
     reset,
-    formState: { errors },
+    formState: { errors, isSubmitting }, // Use isSubmitting from react-hook-form
     setValue,
   } = useForm<TransactionFormData>({
     resolver: zodResolver(transactionSchema),
@@ -106,20 +108,24 @@ export function TransactionFormDialog({
     const baseTransactionData = {
       ...data,
       date: format(data.date, "yyyy-MM-dd"),
-      amount: amountInUSD,
+      amount: amountInUSD, // Amount is now in USD
     };
     
-    const transactionDataToSave = transaction
-        ? { ...baseTransactionData, id: transaction.id } // Preserve ID if editing
-        : { ...baseTransactionData, id: uuidv4() }; // Generate ID for new transaction
+    // ID is generated here for new transactions, or preserved for edits.
+    // This full Transaction object (with ID) is passed to onSave.
+    const transactionDataToSave: Transaction = transaction
+        ? { ...baseTransactionData, id: transaction.id } 
+        : { ...baseTransactionData, id: uuidv4() }; 
 
 
     onSave(transactionDataToSave);
-    onOpenChange(false);
+    // onOpenChange(false); // Moved to parent component after successful save
   };
+  
+  const finalIsSaving = isSaving || isSubmitting;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={!finalIsSaving ? onOpenChange : undefined}>
       <DialogContent className="sm:max-w-[425px] overflow-hidden">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -151,6 +157,7 @@ export function TransactionFormDialog({
                           "col-span-3 justify-start text-left font-normal",
                           !field.value && "text-muted-foreground"
                         )}
+                        disabled={finalIsSaving}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
@@ -162,6 +169,7 @@ export function TransactionFormDialog({
                         selected={field.value}
                         onSelect={field.onChange}
                         initialFocus
+                        disabled={finalIsSaving}
                       />
                     </PopoverContent>
                   </Popover>
@@ -176,6 +184,7 @@ export function TransactionFormDialog({
                 id="description"
                 {...register("description")}
                 className="col-span-3"
+                disabled={finalIsSaving}
               />
               {errors.description && <p className="col-span-4 text-sm text-destructive text-right">{errors.description.message}</p>}
             </div>
@@ -191,6 +200,7 @@ export function TransactionFormDialog({
                   onChange: (e) => setValue("amount", parseFloat(parseFloat(e.target.value).toFixed(2)))
                 })}
                 className="col-span-3"
+                disabled={finalIsSaving}
               />
               {errors.amount && <p className="col-span-4 text-sm text-destructive text-right">{errors.amount.message}</p>}
             </div>
@@ -201,6 +211,7 @@ export function TransactionFormDialog({
                 id="category"
                 {...register("category")}
                 className="col-span-3"
+                disabled={finalIsSaving}
               />
               {errors.category && <p className="col-span-4 text-sm text-destructive text-right">{errors.category.message}</p>}
             </div>
@@ -211,7 +222,7 @@ export function TransactionFormDialog({
                 name="type"
                 control={control}
                 render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value} disabled={finalIsSaving}>
                     <SelectTrigger className="col-span-3">
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
@@ -226,8 +237,11 @@ export function TransactionFormDialog({
             </div>
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-              <Button type="submit">Save Transaction</Button>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={finalIsSaving}>Cancel</Button>
+              <Button type="submit" disabled={finalIsSaving}>
+                {finalIsSaving && <RotateCw className="mr-2 h-4 w-4 animate-spin" />}
+                {finalIsSaving ? "Saving..." : "Save Transaction"}
+              </Button>
             </DialogFooter>
           </form>
         </motion.div>
@@ -235,3 +249,4 @@ export function TransactionFormDialog({
     </Dialog>
   );
 }
+

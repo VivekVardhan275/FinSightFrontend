@@ -1,9 +1,9 @@
 
 "use client";
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, RotateCw } from "lucide-react";
 import { DataTable } from "@/components/transactions/data-table";
 import { getColumns } from "@/components/transactions/transaction-table-columns";
 import type { Transaction } from "@/types";
@@ -25,8 +25,11 @@ import { format, parseISO } from 'date-fns';
 import { useCurrency } from '@/contexts/currency-context';
 import { formatCurrency } from '@/lib/utils';
 import { motion } from "framer-motion";
+import { useAuthState } from '@/hooks/use-auth-state'; // Import useAuthState
+import axios from 'axios'; // Import axios
 
-// Removed pageHeaderBlockMotionVariants
+const TRANSACTION_API_BASE_URL = "http://localhost:8080/api/user/transactions";
+
 
 const buttonMotionVariants = {
   initial: { opacity: 0, scale: 0.9 },
@@ -40,6 +43,7 @@ const tableMotionVariants = {
 
 
 export default function TransactionsPage() {
+  const { user } = useAuthState(); // Get user for email
   const { transactions, addTransaction, updateTransaction, deleteTransaction: deleteTransactionFromContext } = useTransactionContext();
   const { budgets, updateBudgetSpentAmount } = useBudgetContext();
   const { selectedCurrency, convertAmount } = useCurrency();
@@ -48,6 +52,7 @@ export default function TransactionsPage() {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
   const [transactionToDeleteId, setTransactionToDeleteId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false); // For API call loading state
 
   const { addNotification } = useNotification();
 
@@ -68,7 +73,8 @@ export default function TransactionsPage() {
     });
 
     affectedBudgets.forEach(budget => {
-      updateBudgetSpentAmount(budget.id, transactions);
+      // Pass the latest transactions list for accurate calculation
+      updateBudgetSpentAmount(budget.id, transactions); 
     });
   };
 
@@ -89,6 +95,7 @@ export default function TransactionsPage() {
   };
 
   const handleDeleteTransaction = () => {
+    // TODO: Implement API call for delete if needed
     if (transactionToDeleteId) {
       const transactionToDelete = transactions.find(t => t.id === transactionToDeleteId);
       deleteTransactionFromContext(transactionToDeleteId);
@@ -100,39 +107,30 @@ export default function TransactionsPage() {
 
       if (transactionToDelete && transactionToDelete.type === 'expense') {
         const remainingTransactions = transactions.filter(t => t.id !== transactionToDeleteId);
-
-        const transactionDate = new Date(transactionToDelete.date);
-        const year = transactionDate.getFullYear();
-        const month = transactionDate.getMonth() + 1;
-        const transactionCategoryLower = transactionToDelete.category.toLowerCase();
-
-        const affectedBudgets = budgets.filter(b => {
-          const budgetMonthYear = b.month.split('-');
-          return b.category.toLowerCase() === transactionCategoryLower &&
-                 parseInt(budgetMonthYear[0]) === year &&
-                 parseInt(budgetMonthYear[1]) === month;
-        });
-
-        affectedBudgets.forEach(budget => {
-          updateBudgetSpentAmount(budget.id, remainingTransactions);
-        });
+        refreshAffectedBudgets(transactionToDelete); // Pass the deleted transaction's details
       }
       setTransactionToDeleteId(null);
     }
     setIsConfirmDeleteDialogOpen(false);
   };
 
-  const handleSaveTransaction = (transactionData: Omit<Transaction, 'id'> | Transaction) => {
-    const isPotentialEdit = 'id' in transactionData;
-    const editingTransactionIdIfEditing = isPotentialEdit ? (transactionData as Transaction).id : null;
+  const handleSaveTransaction = async (transactionDataFromForm: Transaction) => {
+    if (!user || !user.email) {
+      addNotification({ title: "Error", description: "User not authenticated. Cannot save transaction.", type: "error" });
+      return;
+    }
+    setIsSaving(true);
 
-    const formTxDate = transactionData.date;
-    const formTxDescriptionLower = transactionData.description.toLowerCase();
-    const formTxCategoryLower = transactionData.category.toLowerCase();
-    const formTxAmountUSD = transactionData.amount;
-    const formTxType = transactionData.type;
+    // Existing duplicate and similarity checks can remain, or be adapted if backend handles them
+    const formTxDate = transactionDataFromForm.date;
+    const formTxDescriptionLower = transactionDataFromForm.description.toLowerCase();
+    const formTxCategoryLower = transactionDataFromForm.category.toLowerCase();
+    const formTxAmountUSD = transactionDataFromForm.amount; // This is already in USD from the form
+    const formTxType = transactionDataFromForm.type;
 
-    if (!editingTransactionIdIfEditing) {
+    const isActualEditOperation = editingTransaction && transactions.some(t => t.id === transactionDataFromForm.id);
+
+    if (!isActualEditOperation) { // Check for similar if adding new
         const similarExistingTx = transactions.find(existingTx =>
             existingTx.date === formTxDate &&
             existingTx.description.toLowerCase() === formTxDescriptionLower &&
@@ -146,16 +144,17 @@ export default function TransactionsPage() {
             const formattedOldAmount = formatCurrency(oldAmountInSelectedCurrency, selectedCurrency);
             addNotification({
                 title: "Review Transaction",
-                description: `A transaction for '${transactionData.description}' (${transactionData.category}, ${formTxType}) on ${format(parseISO(formTxDate), "PPP")} already exists with amount ${formattedOldAmount}. If this is a correction, please edit the existing one. To add as new, consider altering the description.`,
+                description: `A transaction for '${transactionDataFromForm.description}' (${transactionDataFromForm.category}, ${formTxType}) on ${format(parseISO(formTxDate), "PPP")} already exists with amount ${formattedOldAmount}. If this is a correction, please edit the existing one. To add as new, consider altering the description.`,
                 type: "warning",
             });
             setIsFormOpen(false);
+            setIsSaving(false);
             return;
         }
     }
 
     const exactDuplicateTx = transactions.find(existingTx => {
-        if (editingTransactionIdIfEditing && existingTx.id === editingTransactionIdIfEditing) {
+        if (isActualEditOperation && existingTx.id === transactionDataFromForm.id) {
             return false;
         }
         return existingTx.date === formTxDate &&
@@ -172,66 +171,79 @@ export default function TransactionsPage() {
             type: "error",
         });
         setIsFormOpen(false);
+        setIsSaving(false);
         return;
     }
 
-    let savedDescription = "";
-    let savedTransaction: Transaction;
     let originalTransactionDetailsForEdit: { category: string; date: string; type: 'income' | 'expense', amount: number } | undefined = undefined;
 
-    const isActualEditOperation = editingTransactionIdIfEditing && transactions.some(t => t.id === editingTransactionIdIfEditing);
-
-    if (isActualEditOperation) {
-        const txToUpdate = transactionData as Transaction;
-        const originalTx = transactions.find(t => t.id === txToUpdate.id);
+    try {
+      if (isActualEditOperation) {
+        const originalTx = transactions.find(t => t.id === transactionDataFromForm.id);
         if (originalTx) {
             originalTransactionDetailsForEdit = { category: originalTx.category, date: originalTx.date, type: originalTx.type, amount: originalTx.amount };
         }
-        updateTransaction(txToUpdate);
-        savedTransaction = txToUpdate;
-        savedDescription = txToUpdate.description;
+        // API Call for UPDATE
+        await axios.put(`${TRANSACTION_API_BASE_URL}/${transactionDataFromForm.id}?email=${encodeURIComponent(user.email)}`, transactionDataFromForm);
+        updateTransaction(transactionDataFromForm);
         addNotification({
             title: `Transaction Updated`,
-            description: `${savedDescription} successfully updated.`,
+            description: `${transactionDataFromForm.description} successfully updated.`,
             type: "success",
             href: "/transactions"
         });
-    } else {
-        const { id, ...newTxDataNoId } = transactionData as Transaction;
-        savedTransaction = addTransaction(newTxDataNoId);
-        savedDescription = savedTransaction.description;
+
+      } else { // Adding new transaction
+        // API Call for ADD
+        // The backend might return the created transaction, potentially with a backend-generated ID.
+        // For now, we assume the frontend-generated ID in transactionDataFromForm is used or accepted.
+        await axios.post(`${TRANSACTION_API_BASE_URL}?email=${encodeURIComponent(user.email)}`, transactionDataFromForm);
+        addTransaction(transactionDataFromForm); // Context function now accepts full Transaction object
         addNotification({
             title: `Transaction Added`,
-            description: `${savedDescription} successfully added.`,
+            description: `${transactionDataFromForm.description} successfully added.`,
             type: "success",
             href: "/transactions"
         });
-    }
+      }
 
-    setIsFormOpen(false);
+      setIsFormOpen(false);
 
-    if (isActualEditOperation && originalTransactionDetailsForEdit) {
-        const oldCat = originalTransactionDetailsForEdit.category;
-        const oldDate = originalTransactionDetailsForEdit.date;
-        const oldType = originalTransactionDetailsForEdit.type;
-        const oldAmount = originalTransactionDetailsForEdit.amount;
+      // Budget refresh logic - needs to use the final state of transactions
+      // Run this after state update from addTransaction/updateTransaction has likely settled
+      // Or better, ensure transactions passed to refreshAffectedBudgets is the *new* list
+      const updatedTransactionsList = isActualEditOperation
+        ? transactions.map(t => t.id === transactionDataFromForm.id ? transactionDataFromForm : t)
+        : [transactionDataFromForm, ...transactions];
 
-        const newCat = savedTransaction.category;
-        const newDate = savedTransaction.date;
-        const newType = savedTransaction.type;
-        const newAmount = savedTransaction.amount;
 
-        if (oldType === 'expense' &&
-            (oldCat.toLowerCase() !== newCat.toLowerCase() ||
-             oldDate.substring(0,7) !== newDate.substring(0,7) ||
-             newType !== 'expense' ||
-             oldAmount !== newAmount )) {
-            refreshAffectedBudgets({ category: oldCat, date: oldDate, type: 'expense' });
-        }
-    }
+      if (isActualEditOperation && originalTransactionDetailsForEdit) {
+          const oldCat = originalTransactionDetailsForEdit.category;
+          const oldDate = originalTransactionDetailsForEdit.date;
+          const oldType = originalTransactionDetailsForEdit.type;
 
-    if (savedTransaction.type === 'expense') {
-        refreshAffectedBudgets(savedTransaction);
+          // If critical fields for budget linking changed OR type changed from/to expense
+          if (oldType === 'expense' &&
+              (oldCat.toLowerCase() !== transactionDataFromForm.category.toLowerCase() ||
+               oldDate.substring(0,7) !== transactionDataFromForm.date.substring(0,7) ||
+               transactionDataFromForm.type !== 'expense')) {
+              refreshAffectedBudgets({ category: oldCat, date: oldDate, type: 'expense' });
+          }
+      }
+      if (transactionDataFromForm.type === 'expense') {
+          refreshAffectedBudgets(transactionDataFromForm);
+      }
+
+    } catch (error) {
+      console.error("Error saving transaction:", error);
+      const action = isActualEditOperation ? "updating" : "adding";
+      addNotification({
+        title: `Error ${action} transaction`,
+        description: `Failed to save transaction. Please try again. ${axios.isAxiosError(error) && error.response?.data?.message ? error.response.data.message : ""}`,
+        type: "error",
+      });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -261,7 +273,8 @@ export default function TransactionsPage() {
         open={isFormOpen}
         onOpenChange={setIsFormOpen}
         transaction={editingTransaction}
-        onSave={handleSaveTransaction}
+        onSave={handleSaveTransaction} // This will now be an async function
+        isSaving={isSaving} // Pass saving state to dialog
       />
 
       <AlertDialog open={isConfirmDeleteDialogOpen} onOpenChange={setIsConfirmDeleteDialogOpen}>
@@ -283,3 +296,4 @@ export default function TransactionsPage() {
     </div>
   );
 }
+
