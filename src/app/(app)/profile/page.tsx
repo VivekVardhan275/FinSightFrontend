@@ -162,7 +162,6 @@ export default function ProfilePage() {
     setIsSaving(true);
 
     const profileDataToSave = {
-      email: user.email,
       displayName: displayName,
       phoneNumber: phoneNumber || null,
       dateOfBirth: dateOfBirth || null,
@@ -170,7 +169,7 @@ export default function ProfilePage() {
     };
 
     try {
-      await axios.put(PROFILE_API_URL, profileDataToSave);
+      await axios.put(`${PROFILE_API_URL}?email=${encodeURIComponent(user.email)}`, profileDataToSave);
       toast({
         title: "Profile Updated",
         description: "Your personal information has been successfully saved.",
