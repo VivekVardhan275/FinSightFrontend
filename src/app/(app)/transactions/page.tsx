@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useTransactionContext } from '@/contexts/transaction-context';
 import { useBudgetContext } from '@/contexts/budget-context';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { useCurrency } from '@/contexts/currency-context';
 import { formatCurrency } from '@/lib/utils';
 import { motion } from "framer-motion";
@@ -139,7 +139,8 @@ export default function TransactionsPage() {
     }
     setIsSaving(true);
 
-    const amountInUSD = formData.amount / (conversionRates[selectedCurrency] || 1);
+    // Convert formData.amount (in selectedCurrency) to INR for backend storage
+    const amountInINR = formData.amount / (conversionRates[selectedCurrency] || 1);
     const formattedDate = format(formData.date, "yyyy-MM-dd");
 
     const formTxDescriptionLower = formData.description.toLowerCase();
@@ -148,17 +149,18 @@ export default function TransactionsPage() {
 
     const isActualEditOperation = editingTransaction !== null;
 
-    // Duplicate and similarity checks
+    // Duplicate and similarity checks (amounts are compared in INR)
     if (!isActualEditOperation) {
         const similarExistingTx = transactions.find(existingTx =>
             existingTx.date === formattedDate &&
             existingTx.description.toLowerCase() === formTxDescriptionLower &&
             existingTx.category.toLowerCase() === formTxCategoryLower &&
             existingTx.type === formTxType &&
-            existingTx.amount !== amountInUSD // Compare USD amounts for backend consistency
+            existingTx.amount !== amountInINR // Compare INR amounts
         );
 
         if (similarExistingTx) {
+            // Convert existingTx.amount (INR) back to selectedCurrency for display in notification
             const oldAmountInSelectedCurrency = convertAmount(similarExistingTx.amount, selectedCurrency);
             const formattedOldAmount = formatCurrency(oldAmountInSelectedCurrency, selectedCurrency);
             addNotification({
@@ -172,15 +174,14 @@ export default function TransactionsPage() {
         }
     }
     
-    // Exact duplicate check (for new items, or for edits if all values match another existing item)
     const exactDuplicateTx = transactions.find(existingTx => {
         if (isActualEditOperation && existingTx.id === editingTransaction!.id) {
-            return false; // Don't compare against itself during an edit
+            return false; 
         }
         return existingTx.date === formattedDate &&
                existingTx.description.toLowerCase() === formTxDescriptionLower &&
                existingTx.category.toLowerCase() === formTxCategoryLower &&
-               existingTx.amount === amountInUSD && // Compare USD amounts
+               existingTx.amount === amountInINR && // Compare INR amounts
                existingTx.type === formTxType;
     });
 
@@ -197,40 +198,43 @@ export default function TransactionsPage() {
 
     let originalTransactionDetailsForEdit: { category: string; date: string; type: 'income' | 'expense', amount: number } | undefined = undefined;
 
-    const dataForApi = {
+    const dataForApi = { // Data to be sent to API (amount in INR)
         date: formattedDate,
         description: formData.description,
         category: formData.category,
-        amount: amountInUSD,
+        amount: amountInINR, 
         type: formData.type,
     };
 
     try {
+      let savedTransaction: Transaction;
       if (isActualEditOperation && editingTransaction) {
         originalTransactionDetailsForEdit = { 
             category: editingTransaction.category, 
             date: editingTransaction.date, 
             type: editingTransaction.type, 
-            amount: editingTransaction.amount 
+            amount: editingTransaction.amount // This is in INR from context
         };
+        // For PUT, include the ID in the object sent to API
         const transactionToUpdate: Transaction = { ...dataForApi, id: editingTransaction.id };
-        await axios.put(`${TRANSACTION_API_BASE_URL}/${editingTransaction.id}?email=${encodeURIComponent(user.email)}`, transactionToUpdate);
-        updateTransaction(transactionToUpdate); // Or use response.data if backend returns the updated object
+        const response = await axios.put(`${TRANSACTION_API_BASE_URL}/${editingTransaction.id}?email=${encodeURIComponent(user.email)}`, transactionToUpdate);
+        savedTransaction = response.data as Transaction; // Assume backend returns the updated object
+        updateTransaction(savedTransaction);
         addNotification({
             title: `Transaction Updated`,
-            description: `${formData.description} successfully updated.`,
+            description: `${savedTransaction.description} successfully updated.`,
             type: "success",
             href: "/transactions"
         });
 
       } else {
-        // For new transactions, backend generates ID and returns the full object
+        // For POST, backend generates ID and returns the full object
         const response = await axios.post(`${TRANSACTION_API_BASE_URL}?email=${encodeURIComponent(user.email)}`, dataForApi);
-        const newTransactionWithId = response.data as Transaction; // Assume backend returns Transaction
-        addTransaction(newTransactionWithId);
+        savedTransaction = response.data as Transaction; // Backend returns Transaction with ID
+        addTransaction(savedTransaction);
         addNotification({
             title: `Transaction Added`,
-            description: `${newTransactionWithId.description} successfully added.`,
+            description: `${savedTransaction.description} successfully added.`,
             type: "success",
             href: "/transactions"
         });
@@ -239,25 +243,20 @@ export default function TransactionsPage() {
       setIsFormOpen(false);
       setEditingTransaction(null);
       
-      // Refresh budget if category/date/type changed or if it's a new expense
-      const affectedTransactionDetails = isActualEditOperation && editingTransaction 
-        ? { ...dataForApi, id: editingTransaction.id } as Transaction 
-        : transactions.find(t => t.description === formData.description && t.date === formattedDate && t.amount === amountInUSD); // find the newly added one for refresh logic
-
       if (isActualEditOperation && originalTransactionDetailsForEdit) {
           const oldCat = originalTransactionDetailsForEdit.category;
           const oldDate = originalTransactionDetailsForEdit.date;
           const oldType = originalTransactionDetailsForEdit.type;
 
           if (oldType === 'expense' &&
-              (oldCat.toLowerCase() !== formData.category.toLowerCase() ||
-               oldDate.substring(0,7) !== formattedDate.substring(0,7) ||
-               formData.type !== 'expense')) {
+              (oldCat.toLowerCase() !== savedTransaction.category.toLowerCase() ||
+               oldDate.substring(0,7) !== savedTransaction.date.substring(0,7) ||
+               savedTransaction.type !== 'expense')) {
               refreshAffectedBudgets({ category: oldCat, date: oldDate, type: 'expense' });
           }
       }
-      if (affectedTransactionDetails && affectedTransactionDetails.type === 'expense') {
-          refreshAffectedBudgets(affectedTransactionDetails);
+      if (savedTransaction.type === 'expense') {
+          refreshAffectedBudgets(savedTransaction);
       }
 
     } catch (error) {

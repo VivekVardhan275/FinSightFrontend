@@ -25,7 +25,7 @@ interface BudgetFormDialogProps {
   budget?: Budget | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (budgetData: BudgetFormData) => void; // Changed to pass BudgetFormData
+  onSave: (budgetData: BudgetFormData) => void;
   isSaving?: boolean;
 }
 
@@ -44,7 +44,7 @@ export function BudgetFormDialog({
   onSave,
   isSaving = false,
 }: BudgetFormDialogProps) {
-  const { selectedCurrency, convertAmount } = useCurrency(); // Removed conversionRates
+  const { selectedCurrency, convertAmount } = useCurrency();
 
   const budgetSchema = getBudgetSchema(selectedCurrency);
 
@@ -66,7 +66,8 @@ export function BudgetFormDialog({
   useEffect(() => {
     if (open) {
       if (budget) {
-        // When editing, convert amount from USD (stored) to selectedCurrency for display
+        // When editing, budget.allocated from backend is in INR.
+        // Convert it to selectedCurrency for display.
         const displayAllocated = convertAmount(budget.allocated, selectedCurrency);
         reset({
           category: budget.category,
@@ -84,7 +85,7 @@ export function BudgetFormDialog({
   }, [budget, open, reset, selectedCurrency, convertAmount]);
 
   // Passes validated form data (amounts in selectedCurrency) to the parent.
-  // Parent component (BudgetsPage) will handle USD conversion for API calls.
+  // Parent component (BudgetsPage) will handle INR conversion for API calls.
   const processSubmit = (data: BudgetFormData) => {
     onSave(data);
   };

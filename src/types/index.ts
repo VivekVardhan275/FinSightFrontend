@@ -4,21 +4,21 @@ export type Transaction = {
   date: string; // ISO string date for simplicity
   description: string;
   category: string;
-  amount: number;
+  amount: number; // Stored in INR in the backend
   type: 'income' | 'expense';
 };
 
 export type Budget = {
   id:string;
   category: string;
-  allocated: number;
-  spent: number;
+  allocated: number; // Stored in INR in the backend
+  spent: number; // Stored in INR in the backend
   month: string; // Format: YYYY-MM
 };
 
 export type SummaryCardData = {
   title: string;
-  rawValue: number; // The actual number for animation
+  rawValue: number; // The actual number for animation (assumed to be in INR if it's a currency value)
   prefix?: string;
   suffix?: string;
   isCurrency?: boolean;
@@ -29,17 +29,18 @@ export type SummaryCardData = {
 };
 
 // Schema types for react-hook-form validation (using Zod)
+// Amounts in forms are in the user's selected display currency
 export type TransactionFormData = {
   date: Date; // react-day-picker uses Date objects
   description: string;
   category: string;
-  amount: number;
+  amount: number; // In selected display currency
   type: 'income' | 'expense';
 };
 
 export type BudgetFormData = {
   category: string;
-  allocated: number;
+  allocated: number; // In selected display currency
   month: string; // YYYY-MM format
 };
 

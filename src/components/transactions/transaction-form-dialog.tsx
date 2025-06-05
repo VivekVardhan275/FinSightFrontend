@@ -36,7 +36,7 @@ interface TransactionFormDialogProps {
   transaction?: Transaction | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (data: TransactionFormData) => void; // Changed to pass TransactionFormData
+  onSave: (data: TransactionFormData) => void; 
   isSaving?: boolean;
 }
 
@@ -56,7 +56,7 @@ export function TransactionFormDialog({
   onSave,
   isSaving = false,
 }: TransactionFormDialogProps) {
-  const { selectedCurrency, convertAmount } = useCurrency(); // Removed conversionRates as it's handled in page
+  const { selectedCurrency, convertAmount } = useCurrency();
 
   const transactionSchema = getTransactionSchema(selectedCurrency);
 
@@ -73,7 +73,7 @@ export function TransactionFormDialog({
       date: new Date(),
       description: "",
       category: "",
-      amount: 0,
+      amount: 0, // This amount is in selectedCurrency for the form
       type: "expense",
     },
   });
@@ -81,7 +81,8 @@ export function TransactionFormDialog({
   useEffect(() => {
     if (open) {
       if (transaction) {
-        // When editing, convert amount from USD (stored) to selectedCurrency for display
+        // When editing, transaction.amount from backend is in INR.
+        // Convert it to selectedCurrency for display in the form.
         const displayAmount = convertAmount(transaction.amount, selectedCurrency);
         reset({
           date: parseISO(transaction.date),
@@ -103,7 +104,7 @@ export function TransactionFormDialog({
   }, [transaction, open, reset, selectedCurrency, convertAmount]);
 
   // Passes validated form data (amounts in selectedCurrency) to the parent.
-  // Parent component (TransactionsPage) will handle USD conversion for API calls.
+  // Parent component (TransactionsPage) will handle INR conversion for API calls.
   const processSubmit = (data: TransactionFormData) => {
     onSave(data);
   };

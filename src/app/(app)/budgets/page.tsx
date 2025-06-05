@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Target, RotateCw } from "lucide-react";
-import type { Budget, BudgetFormData } from "@/types"; // Added BudgetFormData
+import type { Budget, BudgetFormData } from "@/types";
 import { BudgetCard } from '@/components/budgets/budget-card';
 import { BudgetFormDialog } from '@/components/budgets/budget-form-dialog';
 import { useNotification } from '@/contexts/notification-context';
@@ -68,7 +68,7 @@ export default function BudgetsPage() {
   const { user } = useAuthState();
   const { budgets, isLoading: isLoadingBudgets, addBudget, updateBudget, deleteBudget: deleteBudgetFromContext, updateBudgetSpentAmount } = useBudgetContext();
   const { transactions } = useTransactionContext();
-  const { selectedCurrency, convertAmount, conversionRates } = useCurrency(); // Added conversionRates
+  const { selectedCurrency, convertAmount, conversionRates } = useCurrency();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
@@ -123,37 +123,38 @@ export default function BudgetsPage() {
     }
   };
 
-  const handleSaveBudget = async (formData: BudgetFormData) => { // Changed to BudgetFormData
+  const handleSaveBudget = async (formData: BudgetFormData) => { 
     if (!user || !user.email) {
       addNotification({ title: "Error", description: "User not authenticated. Cannot save budget.", type: "error" });
       return;
     }
     setIsSaving(true);
 
-    const allocatedInUSD = formData.allocated / (conversionRates[selectedCurrency] || 1);
+    // Convert formData.allocated (in selectedCurrency) to INR for backend storage
+    const allocatedInINR = formData.allocated / (conversionRates[selectedCurrency] || 1);
     const newBudgetCategoryLower = formData.category.toLowerCase();
     const newBudgetMonth = formData.month;
 
     const isActualEditOperation = editingBudget !== null;
 
-    // Duplicate check logic (using USD for comparison with stored data)
+    // Duplicate check logic (using INR for comparison with stored data)
     const existingBudgetWithSameCategoryMonth = budgets.find(existingBudget => {
       if (isActualEditOperation && editingBudget && existingBudget.id === editingBudget.id) {
-        return false; // Don't compare against itself during an edit
+        return false; 
       }
       return existingBudget.category.toLowerCase() === newBudgetCategoryLower &&
              existingBudget.month === newBudgetMonth;
     });
 
     if (existingBudgetWithSameCategoryMonth) {
-      // This logic may need adjustment if backend handles conflicts differently
-      if (existingBudgetWithSameCategoryMonth.allocated === allocatedInUSD) {
+      if (Math.abs(existingBudgetWithSameCategoryMonth.allocated - allocatedInINR) < 0.005) { // Compare INR amounts
         addNotification({
           title: "Duplicate Budget",
           description: `A budget for ${formData.category} in ${newBudgetMonth} with the same allocated amount already exists.`,
           type: "error",
         });
       } else {
+        // Convert existing allocated (INR) to selected currency for display in message
         const oldAllocatedInSelectedCurrency = convertAmount(existingBudgetWithSameCategoryMonth.allocated, selectedCurrency);
         const formattedOldAmount = formatCurrency(oldAllocatedInSelectedCurrency, selectedCurrency);
         addNotification({
@@ -167,43 +168,43 @@ export default function BudgetsPage() {
       return;
     }
     
-    const dataForApi = {
+    const dataForApi = { // Data to be sent to API (allocated in INR)
       category: formData.category,
-      allocated: allocatedInUSD, // Send USD to backend
+      allocated: allocatedInINR, 
       month: formData.month,
     };
 
     let notificationAction = isActualEditOperation ? "Updated" : "Added";
 
     try {
+      let savedBudget: Budget;
       if (isActualEditOperation && editingBudget) {
         const budgetToUpdate: Budget = { 
             ...dataForApi, 
             id: editingBudget.id, 
-            spent: editingBudget.spent // Preserve current spent amount for PUT
+            spent: editingBudget.spent // Preserve current spent amount (INR) for PUT
         };
-        await axios.put(`${BUDGET_API_BASE_URL}/${editingBudget.id}?email=${encodeURIComponent(user.email)}`, budgetToUpdate);
-        updateBudget(budgetToUpdate); // Or use response.data if backend returns updated object
+        const response = await axios.put(`${BUDGET_API_BASE_URL}/${editingBudget.id}?email=${encodeURIComponent(user.email)}`, budgetToUpdate);
+        savedBudget = response.data as Budget;
+        updateBudget(savedBudget); 
       } else {
         // For new budgets, backend generates ID and returns the full object
-        const response = await axios.post(`${BUDGET_API_BASE_URL}?email=${encodeURIComponent(user.email)}`, dataForApi);
-        const newBudgetWithId = response.data as Budget; // Assume backend returns Budget
-        addBudget(newBudgetWithId);
+        const response = await axios.post(`${BUDGET_API_BASE_URL}?email=${encodeURIComponent(user.email)}`, dataForApi); // Backend adds ID and spent: 0
+        savedBudget = response.data as Budget; 
+        addBudget(savedBudget);
       }
       
       addNotification({
           title: `Budget ${notificationAction}`,
-          description: `Budget for ${formData.category} successfully ${notificationAction.toLowerCase()}.`,
+          description: `Budget for ${savedBudget.category} successfully ${notificationAction.toLowerCase()}.`,
           type: 'success',
           href: '/budgets'
         });
       setIsFormOpen(false);
       setEditingBudget(null);
-      // Refresh affected budget's spent amount (especially if it was a new budget the context needs to know about)
-      const budgetToRefresh = isActualEditOperation && editingBudget ? editingBudget.id : budgets.find(b => b.category === formData.category && b.month === formData.month)?.id;
-      if (budgetToRefresh) {
-        updateBudgetSpentAmount(budgetToRefresh, transactions);
-      }
+      
+      // Refresh budget's spent amount
+      updateBudgetSpentAmount(savedBudget.id, transactions);
 
 
     } catch (error) {

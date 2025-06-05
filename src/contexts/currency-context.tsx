@@ -5,39 +5,52 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 
 export type Currency = "USD" | "EUR" | "GBP" | "INR";
 
+// Rates represent: 1 INR = X units of this currency
+// Example: If 1 USD = 83 INR, then 1 INR = 1/83 USD.
 export interface ConversionRates {
-  USD: number; // Base
+  INR: number; // Base
+  USD: number;
   EUR: number;
   GBP: number;
-  INR: number;
-  [key: string]: number; // Allow for more currencies if needed
+  [key: string]: number;
 }
 
 interface CurrencyContextType {
   selectedCurrency: Currency;
   setSelectedCurrency: (currency: Currency) => void;
   conversionRates: ConversionRates;
-  convertAmount: (amountInUsd: number, toCurrency?: Currency) => number;
+  /**
+   * Converts an amount from INR to the specified target currency.
+   * @param amountInINR The amount in INR.
+   * @param toCurrency The target currency to convert to. Defaults to the globally selected currency.
+   * @returns The converted amount in the target currency.
+   */
+  convertAmount: (amountInINR: number, toCurrency?: Currency) => number;
 }
 
+// Define base rates against INR. Adjust these as per actual desired fixed rates.
+// For example, if you want to peg:
+// 1 USD = 83 INR
+// 1 EUR = 76.36 INR (derived from 0.92 EUR/USD * 83 INR/USD)
+// 1 GBP = 65.57 INR (derived from 0.79 GBP/USD * 83 INR/USD)
+// Then the rates for the object (1 INR = X of other currency) are:
 const placeholderConversionRates: ConversionRates = {
-  USD: 1,
-  EUR: 0.92, // 1 USD = 0.92 EUR
-  GBP: 0.79, // 1 USD = 0.79 GBP
-  INR: 83.00, // 1 USD = 83.00 INR (Example rate)
+  INR: 1,
+  USD: 1 / 83,      // Approximately 0.012048
+  EUR: 1 / 76.36,   // Approximately 0.013096
+  GBP: 1 / 65.57,   // Approximately 0.015251
 };
 
 const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined);
 
 export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
-  const [selectedCurrencyState, setSelectedCurrencyState] = useState<Currency>("INR"); // Default to INR
+  const [selectedCurrencyState, setSelectedCurrencyState] = useState<Currency>("INR");
 
   useEffect(() => {
     const storedCurrency = localStorage.getItem("app-currency") as Currency | null;
     if (storedCurrency && placeholderConversionRates[storedCurrency]) {
       setSelectedCurrencyState(storedCurrency);
     } else {
-      // If not stored or invalid, default to INR and save it
       setSelectedCurrencyState("INR");
       localStorage.setItem("app-currency", "INR");
     }
@@ -50,9 +63,9 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const convertAmount = useCallback((amountInUsd: number, toCurrency: Currency = selectedCurrencyState): number => {
-    const rate = placeholderConversionRates[toCurrency] || 1;
-    return amountInUsd * rate;
+  const convertAmount = useCallback((amountInINR: number, toCurrency: Currency = selectedCurrencyState): number => {
+    const rate = placeholderConversionRates[toCurrency] || 1; // Fallback to 1 if currency not found (should not happen)
+    return amountInINR * rate;
   }, [selectedCurrencyState]);
 
   return (
@@ -69,3 +82,4 @@ export const useCurrency = (): CurrencyContextType => {
   }
   return context;
 };
+
