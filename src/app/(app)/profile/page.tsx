@@ -8,12 +8,15 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuthState } from "@/hooks/use-auth-state";
-import { User as UserIconLucide, Mail, Edit3, Save, XCircle } from "lucide-react";
+import { User as UserIconLucide, Mail, Edit3, Save, XCircle, RotateCw } from "lucide-react";
 import { motion } from "framer-motion";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import axios from "axios"; // Import axios
+
+const PROFILE_API_URL = "http://localhost:8080/api/user/profile";
 
 const pageHeaderBlockMotionVariants = {
   initial: { opacity: 0, x: -20 },
@@ -32,7 +35,7 @@ const ReadOnlyFieldDisplay = ({ value, placeholder = "Not set" }: { value: strin
 );
 
 export default function ProfilePage() {
-  const { user, isLoading } = useAuthState();
+  const { user, isLoading: authLoading } = useAuthState();
   const { toast } = useToast();
 
   const [displayName, setDisplayName] = useState("");
@@ -46,30 +49,76 @@ export default function ProfilePage() {
   const [initialDateOfBirthForEdit, setInitialDateOfBirthForEdit] = useState("");
   const [initialGenderForEdit, setInitialGenderForEdit] = useState("");
 
-  useEffect(() => {
-    if (user) {
-      const initialName = user.name || "";
-      setDisplayName(initialName);
-      setInitialDisplayNameForEdit(initialName);
+  const [isProfileDataLoading, setIsProfileDataLoading] = useState(true);
 
-      const initialPhone = ""; // Replace with actual data if/when available from backend
-      setPhoneNumber(initialPhone);
-      setInitialPhoneNumberForEdit(initialPhone);
+  const fetchProfileData = useCallback(async (userEmail: string) => {
+    setIsProfileDataLoading(true);
+    try {
+      const response = await axios.get(`${PROFILE_API_URL}?email=${encodeURIComponent(userEmail)}`);
+      const profileData = response.data;
 
-      const initialDob = ""; // Replace with actual data
-      setDateOfBirth(initialDob);
-      setInitialDateOfBirthForEdit(initialDob);
+      const apiDisplayName = profileData.displayName || user?.name || "";
+      const apiPhoneNumber = profileData.phoneNumber || "";
+      // Ensure dateOfBirth is handled correctly if it's null or needs formatting
+      const apiDateOfBirth = profileData.dateOfBirth ? profileData.dateOfBirth.split('T')[0] : ""; // Assuming YYYY-MM-DD
+      const apiGender = profileData.gender || "";
 
-      const initialGen = ""; // Replace with actual data
-      setGender(initialGen);
-      setInitialGenderForEdit(initialGen);
+      setDisplayName(apiDisplayName);
+      setPhoneNumber(apiPhoneNumber);
+      setDateOfBirth(apiDateOfBirth);
+      setGender(apiGender);
+
+      setInitialDisplayNameForEdit(apiDisplayName);
+      setInitialPhoneNumberForEdit(apiPhoneNumber);
+      setInitialDateOfBirthForEdit(apiDateOfBirth);
+      setInitialGenderForEdit(apiGender);
+
+      toast({
+        title: "Profile Loaded",
+        description: "Your profile information has been successfully loaded.",
+        variant: "default",
+      });
+    } catch (error) {
+      console.error("Error fetching profile data:", error);
+      toast({
+        title: "Error Loading Profile",
+        description: "Could not fetch your profile information. Displaying defaults.",
+        variant: "destructive",
+      });
+      // Fallback to session data or defaults if API fails
+      const fallbackName = user?.name || "";
+      setDisplayName(fallbackName);
+      setInitialDisplayNameForEdit(fallbackName);
+      setPhoneNumber(""); setInitialPhoneNumberForEdit("");
+      setDateOfBirth(""); setInitialDateOfBirthForEdit("");
+      setGender(""); setInitialGenderForEdit("");
+    } finally {
+      setIsProfileDataLoading(false);
     }
-  }, [user]);
+  }, [user, toast]);
 
-  if (isLoading) {
+  useEffect(() => {
+    if (user && user.email && !authLoading) {
+      fetchProfileData(user.email);
+    } else if (!authLoading) {
+      // No user or user.email, but auth has finished loading
+      // Set default/empty values and stop loading indicator for profile data
+      const fallbackName = user?.name || "";
+      setDisplayName(fallbackName);
+      setInitialDisplayNameForEdit(fallbackName);
+      setPhoneNumber(""); setInitialPhoneNumberForEdit("");
+      setDateOfBirth(""); setInitialDateOfBirthForEdit("");
+      setGender(""); setInitialGenderForEdit("");
+      setIsProfileDataLoading(false);
+    }
+  }, [user, authLoading, fetchProfileData]);
+
+
+  if (authLoading || isProfileDataLoading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <p>Loading profile...</p>
+         <RotateCw className="mr-2 h-6 w-6 animate-spin text-primary" />
+        <p>Loading profile information...</p>
       </div>
     );
   }
@@ -93,6 +142,7 @@ export default function ProfilePage() {
   };
 
   const handleEditPersonalInfo = () => {
+    // Values are already up-to-date from state which reflects API or session data
     setInitialDisplayNameForEdit(displayName);
     setInitialPhoneNumberForEdit(phoneNumber);
     setInitialDateOfBirthForEdit(dateOfBirth);
@@ -109,13 +159,25 @@ export default function ProfilePage() {
   };
 
   const handleSaveChanges = () => {
-    console.log("Saving profile:", { displayName, phoneNumber, dateOfBirth, gender });
-    // Here, you would typically make an API call to save the data
+    // TODO: Implement API call to save changes to the backend
+    // For example:
+    // axios.put(`${PROFILE_API_URL}`, { email: user.email, displayName, phoneNumber, dateOfBirth, gender })
+    //   .then(() => {
+    //     toast({ title: "Profile Updated", description: "Your personal information has been saved." });
+    //     setIsEditingPersonalInfo(false);
+    //     setInitialDisplayNameForEdit(displayName);
+    //     // ... update other initial states
+    //   })
+    //   .catch(error => {
+    //     toast({ title: "Error Saving Profile", description: "Could not save your changes.", variant: "destructive" });
+    //   });
+    console.log("Simulating save profile:", { email: user.email, displayName, phoneNumber, dateOfBirth, gender });
     toast({
-      title: "Profile Updated",
+      title: "Profile Updated (Simulated)",
       description: "Your personal information has been (simulated) saved.",
     });
     setIsEditingPersonalInfo(false);
+    // Update initial states upon successful (simulated) save
     setInitialDisplayNameForEdit(displayName);
     setInitialPhoneNumberForEdit(phoneNumber);
     setInitialDateOfBirthForEdit(dateOfBirth);
@@ -125,7 +187,7 @@ export default function ProfilePage() {
   const handleEmailClick = () => {
     toast({
       title: "Email Address",
-      description: "Your email address cannot be changed.",
+      description: "Your email address cannot be changed here. It's tied to your login provider.",
     });
   };
   
@@ -160,7 +222,8 @@ export default function ProfilePage() {
         <Card className="md:col-span-1 shadow-lg">
           <CardHeader className="items-center text-center">
             <Avatar className="h-24 w-24 mb-4 border-2 border-primary">
-              <AvatarFallback className="text-3xl">{getInitials(displayName || user.name)}</AvatarFallback>
+              {/* AvatarImage removed - use AvatarFallback consistently */}
+              <AvatarFallback className="text-3xl">{getInitials(displayName || user.name || "")}</AvatarFallback>
             </Avatar>
             <CardTitle className="text-2xl font-headline">{displayName || user.name}</CardTitle>
             <CardDescription className="flex items-center justify-center gap-1">
@@ -172,6 +235,7 @@ export default function ProfilePage() {
             <Button variant="outline" disabled>
               <Edit3 className="mr-2 h-4 w-4" /> Edit Profile Picture
             </Button>
+            <p className="text-xs text-muted-foreground mt-2">Feature coming soon</p>
           </CardContent>
         </Card>
 
@@ -182,7 +246,7 @@ export default function ProfilePage() {
               Personal Information
             </CardTitle>
             <CardDescription>
-              Update your personal details here.
+              Update your personal details here. Click 'Edit Info' to make changes.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -193,9 +257,10 @@ export default function ProfilePage() {
                   id="fullName"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder="Enter your full name"
                 />
               ) : (
-                <ReadOnlyFieldDisplay value={displayName || user.name} placeholder="Enter your full name" />
+                <ReadOnlyFieldDisplay value={displayName} placeholder="Full name not set" />
               )}
             </div>
 
@@ -208,6 +273,7 @@ export default function ProfilePage() {
                   "flex h-10 w-full items-center rounded-md border border-transparent bg-transparent px-3 py-2 text-sm",
                   "cursor-not-allowed opacity-70"
                 )}
+                title="Your email address cannot be changed."
               >
                 {user.email}
               </div>
@@ -236,9 +302,10 @@ export default function ProfilePage() {
                   type="date"
                   value={dateOfBirth}
                   onChange={(e) => setDateOfBirth(e.target.value)}
+                  max={new Date().toISOString().split("T")[0]} // Prevent future dates
                 />
               ) : (
-                 <ReadOnlyFieldDisplay value={dateOfBirth ? new Date(dateOfBirth + 'T00:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : null} placeholder="Select date of birth" />
+                 <ReadOnlyFieldDisplay value={dateOfBirth ? new Date(dateOfBirth).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) : null} placeholder="Select date of birth" />
               )}
             </div>
 
