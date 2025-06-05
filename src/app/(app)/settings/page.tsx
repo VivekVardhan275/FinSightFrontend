@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useTheme } from "next-themes";
 import { useToast } from "@/hooks/use-toast";
-import { Palette, Globe, Save, User as UserIconLucide } from "lucide-react";
+import { Palette, Globe, Save } from "lucide-react";
 import { motion } from "framer-motion";
 import { useCurrency, type Currency as AppCurrency } from "@/contexts/currency-context";
 
@@ -197,26 +197,6 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       </motion.div>
-
-      {/* Account Settings Placeholder */}
-       <motion.div initial="initial" animate="animate" variants={cardMotionVariants(0.3)} viewport={{ once: true }}>
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="flex items-center font-headline">
-              <UserIconLucide className="mr-2 h-6 w-6 text-primary" />
-               Account
-            </CardTitle>
-            <CardDescription>Manage your account details and security.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Advanced account settings like password change, 2FA, and connected accounts will be available here in future updates.
-              You can log out via the user menu in the top right.
-            </p>
-          </CardContent>
-        </Card>
-      </motion.div>
-
 
       <motion.div initial="initial" animate="animate" variants={cardMotionVariants(0.4)} className="flex justify-end pt-4" viewport={{ once: true }}>
         <Button onClick={handleSaveSettings} size="lg">
