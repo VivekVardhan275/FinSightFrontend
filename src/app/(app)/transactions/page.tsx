@@ -24,13 +24,29 @@ import { useBudgetContext } from '@/contexts/budget-context';
 import { format, parseISO } from 'date-fns';
 import { useCurrency } from '@/contexts/currency-context';
 import { formatCurrency } from '@/lib/utils';
+import { motion } from "framer-motion";
+
+const pageMotionVariants = {
+  initial: { opacity: 0, x: -20 },
+  animate: { opacity: 1, x: 0, transition: { duration: 0.5, delay: 0.1 } },
+};
+
+const buttonMotionVariants = {
+  initial: { opacity: 0, scale: 0.9 },
+  animate: { opacity: 1, scale: 1, transition: { duration: 0.4, delay: 0.2 } },
+};
+
+const tableMotionVariants = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.5, delay: 0.25 } },
+};
 
 
 export default function TransactionsPage() {
   const { transactions, addTransaction, updateTransaction, deleteTransaction: deleteTransactionFromContext } = useTransactionContext();
   const { budgets, updateBudgetSpentAmount } = useBudgetContext();
   const { selectedCurrency, convertAmount } = useCurrency();
-  
+
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
@@ -40,23 +56,22 @@ export default function TransactionsPage() {
 
   const refreshAffectedBudgets = (transactionDetails: Transaction | { category: string; date: string; type?: 'income' | 'expense' }) => {
     if (transactionDetails.type && transactionDetails.type !== 'expense') {
-      return; // Only refresh budgets for expense transactions or if type is unknown (e.g., for old category after edit)
+      return;
     }
-    const transactionDate = new Date(transactionDetails.date); // Date string YYYY-MM-DD
+    const transactionDate = new Date(transactionDetails.date);
     const year = transactionDate.getFullYear();
-    const month = transactionDate.getMonth() + 1; // date-fns months are 0-indexed, but we use 1-indexed
+    const month = transactionDate.getMonth() + 1;
     const transactionCategoryLower = transactionDetails.category.toLowerCase();
 
     const affectedBudgets = budgets.filter(b => {
-      const budgetMonthYear = b.month.split('-'); // YYYY-MM
-      return b.category.toLowerCase() === transactionCategoryLower && 
+      const budgetMonthYear = b.month.split('-');
+      return b.category.toLowerCase() === transactionCategoryLower &&
              parseInt(budgetMonthYear[0]) === year &&
              parseInt(budgetMonthYear[1]) === month;
     });
-    
+
     affectedBudgets.forEach(budget => {
-      // Pass the current global transactions list for recalculation
-      updateBudgetSpentAmount(budget.id, transactions); 
+      updateBudgetSpentAmount(budget.id, transactions);
     });
   };
 
@@ -87,12 +102,8 @@ export default function TransactionsPage() {
       });
 
       if (transactionToDelete && transactionToDelete.type === 'expense') {
-        // After deletion, the `transactions` list in context is updated.
-        // We need to get the updated list to pass to updateBudgetSpentAmount.
-        // However, the `transactions` variable in this scope might be stale.
-        // A robust way is to filter it out from the current stale `transactions` list for immediate calculation.
         const remainingTransactions = transactions.filter(t => t.id !== transactionToDeleteId);
-        
+
         const transactionDate = new Date(transactionToDelete.date);
         const year = transactionDate.getFullYear();
         const month = transactionDate.getMonth() + 1;
@@ -100,13 +111,13 @@ export default function TransactionsPage() {
 
         const affectedBudgets = budgets.filter(b => {
           const budgetMonthYear = b.month.split('-');
-          return b.category.toLowerCase() === transactionCategoryLower && 
+          return b.category.toLowerCase() === transactionCategoryLower &&
                  parseInt(budgetMonthYear[0]) === year &&
                  parseInt(budgetMonthYear[1]) === month;
         });
-        
+
         affectedBudgets.forEach(budget => {
-          updateBudgetSpentAmount(budget.id, remainingTransactions); 
+          updateBudgetSpentAmount(budget.id, remainingTransactions);
         });
       }
       setTransactionToDeleteId(null);
@@ -115,26 +126,22 @@ export default function TransactionsPage() {
   };
 
   const handleSaveTransaction = (transactionData: Omit<Transaction, 'id'> | Transaction) => {
-    // transactionData.amount is already in USD from TransactionFormDialog
-    // transactionData.date is "yyyy-MM-dd" string
-
     const isPotentialEdit = 'id' in transactionData;
     const editingTransactionIdIfEditing = isPotentialEdit ? (transactionData as Transaction).id : null;
 
     const formTxDate = transactionData.date;
     const formTxDescriptionLower = transactionData.description.toLowerCase();
     const formTxCategoryLower = transactionData.category.toLowerCase();
-    const formTxAmountUSD = transactionData.amount; // Already in USD
+    const formTxAmountUSD = transactionData.amount;
     const formTxType = transactionData.type;
 
-    // Scenario 1: Trying to ADD a new transaction that is very similar to an existing one but differs in amount
-    if (!editingTransactionIdIfEditing) { // This is definitively an ADD operation
+    if (!editingTransactionIdIfEditing) {
         const similarExistingTx = transactions.find(existingTx =>
             existingTx.date === formTxDate &&
             existingTx.description.toLowerCase() === formTxDescriptionLower &&
             existingTx.category.toLowerCase() === formTxCategoryLower &&
             existingTx.type === formTxType &&
-            existingTx.amount !== formTxAmountUSD // Compare USD amounts
+            existingTx.amount !== formTxAmountUSD
         );
 
         if (similarExistingTx) {
@@ -150,15 +157,14 @@ export default function TransactionsPage() {
         }
     }
 
-    // Scenario 2: Trying to ADD OR EDIT to an EXACT duplicate of another transaction
     const exactDuplicateTx = transactions.find(existingTx => {
         if (editingTransactionIdIfEditing && existingTx.id === editingTransactionIdIfEditing) {
-            return false; // Don't compare with self when editing
+            return false;
         }
         return existingTx.date === formTxDate &&
                existingTx.description.toLowerCase() === formTxDescriptionLower &&
                existingTx.category.toLowerCase() === formTxCategoryLower &&
-               existingTx.amount === formTxAmountUSD && // Both are USD
+               existingTx.amount === formTxAmountUSD &&
                existingTx.type === formTxType;
     });
 
@@ -171,8 +177,7 @@ export default function TransactionsPage() {
         setIsFormOpen(false);
         return;
     }
-    
-    // If we reach here, it's safe to add or update
+
     let savedDescription = "";
     let savedTransaction: Transaction;
     let originalTransactionDetailsForEdit: { category: string; date: string; type: 'income' | 'expense', amount: number } | undefined = undefined;
@@ -195,8 +200,8 @@ export default function TransactionsPage() {
             href: "/transactions"
         });
     } else {
-        const { id, ...newTxDataNoId } = transactionData as Transaction; 
-        savedTransaction = addTransaction(newTxDataNoId); 
+        const { id, ...newTxDataNoId } = transactionData as Transaction;
+        savedTransaction = addTransaction(newTxDataNoId);
         savedDescription = savedTransaction.description;
         addNotification({
             title: `Transaction Added`,
@@ -207,9 +212,6 @@ export default function TransactionsPage() {
     }
 
     setIsFormOpen(false);
-
-    // After state updates in context, `transactions` list here will be updated in next render.
-    // For immediate budget refresh, we rely on the context's `transactions` list to be up-to-date when `updateBudgetSpentAmount` is called.
 
     if (isActualEditOperation && originalTransactionDetailsForEdit) {
         const oldCat = originalTransactionDetailsForEdit.category;
@@ -222,10 +224,9 @@ export default function TransactionsPage() {
         const newType = savedTransaction.type;
         const newAmount = savedTransaction.amount;
 
-        // Check if the transaction moved out of an expense category/month or its expense-affecting properties changed
-        if (oldType === 'expense' && 
-            (oldCat.toLowerCase() !== newCat.toLowerCase() || 
-             oldDate.substring(0,7) !== newDate.substring(0,7) || 
+        if (oldType === 'expense' &&
+            (oldCat.toLowerCase() !== newCat.toLowerCase() ||
+             oldDate.substring(0,7) !== newDate.substring(0,7) ||
              newType !== 'expense' ||
              oldAmount !== newAmount )) {
             refreshAffectedBudgets({ category: oldCat, date: oldDate, type: 'expense' });
@@ -236,24 +237,28 @@ export default function TransactionsPage() {
         refreshAffectedBudgets(savedTransaction);
     }
   };
-  
+
   const columns = useMemo(() => getColumns(handleEditTransaction, confirmDeleteTransaction), [transactions, budgets, selectedCurrency, convertAmount]); //eslint-disable-line react-hooks/exhaustive-deps
 
 
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <div>
+        <motion.div initial="initial" animate="animate" variants={pageMotionVariants}>
           <h1 className="font-headline text-3xl font-bold tracking-tight">Transactions</h1>
           <p className="text-muted-foreground">Manage your income and expenses.</p>
-        </div>
-        <Button onClick={handleAddTransaction} className="animate-in fade-in duration-300">
-          <PlusCircle className="mr-2 h-5 w-5" />
-          Add Transaction
-        </Button>
+        </motion.div>
+        <motion.div initial="initial" animate="animate" variants={buttonMotionVariants}>
+          <Button onClick={handleAddTransaction}>
+            <PlusCircle className="mr-2 h-5 w-5" />
+            Add Transaction
+          </Button>
+        </motion.div>
       </div>
 
-      <DataTable columns={columns} data={transactions} />
+      <motion.div initial="initial" animate="animate" variants={tableMotionVariants}>
+        <DataTable columns={columns} data={transactions} />
+      </motion.div>
 
       <TransactionFormDialog
         open={isFormOpen}
@@ -281,4 +286,3 @@ export default function TransactionsPage() {
     </div>
   );
 }
-

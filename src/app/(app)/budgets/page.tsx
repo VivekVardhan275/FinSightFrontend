@@ -22,6 +22,48 @@ import { useBudgetContext } from '@/contexts/budget-context';
 import { useTransactionContext } from '@/contexts/transaction-context';
 import { useCurrency } from '@/contexts/currency-context';
 import { formatCurrency } from '@/lib/utils';
+import { motion } from "framer-motion";
+
+const pageMotionVariants = {
+  initial: { opacity: 0, x: -20 },
+  animate: { opacity: 1, x: 0, transition: { duration: 0.5, delay: 0.1 } },
+};
+
+const buttonMotionVariants = {
+  initial: { opacity: 0, scale: 0.9 },
+  animate: { opacity: 1, scale: 1, transition: { duration: 0.4, delay: 0.2 } },
+};
+
+const gridMotionVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      delay: 0.2,
+      when: "beforeChildren",
+      staggerChildren: 0.05, // Small stagger for cards within the grid
+    },
+  },
+};
+
+const budgetCardVariants = {
+  hidden: { opacity: 0, y: 20, scale: 0.95 },
+  visible: (i: number) => ({ // Accept custom prop for dynamic delay
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      delay: i * 0.07, // Stagger based on index
+      duration: 0.4,
+      ease: "easeOut",
+    },
+  }),
+};
+
+const emptyStateMotionVariants = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.5, delay: 0.2 } },
+};
 
 
 export default function BudgetsPage() {
@@ -32,7 +74,7 @@ export default function BudgetsPage() {
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
   const [budgetToDeleteId, setBudgetToDeleteId] = useState<string | null>(null);
-  
+
   const { addNotification } = useNotification();
 
   const handleAddBudget = () => {
@@ -66,12 +108,10 @@ export default function BudgetsPage() {
   const handleSaveBudget = useCallback((budgetDataFromForm: Omit<Budget, 'id' | 'spent'> | Budget) => {
     const newBudgetCategoryLower = budgetDataFromForm.category.toLowerCase();
     const newBudgetMonth = budgetDataFromForm.month;
-    // budgetDataFromForm.allocated is already in USD from BudgetFormDialog
     const newBudgetAllocatedUSD = (budgetDataFromForm as Budget).allocated;
 
 
     const existingBudgetWithSameCategoryMonth = budgets.find(existingBudget => {
-      // If we are editing, and existingBudget is the one being edited, skip it for this specific check.
       if ('id' in budgetDataFromForm && (budgetDataFromForm as Budget).id && existingBudget.id === (budgetDataFromForm as Budget).id) {
         return false;
       }
@@ -80,8 +120,6 @@ export default function BudgetsPage() {
     });
 
     if (existingBudgetWithSameCategoryMonth) {
-      // A budget for the same category and month already exists (and it's not the one being edited).
-      // Now check if the allocated amount is also the same.
       if (existingBudgetWithSameCategoryMonth.allocated === newBudgetAllocatedUSD) {
         addNotification({
           title: "Duplicate Budget",
@@ -89,7 +127,6 @@ export default function BudgetsPage() {
           type: "error",
         });
       } else {
-        // Same category/month, but different allocated amount. Suggest updating.
         const oldAllocatedInSelectedCurrency = convertAmount(existingBudgetWithSameCategoryMonth.allocated, selectedCurrency);
         const formattedOldAmount = formatCurrency(oldAllocatedInSelectedCurrency, selectedCurrency);
         addNotification({
@@ -101,30 +138,28 @@ export default function BudgetsPage() {
       setIsFormOpen(false);
       return;
     }
-    
+
     let savedCategory = "";
     let savedBudget: Budget;
     let notificationAction = "Added";
-    
+
     const isActualEditOperation = 'id' in budgetDataFromForm && budgets.some(b => b.id === (budgetDataFromForm as Budget).id);
 
 
     if (isActualEditOperation) {
       notificationAction = "Updated";
       const budgetToUpdate = {
-        ...budgets.find(b => b.id === (budgetDataFromForm as Budget).id)!, 
-        ...(budgetDataFromForm as Budget), 
+        ...budgets.find(b => b.id === (budgetDataFromForm as Budget).id)!,
+        ...(budgetDataFromForm as Budget),
       };
-      updateBudget(budgetToUpdate); 
+      updateBudget(budgetToUpdate);
       savedBudget = budgetToUpdate;
     } else {
-      // For a new budget, budgetDataFromForm is Omit<Budget, 'id' | 'spent'>
-      // It already has allocated in USD.
       savedBudget = addBudget(budgetDataFromForm as Omit<Budget, 'id' | 'spent'>);
     }
-    
+
     savedCategory = savedBudget.category;
-    updateBudgetSpentAmount(savedBudget.id, transactions); 
+    updateBudgetSpentAmount(savedBudget.id, transactions);
 
     addNotification({
         title: `Budget ${notificationAction}`,
@@ -132,14 +167,14 @@ export default function BudgetsPage() {
         type: 'success',
         href: '/budgets'
       });
-    setIsFormOpen(false); 
+    setIsFormOpen(false);
   }, [budgets, transactions, addBudget, updateBudget, updateBudgetSpentAmount, addNotification, setIsFormOpen, selectedCurrency, convertAmount]);
 
 
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <div>
+        <motion.div initial="initial" animate="animate" variants={pageMotionVariants}>
           <h1
             className="font-headline text-3xl font-bold tracking-tight"
           >
@@ -150,31 +185,39 @@ export default function BudgetsPage() {
           >
             Set and track your monthly spending goals.
           </p>
-        </div>
-        <div>
+        </motion.div>
+        <motion.div initial="initial" animate="animate" variants={buttonMotionVariants}>
           <Button onClick={handleAddBudget}>
             <PlusCircle className="mr-2 h-5 w-5" />
             Add Budget
           </Button>
-        </div>
+        </motion.div>
       </div>
 
       {budgets.length > 0 ? (
-        <div
+        <motion.div
           className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
+          initial="hidden"
+          animate="visible"
+          variants={gridMotionVariants}
         >
-          {budgets.map((budget) => (
+          {budgets.map((budget, index) => (
             <BudgetCard
               key={budget.id}
               budget={budget}
               onEdit={handleEditBudget}
               onDelete={confirmDeleteBudget}
+              variants={budgetCardVariants}
+              custom={index} // Pass index for staggered delay
             />
           ))}
-        </div>
+        </motion.div>
       ) : (
-        <div
+        <motion.div
           className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/30 p-12 text-center"
+          initial="initial"
+          animate="animate"
+          variants={emptyStateMotionVariants}
         >
             <Target className="mx-auto h-12 w-12 text-muted-foreground" />
             <h3 className="mt-4 text-xl font-semibold">No budgets yet</h3>
@@ -184,7 +227,7 @@ export default function BudgetsPage() {
             <Button onClick={handleAddBudget}>
               <PlusCircle className="mr-2 h-4 w-4" /> Create Budget
             </Button>
-        </div>
+        </motion.div>
       )}
 
       <BudgetFormDialog

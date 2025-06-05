@@ -7,17 +7,18 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Edit2, Trash2, AlertTriangle } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
-// import { motion, type Variants } from 'framer-motion'; // Removed Framer Motion
+import { motion, type Variants } from 'framer-motion';
 import { useCurrency } from '@/contexts/currency-context';
 
 interface BudgetCardProps {
   budget: Budget;
   onEdit: (budget: Budget) => void;
   onDelete: (budgetId: string) => void;
-  // variants?: Variants; // Removed variants prop
+  variants?: Variants;
+  custom?: number;
 }
 
-export function BudgetCard({ budget, onEdit, onDelete }: BudgetCardProps) {
+export function BudgetCard({ budget, onEdit, onDelete, variants, custom }: BudgetCardProps) {
   const { selectedCurrency, convertAmount } = useCurrency();
 
   const convertedSpent = convertAmount(budget.spent, selectedCurrency);
@@ -27,17 +28,18 @@ export function BudgetCard({ budget, onEdit, onDelete }: BudgetCardProps) {
   const convertedRemaining = convertedAllocated - convertedSpent;
   const isOverBudget = convertedSpent > convertedAllocated;
 
-  const colorVariable = isOverBudget || progress > 90 
-    ? 'destructive' 
-    : progress > 70 
-    ? 'chart-4' 
+  const colorVariable = isOverBudget || progress > 90
+    ? 'destructive'
+    : progress > 70
+    ? 'chart-4'
     : 'primary';
 
   return (
-    <div 
-      // variants={variants} // Removed variants
+    <motion.div
+      variants={variants}
+      custom={custom}
       className="h-full"
-      // whileHover={{ y: -5, transition: { duration: 0.2 } }} // Removed whileHover
+      whileHover={{ y: -5, scale: 1.03, transition: { duration: 0.2 } }}
     >
       <Card className="shadow-lg transition-shadow hover:shadow-xl h-full flex flex-col">
         <CardHeader>
@@ -55,18 +57,18 @@ export function BudgetCard({ budget, onEdit, onDelete }: BudgetCardProps) {
               <span>Spent: {formatCurrency(convertedSpent, selectedCurrency)}</span>
               <span className="text-muted-foreground">Allocated: {formatCurrency(convertedAllocated, selectedCurrency)}</span>
             </div>
-            <Progress 
-              value={progress} 
-              className="h-3 [&>*]:bg-[--progress-bar-color]" 
-              style={{ '--progress-bar-color': `hsl(var(--${colorVariable}))` } as React.CSSProperties} 
+            <Progress
+              value={progress}
+              className="h-3 [&>*]:bg-[--progress-bar-color]"
+              style={{ '--progress-bar-color': `hsl(var(--${colorVariable}))` } as React.CSSProperties}
             />
           </div>
           <p className={cn(
             "text-sm font-medium",
             isOverBudget ? "text-destructive" : convertedRemaining >=0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
           )}>
-            {isOverBudget 
-              ? `Over budget by ${formatCurrency(Math.abs(convertedRemaining), selectedCurrency)}` 
+            {isOverBudget
+              ? `Over budget by ${formatCurrency(Math.abs(convertedRemaining), selectedCurrency)}`
               : `${formatCurrency(convertedRemaining, selectedCurrency)} Remaining`}
           </p>
         </CardContent>
@@ -79,6 +81,6 @@ export function BudgetCard({ budget, onEdit, onDelete }: BudgetCardProps) {
           </Button>
         </CardFooter>
       </Card>
-    </div>
+    </motion.div>
   );
 }
