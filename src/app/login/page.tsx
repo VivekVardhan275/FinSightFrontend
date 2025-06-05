@@ -31,21 +31,20 @@ const GoogleLogo = () => (
 
 export default function LoginPage() {
   const { loginWithGoogle, loginWithGitHub, isAuthenticated, isLoading, status } = useAuthState();
-  const router = useRouter();
+  // const router = useRouter(); // No longer needed directly here for redirection
 
-  useEffect(() => {
-    // useAuthState hook now handles redirection logic based on auth status and setup completion.
-    // This useEffect can be simplified or removed if all redirection is handled by the hook.
-    // For now, keeping a basic check.
-    if (isAuthenticated && status === 'authenticated') {
-      // The hook should ideally redirect to /dashboard or /welcome/setup
-      // but as a fallback, we can push to dashboard here if somehow missed.
-      // router.replace('/dashboard'); // This might conflict with hook's logic. Best to let hook manage.
-    }
-  }, [isAuthenticated, status, router]);
+  // useEffect(() => {
+  //   // useAuthState hook now handles redirection logic based on auth status and setup completion.
+  //   // This useEffect can be simplified or removed if all redirection is handled by the hook.
+  //   if (isAuthenticated && status === 'authenticated') {
+  //     // The hook should ideally redirect to /dashboard or /welcome/setup
+  //     // router.replace('/dashboard'); // This might conflict with hook's logic. Best to let hook manage.
+  //   }
+  // }, [isAuthenticated, status, router]); // Removed router from deps
 
   if (isLoading || (isAuthenticated && status === 'authenticated')) {
     // Show a loading state or null if redirecting (Auth.js status 'loading' or already 'authenticated')
+    // useAuthState hook is responsible for navigation if authenticated.
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <p>Loading...</p>

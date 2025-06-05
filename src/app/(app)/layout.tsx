@@ -59,7 +59,7 @@ function BudgetNotificationEffect() {
     const currentMonthBudgets = getBudgetsByMonth(currentYear, currentMonth);
 
     currentMonthBudgets.forEach(budget => {
-      const budgetTransactions = getTransactionsByCategoryAndMonth(budget.category.toLowerCase(), currentYear, currentMonth);
+      // const budgetTransactions = getTransactionsByCategoryAndMonth(budget.category.toLowerCase(), currentYear, currentMonth); // Not needed if using budget.spent directly
       const currentSpent = budget.spent; 
 
       const percentageSpent = budget.allocated > 0 ? (currentSpent / budget.allocated) * 100 : 0;
@@ -135,15 +135,11 @@ export default function AuthenticatedAppLayout({
   const pathname = usePathname();
 
   useEffect(() => {
-    // This useEffect handles redirection for setup completion status if the user is authenticated.
-    // Redirection for unauthenticated users is handled by useAuthState.
     if (status === 'authenticated') {
       const hasCompletedSetup = localStorage.getItem('foresight_hasCompletedSetup') === 'true';
       if (!hasCompletedSetup && pathname !== '/welcome/setup') {
-         console.log("AuthenticatedAppLayout: User authenticated, setup not complete, redirecting to /welcome/setup");
          router.replace('/welcome/setup');
       } else if (hasCompletedSetup && pathname === '/welcome/setup') {
-         console.log("AuthenticatedAppLayout: User authenticated, setup complete, but on setup page, redirecting to /dashboard");
          router.replace('/dashboard');
       }
     }
@@ -158,11 +154,8 @@ export default function AuthenticatedAppLayout({
     );
   }
   
-  // If not authenticated and not loading, useAuthState hook should handle the redirect.
-  // This layout shows a placeholder message.
-  if (status === 'unauthenticated' && pathname !== '/welcome/setup') { // Allow setup page to handle its own auth check
-     console.warn("AuthenticatedAppLayout: Unauthenticated. Redirect should be handled by useAuthState.");
-     // router.replace('/login'); // REMOVED: This was causing the error. useAuthState handles this.
+  if (status === 'unauthenticated' && pathname !== '/welcome/setup') { 
+     // router.replace('/login'); // useAuthState handles this.
      return (
         <div className="flex h-screen items-center justify-center bg-background">
           <p>Redirecting to login...</p>
@@ -170,8 +163,6 @@ export default function AuthenticatedAppLayout({
      );
   }
 
-  // If authenticated but setup is not complete, and current path is not the setup page,
-  // the useEffect above will handle the redirect. This shows a placeholder.
   if (status === 'authenticated') {
     const hasCompletedSetup = localStorage.getItem('foresight_hasCompletedSetup') === 'true';
     if (!hasCompletedSetup && pathname !== '/welcome/setup') {
