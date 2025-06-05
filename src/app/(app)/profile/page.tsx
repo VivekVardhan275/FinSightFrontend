@@ -35,7 +35,7 @@ const ReadOnlyFieldDisplay = ({ value, placeholder = "Not set" }: { value: strin
 );
 
 export default function ProfilePage() {
-  const { user, isLoading: authLoading } = useAuthState();
+  const { user, isLoading: authLoading, updateSession } = useAuthState();
   const { toast } = useToast();
 
   const [displayName, setDisplayName] = useState("");
@@ -50,6 +50,7 @@ export default function ProfilePage() {
   const [initialGenderForEdit, setInitialGenderForEdit] = useState("");
 
   const [isProfileDataLoading, setIsProfileDataLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   const fetchProfileData = useCallback(async (userEmail: string) => {
     setIsProfileDataLoading(true);
@@ -59,8 +60,7 @@ export default function ProfilePage() {
 
       const apiDisplayName = profileData.displayName || user?.name || "";
       const apiPhoneNumber = profileData.phoneNumber || "";
-      // Ensure dateOfBirth is handled correctly if it's null or needs formatting
-      const apiDateOfBirth = profileData.dateOfBirth ? profileData.dateOfBirth.split('T')[0] : ""; // Assuming YYYY-MM-DD
+      const apiDateOfBirth = profileData.dateOfBirth ? profileData.dateOfBirth.split('T')[0] : "";
       const apiGender = profileData.gender || "";
 
       setDisplayName(apiDisplayName);
@@ -85,7 +85,6 @@ export default function ProfilePage() {
         description: "Could not fetch your profile information. Displaying defaults.",
         variant: "destructive",
       });
-      // Fallback to session data or defaults if API fails
       const fallbackName = user?.name || "";
       setDisplayName(fallbackName);
       setInitialDisplayNameForEdit(fallbackName);
@@ -101,8 +100,6 @@ export default function ProfilePage() {
     if (user && user.email && !authLoading) {
       fetchProfileData(user.email);
     } else if (!authLoading) {
-      // No user or user.email, but auth has finished loading
-      // Set default/empty values and stop loading indicator for profile data
       const fallbackName = user?.name || "";
       setDisplayName(fallbackName);
       setInitialDisplayNameForEdit(fallbackName);
@@ -142,7 +139,6 @@ export default function ProfilePage() {
   };
 
   const handleEditPersonalInfo = () => {
-    // Values are already up-to-date from state which reflects API or session data
     setInitialDisplayNameForEdit(displayName);
     setInitialPhoneNumberForEdit(phoneNumber);
     setInitialDateOfBirthForEdit(dateOfBirth);
@@ -158,30 +154,54 @@ export default function ProfilePage() {
     setIsEditingPersonalInfo(false);
   };
 
-  const handleSaveChanges = () => {
-    // TODO: Implement API call to save changes to the backend
-    // For example:
-    // axios.put(`${PROFILE_API_URL}`, { email: user.email, displayName, phoneNumber, dateOfBirth, gender })
-    //   .then(() => {
-    //     toast({ title: "Profile Updated", description: "Your personal information has been saved." });
-    //     setIsEditingPersonalInfo(false);
-    //     setInitialDisplayNameForEdit(displayName);
-    //     // ... update other initial states
-    //   })
-    //   .catch(error => {
-    //     toast({ title: "Error Saving Profile", description: "Could not save your changes.", variant: "destructive" });
-    //   });
-    console.log("Simulating save profile:", { email: user.email, displayName, phoneNumber, dateOfBirth, gender });
-    toast({
-      title: "Profile Updated (Simulated)",
-      description: "Your personal information has been (simulated) saved.",
-    });
-    setIsEditingPersonalInfo(false);
-    // Update initial states upon successful (simulated) save
-    setInitialDisplayNameForEdit(displayName);
-    setInitialPhoneNumberForEdit(phoneNumber);
-    setInitialDateOfBirthForEdit(dateOfBirth);
-    setInitialGenderForEdit(gender);
+  const handleSaveChanges = async () => {
+    if (!user || !user.email) {
+      toast({ title: "Error", description: "User session not found. Please re-login.", variant: "destructive" });
+      return;
+    }
+    setIsSaving(true);
+
+    const profileDataToSave = {
+      email: user.email,
+      displayName: displayName,
+      phoneNumber: phoneNumber || null,
+      dateOfBirth: dateOfBirth || null,
+      gender: gender || null,
+    };
+
+    try {
+      await axios.put(PROFILE_API_URL, profileDataToSave);
+      toast({
+        title: "Profile Updated",
+        description: "Your personal information has been successfully saved.",
+        variant: "default",
+      });
+      setIsEditingPersonalInfo(false);
+      // Update initial states to reflect saved changes
+      setInitialDisplayNameForEdit(displayName);
+      setInitialPhoneNumberForEdit(phoneNumber);
+      setInitialDateOfBirthForEdit(dateOfBirth);
+      setInitialGenderForEdit(gender);
+
+      // If displayName changed, update the NextAuth session
+      if (user.name !== displayName) {
+        await updateSession({ user: { ...user, name: displayName } });
+      }
+
+    } catch (error) {
+      console.error("Error saving profile data:", error);
+      let errorMessage = "Could not save your changes. Please try again.";
+      if (axios.isAxiosError(error) && error.response) {
+        errorMessage = error.response.data?.message || error.response.data?.error || errorMessage;
+      }
+      toast({
+        title: "Error Saving Profile",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleEmailClick = () => {
@@ -222,7 +242,6 @@ export default function ProfilePage() {
         <Card className="md:col-span-1 shadow-lg">
           <CardHeader className="items-center text-center">
             <Avatar className="h-24 w-24 mb-4 border-2 border-primary">
-              {/* AvatarImage removed - use AvatarFallback consistently */}
               <AvatarFallback className="text-3xl">{getInitials(displayName || user.name || "")}</AvatarFallback>
             </Avatar>
             <CardTitle className="text-2xl font-headline">{displayName || user.name}</CardTitle>
@@ -258,6 +277,7 @@ export default function ProfilePage() {
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   placeholder="Enter your full name"
+                  disabled={isSaving}
                 />
               ) : (
                 <ReadOnlyFieldDisplay value={displayName} placeholder="Full name not set" />
@@ -288,6 +308,7 @@ export default function ProfilePage() {
                   placeholder="e.g., (123) 456-7890"
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
+                  disabled={isSaving}
                 />
               ) : (
                 <ReadOnlyFieldDisplay value={phoneNumber} placeholder="Add phone number" />
@@ -302,7 +323,8 @@ export default function ProfilePage() {
                   type="date"
                   value={dateOfBirth}
                   onChange={(e) => setDateOfBirth(e.target.value)}
-                  max={new Date().toISOString().split("T")[0]} // Prevent future dates
+                  max={new Date().toISOString().split("T")[0]} 
+                  disabled={isSaving}
                 />
               ) : (
                  <ReadOnlyFieldDisplay value={dateOfBirth ? new Date(dateOfBirth).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) : null} placeholder="Select date of birth" />
@@ -312,7 +334,7 @@ export default function ProfilePage() {
             <div className="space-y-2">
               <Label htmlFor="gender">Gender</Label>
               {isEditingPersonalInfo ? (
-                <Select value={gender} onValueChange={setGender}>
+                <Select value={gender} onValueChange={setGender} disabled={isSaving}>
                   <SelectTrigger id="gender">
                     <SelectValue placeholder="Select gender" />
                   </SelectTrigger>
@@ -333,11 +355,12 @@ export default function ProfilePage() {
               <div className="flex justify-end space-x-2">
                 {isEditingPersonalInfo ? (
                   <>
-                    <Button variant="outline" onClick={handleCancelPersonalInfoEdit}>
+                    <Button variant="outline" onClick={handleCancelPersonalInfoEdit} disabled={isSaving}>
                       <XCircle className="mr-2 h-4 w-4" /> Cancel
                     </Button>
-                    <Button onClick={handleSaveChanges}>
-                      <Save className="mr-2 h-4 w-4" /> Save Changes
+                    <Button onClick={handleSaveChanges} disabled={isSaving}>
+                      {isSaving ? <RotateCw className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                      {isSaving ? "Saving..." : "Save Changes"}
                     </Button>
                   </>
                 ) : (
