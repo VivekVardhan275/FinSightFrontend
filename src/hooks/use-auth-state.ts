@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation'; // Added usePathname
 
 export interface User {
   name: string;
@@ -20,34 +20,47 @@ export function useAuthState() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  const pathname = usePathname(); // Get current pathname
+
+  const navigateBasedOnSetup = useCallback(() => {
+    const hasCompletedSetup = localStorage.getItem('foresight_hasCompletedSetup') === 'true';
+    if (hasCompletedSetup) {
+      if (pathname === '/welcome/setup' || pathname === '/login') {
+        router.replace('/dashboard');
+      }
+      // If already in app, no need to redirect again unless specifically from login/setup
+    } else {
+      if (pathname !== '/welcome/setup') {
+        router.replace('/welcome/setup');
+      }
+    }
+  }, [router, pathname]);
 
   useEffect(() => {
-    // Simulate checking auth status with a backend
     const checkAuthStatus = async () => {
       setIsLoading(true);
-      // // REAL BACKEND INTEGRATION (Example):
-      // try {
-      //   const response = await fetch('/api/auth/session'); // Or your session/me endpoint
-      //   if (response.ok) {
-      //     const userData = await response.json();
-      //     setUser(userData);
-      //   } else {
-      //     setUser(null); // No active session
-      //   }
-      // } catch (error) {
-      //   console.error('Failed to fetch auth session:', error);
-      //   setUser(null);
-      // } finally {
-      //   setIsLoading(false);
-      // }
-
       // SIMULATION (Current):
       const authStatusTimer = setTimeout(() => {
         const authStatus = localStorage.getItem('isLoggedInForesight');
         if (authStatus === 'true') {
-          setUser(mockUser);
+          const storedUser = localStorage.getItem('foresight_user');
+          if (storedUser) {
+            try {
+              setUser(JSON.parse(storedUser));
+            } catch (e) {
+              setUser(mockUser); // Fallback
+              localStorage.setItem('foresight_user', JSON.stringify(mockUser));
+            }
+          } else {
+            setUser(mockUser);
+            localStorage.setItem('foresight_user', JSON.stringify(mockUser));
+          }
+          navigateBasedOnSetup();
         } else {
           setUser(null);
+          if (pathname !== '/login' && !pathname.startsWith('/welcome')) { // Don't redirect if already on login or setup
+            router.replace('/login');
+          }
         }
         setIsLoading(false);
       }, 750);
@@ -55,77 +68,77 @@ export function useAuthState() {
     };
 
     checkAuthStatus();
-  }, []);
+  }, [navigateBasedOnSetup, router, pathname]); // Added router and pathname
+
+  const performLogin = useCallback(async (loggedInUser: User) => {
+    setIsLoading(true);
+    await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API call
+    
+    localStorage.setItem('isLoggedInForesight', 'true');
+    localStorage.setItem('foresight_user', JSON.stringify(loggedInUser));
+    setUser(loggedInUser);
+    setIsLoading(false);
+
+    // For testing setup flow easily, uncomment next line to always force setup on login
+    // localStorage.removeItem('foresight_hasCompletedSetup'); 
+    
+    const hasCompletedSetup = localStorage.getItem('foresight_hasCompletedSetup') === 'true';
+    if (hasCompletedSetup) {
+      router.push('/dashboard');
+    } else {
+      router.push('/welcome/setup');
+    }
+  }, [router]);
+
 
   const login = useCallback(async () => {
-    setIsLoading(true);
-    // // REAL BACKEND INTEGRATION (Example for Google OAuth):
-    // // This would typically involve redirecting to your backend, which then redirects to Google.
-    // // Or, if using a library like NextAuth.js, you'd call its signIn('google') method.
+    // REAL BACKEND INTEGRATION (Example for Google OAuth):
     // try {
-    //   // Option 1: Redirect to a backend endpoint that initiates OAuth
-    //   // window.location.href = '/api/auth/google/login';
-    //
-    //   // Option 2: If backend handles it and returns user data directly after client-side provider popup (less common for pure OAuth2 backend)
-    //   // const response = await fetch('/api/auth/google/callback-handler', { method: 'POST', /* ... */ });
-    //   // if (!response.ok) throw new Error('Login failed');
-    //   // const userData = await response.json();
-    //   // setUser(userData);
-    //   // localStorage.setItem('isLoggedInForesight', 'true'); // Or manage session via httpOnly cookie from backend
-    //   // router.push('/dashboard');
+    //   // window.location.href = '/api/auth/google/login'; // Redirect to backend
     // } catch (error) {
     //   console.error("Google Login error:", error);
-    //   // Handle login error (e.g., show a toast)
-    // } finally {
-    //   setIsLoading(false);
+    //   setIsLoading(false); // Ensure loading is false on error
     // }
-
-    // SIMULATION (Current):
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    localStorage.setItem('isLoggedInForesight', 'true');
-    setUser(mockUser);
-    setIsLoading(false);
-    router.push('/dashboard');
-  }, [router]);
+    
+    // SIMULATION
+    performLogin(mockUser);
+  }, [performLogin]);
 
   const loginWithGitHub = useCallback(async () => {
-    setIsLoading(true);
-    // // REAL BACKEND INTEGRATION (Example for GitHub OAuth):
-    // // Similar to Google, this would typically involve your backend.
+    // REAL BACKEND INTEGRATION (Example for GitHub OAuth):
     // try {
-    //   // window.location.href = '/api/auth/github/login';
+    //   // window.location.href = '/api/auth/github/login'; // Redirect to backend
     // } catch (error) {
     //   console.error("GitHub Login error:", error);
-    // } finally {
-    //   setIsLoading(false);
+    //   setIsLoading(false); // Ensure loading is false on error
     // }
 
-    // SIMULATION (Current):
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    localStorage.setItem('isLoggedInForesight', 'true');
-    setUser({...mockUser, name: "GitHub User", email: "github@example.com"});
-    setIsLoading(false);
-    router.push('/dashboard');
-  }, [router]);
+    // SIMULATION
+    performLogin({...mockUser, name: "GitHub User", email: "github@example.com"});
+  }, [performLogin]);
+
 
   const logout = useCallback(async () => {
     setIsLoading(true);
-    // // REAL BACKEND INTEGRATION (Example):
+    // REAL BACKEND INTEGRATION (Example):
     // try {
-    //   // await fetch('/api/auth/logout', { method: 'POST' });
-    //   // setUser(null);
-    //   // localStorage.removeItem('isLoggedInForesight'); // If frontend needs to clear something
-    //   // router.push('/login');
+    //   await fetch('/api/auth/logout', { method: 'POST' });
     // } catch (error) {
     //   console.error("Logout error:", error);
-    //   // Handle logout error
     // } finally {
+    //   localStorage.removeItem('isLoggedInForesight');
+    //   localStorage.removeItem('foresight_user');
+    //   localStorage.removeItem('foresight_hasCompletedSetup'); // Also clear setup flag on logout
+    //   setUser(null);
     //   setIsLoading(false);
+    //   router.push('/login');
     // }
 
     // SIMULATION (Current):
     await new Promise(resolve => setTimeout(resolve, 500));
     localStorage.removeItem('isLoggedInForesight');
+    localStorage.removeItem('foresight_user'); // Clear stored user
+    localStorage.removeItem('foresight_hasCompletedSetup'); // Clear setup status on logout
     setUser(null);
     setIsLoading(false);
     router.push('/login');
@@ -133,3 +146,5 @@ export function useAuthState() {
 
   return { user, isLoading, login, loginWithGitHub, logout };
 }
+
+    

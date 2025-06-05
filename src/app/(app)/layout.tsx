@@ -60,11 +60,7 @@ function BudgetNotificationEffect() {
     const currentMonthBudgets = getBudgetsByMonth(currentYear, currentMonth);
 
     currentMonthBudgets.forEach(budget => {
-      // getTransactionsByCategoryAndMonth is now case-insensitive
       const budgetTransactions = getTransactionsByCategoryAndMonth(budget.category, currentYear, currentMonth);
-      // The `budget.spent` amount from context should already reflect case-insensitive aggregation 
-      // due to changes in `updateBudgetSpentAmount` in BudgetContext.
-      // So, we can directly use budget.spent.
       const currentSpent = budget.spent; 
 
       const percentageSpent = budget.allocated > 0 ? (currentSpent / budget.allocated) * 100 : 0;
@@ -141,9 +137,28 @@ export default function AuthenticatedAppLayout({
 
   useEffect(() => {
     if (!isLoading && !user) {
-      router.replace('/login');
+      // If not loading and no user, redirect to login
+      // This check is now primarily handled by useAuthState's main effect
+      // but kept here as a fallback.
+      if (pathname !== '/login') {
+         router.replace('/login');
+      }
+      return;
     }
-  }, [user, isLoading, router]);
+
+    if (!isLoading && user) {
+      // If user is loaded, check if setup is complete
+      const hasCompletedSetup = localStorage.getItem('foresight_hasCompletedSetup') === 'true';
+      if (!hasCompletedSetup) {
+        if (pathname !== '/welcome/setup') {
+          router.replace('/welcome/setup');
+        }
+      } else if (pathname === '/welcome/setup') { 
+        // If setup IS complete but user is somehow on setup page, redirect to dashboard
+        router.replace('/dashboard');
+      }
+    }
+  }, [user, isLoading, router, pathname]);
 
 
   if (isLoading || !user) {
@@ -153,6 +168,18 @@ export default function AuthenticatedAppLayout({
       </div>
     );
   }
+  
+  // If user exists but setup is not complete, and current path is not the setup page,
+  // useAuthState should redirect. This check ensures child components don't render prematurely.
+  const hasCompletedSetup = localStorage.getItem('foresight_hasCompletedSetup') === 'true';
+  if (!hasCompletedSetup && pathname !== '/welcome/setup') {
+     return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <p>Redirecting to setup...</p>
+      </div>
+    );
+  }
+
 
   return (
     <NotificationProvider>
@@ -212,3 +239,5 @@ export default function AuthenticatedAppLayout({
     </NotificationProvider>
   );
 }
+
+    
