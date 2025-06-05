@@ -25,8 +25,8 @@ import { format, parseISO } from 'date-fns';
 import { useCurrency } from '@/contexts/currency-context';
 import { formatCurrency } from '@/lib/utils';
 import { motion } from "framer-motion";
-import { useAuthState } from '@/hooks/use-auth-state'; // Import useAuthState
-import axios from 'axios'; // Import axios
+import { useAuthState } from '@/hooks/use-auth-state';
+import axios from 'axios';
 
 const TRANSACTION_API_BASE_URL = "http://localhost:8080/api/user/transactions";
 
@@ -43,8 +43,8 @@ const tableMotionVariants = {
 
 
 export default function TransactionsPage() {
-  const { user } = useAuthState(); // Get user for email
-  const { transactions, addTransaction, updateTransaction, deleteTransaction: deleteTransactionFromContext } = useTransactionContext();
+  const { user } = useAuthState();
+  const { transactions, addTransaction, updateTransaction, deleteTransaction: deleteTransactionFromContext, isLoading: isLoadingTransactions } = useTransactionContext();
   const { budgets, updateBudgetSpentAmount } = useBudgetContext();
   const { selectedCurrency, convertAmount } = useCurrency();
 
@@ -52,7 +52,9 @@ export default function TransactionsPage() {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
   const [transactionToDeleteId, setTransactionToDeleteId] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false); // For API call loading state
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
 
   const { addNotification } = useNotification();
 
@@ -94,9 +96,17 @@ export default function TransactionsPage() {
     setIsConfirmDeleteDialogOpen(true);
   };
 
-  const handleDeleteTransaction = () => {
-    // TODO: Implement API call for delete if needed
-    if (transactionToDeleteId) {
+  const handleDeleteTransaction = async () => {
+    if (!transactionToDeleteId || !user || !user.email) {
+      addNotification({ title: "Error", description: "Cannot delete transaction. User or transaction ID missing.", type: "error" });
+      setIsConfirmDeleteDialogOpen(false);
+      return;
+    }
+    setIsDeleting(true);
+
+    try {
+      await axios.delete(`${TRANSACTION_API_BASE_URL}/${transactionToDeleteId}?email=${encodeURIComponent(user.email)}`);
+      
       const transactionToDelete = transactions.find(t => t.id === transactionToDeleteId);
       deleteTransactionFromContext(transactionToDeleteId);
       addNotification({
@@ -106,12 +116,21 @@ export default function TransactionsPage() {
       });
 
       if (transactionToDelete && transactionToDelete.type === 'expense') {
-        const remainingTransactions = transactions.filter(t => t.id !== transactionToDeleteId);
-        refreshAffectedBudgets(transactionToDelete); // Pass the deleted transaction's details
+        refreshAffectedBudgets(transactionToDelete);
       }
       setTransactionToDeleteId(null);
+
+    } catch (error) {
+      console.error("Error deleting transaction:", error);
+      addNotification({
+        title: "Error Deleting Transaction",
+        description: `Failed to delete transaction. Please try again. ${axios.isAxiosError(error) && error.response?.data?.message ? error.response.data.message : ""}`,
+        type: "error",
+      });
+    } finally {
+      setIsDeleting(false);
+      setIsConfirmDeleteDialogOpen(false);
     }
-    setIsConfirmDeleteDialogOpen(false);
   };
 
   const handleSaveTransaction = async (transactionDataFromForm: Transaction) => {
@@ -121,16 +140,15 @@ export default function TransactionsPage() {
     }
     setIsSaving(true);
 
-    // Existing duplicate and similarity checks can remain, or be adapted if backend handles them
     const formTxDate = transactionDataFromForm.date;
     const formTxDescriptionLower = transactionDataFromForm.description.toLowerCase();
     const formTxCategoryLower = transactionDataFromForm.category.toLowerCase();
-    const formTxAmountUSD = transactionDataFromForm.amount; // This is already in USD from the form
+    const formTxAmountUSD = transactionDataFromForm.amount;
     const formTxType = transactionDataFromForm.type;
 
     const isActualEditOperation = editingTransaction && transactions.some(t => t.id === transactionDataFromForm.id);
 
-    if (!isActualEditOperation) { // Check for similar if adding new
+    if (!isActualEditOperation) {
         const similarExistingTx = transactions.find(existingTx =>
             existingTx.date === formTxDate &&
             existingTx.description.toLowerCase() === formTxDescriptionLower &&
@@ -183,7 +201,6 @@ export default function TransactionsPage() {
         if (originalTx) {
             originalTransactionDetailsForEdit = { category: originalTx.category, date: originalTx.date, type: originalTx.type, amount: originalTx.amount };
         }
-        // API Call for UPDATE
         await axios.put(`${TRANSACTION_API_BASE_URL}/${transactionDataFromForm.id}?email=${encodeURIComponent(user.email)}`, transactionDataFromForm);
         updateTransaction(transactionDataFromForm);
         addNotification({
@@ -193,12 +210,9 @@ export default function TransactionsPage() {
             href: "/transactions"
         });
 
-      } else { // Adding new transaction
-        // API Call for ADD
-        // The backend might return the created transaction, potentially with a backend-generated ID.
-        // For now, we assume the frontend-generated ID in transactionDataFromForm is used or accepted.
+      } else {
         await axios.post(`${TRANSACTION_API_BASE_URL}?email=${encodeURIComponent(user.email)}`, transactionDataFromForm);
-        addTransaction(transactionDataFromForm); // Context function now accepts full Transaction object
+        addTransaction(transactionDataFromForm);
         addNotification({
             title: `Transaction Added`,
             description: `${transactionDataFromForm.description} successfully added.`,
@@ -208,21 +222,12 @@ export default function TransactionsPage() {
       }
 
       setIsFormOpen(false);
-
-      // Budget refresh logic - needs to use the final state of transactions
-      // Run this after state update from addTransaction/updateTransaction has likely settled
-      // Or better, ensure transactions passed to refreshAffectedBudgets is the *new* list
-      const updatedTransactionsList = isActualEditOperation
-        ? transactions.map(t => t.id === transactionDataFromForm.id ? transactionDataFromForm : t)
-        : [transactionDataFromForm, ...transactions];
-
-
+      
       if (isActualEditOperation && originalTransactionDetailsForEdit) {
           const oldCat = originalTransactionDetailsForEdit.category;
           const oldDate = originalTransactionDetailsForEdit.date;
           const oldType = originalTransactionDetailsForEdit.type;
 
-          // If critical fields for budget linking changed OR type changed from/to expense
           if (oldType === 'expense' &&
               (oldCat.toLowerCase() !== transactionDataFromForm.category.toLowerCase() ||
                oldDate.substring(0,7) !== transactionDataFromForm.date.substring(0,7) ||
@@ -258,23 +263,30 @@ export default function TransactionsPage() {
           <p className="text-muted-foreground">Manage your income and expenses.</p>
         </div>
         <motion.div initial="initial" animate="animate" variants={buttonMotionVariants} viewport={{ once: true }}>
-          <Button onClick={handleAddTransaction}>
+          <Button onClick={handleAddTransaction} disabled={isLoadingTransactions}>
             <PlusCircle className="mr-2 h-5 w-5" />
             Add Transaction
           </Button>
         </motion.div>
       </div>
 
-      <motion.div initial="initial" animate="animate" variants={tableMotionVariants} viewport={{ once: true }}>
-        <DataTable columns={columns} data={transactions} />
-      </motion.div>
+      {isLoadingTransactions ? (
+        <div className="flex items-center justify-center p-10">
+          <RotateCw className="mr-2 h-6 w-6 animate-spin text-primary" />
+          <p className="text-muted-foreground">Loading transactions...</p>
+        </div>
+      ) : (
+        <motion.div initial="initial" animate="animate" variants={tableMotionVariants} viewport={{ once: true }}>
+          <DataTable columns={columns} data={transactions} />
+        </motion.div>
+      )}
 
       <TransactionFormDialog
         open={isFormOpen}
         onOpenChange={setIsFormOpen}
         transaction={editingTransaction}
-        onSave={handleSaveTransaction} // This will now be an async function
-        isSaving={isSaving} // Pass saving state to dialog
+        onSave={handleSaveTransaction}
+        isSaving={isSaving}
       />
 
       <AlertDialog open={isConfirmDeleteDialogOpen} onOpenChange={setIsConfirmDeleteDialogOpen}>
@@ -286,9 +298,14 @@ export default function TransactionsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setTransactionToDeleteId(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteTransaction} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete
+            <AlertDialogCancel onClick={() => setTransactionToDeleteId(null)} disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteTransaction} 
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeleting}
+            >
+              {isDeleting && <RotateCw className="mr-2 h-4 w-4 animate-spin" />}
+              {isDeleting ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -296,4 +313,3 @@ export default function TransactionsPage() {
     </div>
   );
 }
-
