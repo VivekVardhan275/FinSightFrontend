@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { User as UserIconLucide, Palette, Globe, Save } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import axios from "axios"; // Import axios
 
 type ThemeSetting = "light" | "dark" | "system";
 type FontSizeSetting = "small" | "medium" | "large";
@@ -51,6 +52,8 @@ const initializeFromLocalStorage = <T,>(
   }
   return defaultValue;
 };
+
+const USER_SETUP_API_URL = "http://localhost:8080/api/users/setup";
 
 
 export default function SetupPage() {
@@ -124,39 +127,57 @@ export default function SetupPage() {
 
 
   const handleSaveSetup = useCallback(async () => {
-    if (!user) {
-      toast({ title: "Error", description: "User not found. Please try logging in again.", variant: "destructive" });
+    if (!user || !user.email) { // Ensure user and email are present
+      toast({ title: "Error", description: "User information is missing. Please try logging in again.", variant: "destructive" });
       router.push('/login');
       return;
     }
     setIsSaving(true);
 
-    // Persist display name & other profile info (simulation, as no backend for these fields yet)
-    // console.log("Saving profile setup:", { displayName, email: user.email, phoneNumber, dateOfBirth, gender });
+    const setupPayload = {
+      email: user.email, // Primary identifier for backend
+      displayName: displayName || user.name, // Fallback to original name if display name is empty
+      phoneNumber: phoneNumber || null, // Send null if empty
+      dateOfBirth: dateOfBirth || null, // Send null if empty
+      gender: gender || null, // Send null if empty
+      // We can also send theme/currency/font preferences if backend stores them
+      // preferences: {
+      //   theme: currentTheme,
+      //   fontSize: fontSize,
+      //   currency: currentSelectedCurrency
+      // }
+    };
 
-    // Persist app settings to localStorage
-    localStorage.setItem("app-theme", currentTheme);
-    localStorage.setItem("app-font-size", fontSize);
-    setGlobalCurrency(currentSelectedCurrency);
-
-    // Update the session to mark setup as complete
     try {
-      await updateSession({ user: { ...user, name: displayName, hasCompletedSetup: true } }); // Update name in session too
+      // Step 1: Send data to your backend API
+      await axios.post(USER_SETUP_API_URL, setupPayload);
+
+      // Step 2: Persist app settings to localStorage (these are client-side preferences)
+      localStorage.setItem("app-theme", currentTheme);
+      localStorage.setItem("app-font-size", fontSize);
+      setGlobalCurrency(currentSelectedCurrency);
+
+      // Step 3: Update the NextAuth session to mark setup as complete and update name
+      await updateSession({ user: { ...user, name: displayName, hasCompletedSetup: true } }); 
+      
       toast({
         title: "Setup Complete!",
         description: "Your profile and preferences have been saved.",
         variant: "default"
       });
-      // No longer need to set localStorage item for 'foresight_hasCompletedSetup'
-      // localStorage.setItem('foresight_hasCompletedSetup', 'true');
       
       await new Promise(resolve => setTimeout(resolve, 1000)); // Give toast time to show
       router.push('/dashboard');
+
     } catch (error) {
-      console.error("Failed to update session for setup completion:", error);
+      console.error("Failed to save setup data:", error);
+      let errorMessage = "Could not save your setup information. Please try again.";
+      if (axios.isAxiosError(error) && error.response) {
+        errorMessage = error.response.data?.message || error.response.data?.error || errorMessage;
+      }
       toast({
         title: "Error Saving Setup",
-        description: "Could not save your setup preferences. Please try again.",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -165,7 +186,7 @@ export default function SetupPage() {
 
   }, [user, displayName, phoneNumber, dateOfBirth, gender, currentTheme, fontSize, currentSelectedCurrency, setGlobalCurrency, router, toast, updateSession]);
 
-  if (authLoading || status === 'loading' || (status === 'unauthenticated' && pathname === '/welcome/setup')) {
+  if (authLoading || status === 'loading' || (status === 'unauthenticated' && pathname === '/welcome/setup') || (status === 'authenticated' && user?.hasCompletedSetup === undefined) ) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <p>Loading setup...</p>
@@ -227,17 +248,17 @@ export default function SetupPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="phone">Phone Number</Label>
+                  <Label htmlFor="phone">Phone Number (Optional)</Label>
                   <Input 
                     id="phone" 
                     type="tel" 
-                    placeholder="(123) 456-7890 (Optional)" 
+                    placeholder="(123) 456-7890" 
                     value={phoneNumber} 
                     onChange={(e) => setPhoneNumber(e.target.value)} 
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="dateOfBirth">Date of Birth</Label>
+                  <Label htmlFor="dateOfBirth">Date of Birth (Optional)</Label>
                   <Input 
                     id="dateOfBirth" 
                     type="date" 
@@ -246,10 +267,10 @@ export default function SetupPage() {
                   />
                 </div>
                 <div className="space-y-1.5 md:col-span-2">
-                  <Label htmlFor="gender">Gender</Label>
+                  <Label htmlFor="gender">Gender (Optional)</Label>
                   <Select value={gender} onValueChange={setGender}>
                     <SelectTrigger id="gender">
-                      <SelectValue placeholder="Select gender (Optional)" />
+                      <SelectValue placeholder="Select gender" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="male">Male</SelectItem>
@@ -345,5 +366,4 @@ export default function SetupPage() {
     </div>
   );
 }
-
     
