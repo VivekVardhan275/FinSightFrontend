@@ -14,6 +14,19 @@ export interface AppUser {
   // Add any other custom fields you expect in your app's user object
 }
 
+const APP_LOCAL_STORAGE_KEYS = [
+  'app-transactions',
+  'app-budgets',
+  'app-notifications',
+  'app-currency',
+  'app-theme',
+  'app-font-size',
+  'foresight_hasCompletedSetup',
+  'app-layout-notified-budgets',
+  'sidebar_state', // From SidebarProvider
+  // Add any other app-specific keys here if introduced later
+];
+
 export function useAuthState() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -99,10 +112,28 @@ export function useAuthState() {
   }, [router]); // Added router to dependency array
 
   const appLogout = useCallback(async () => {
-    console.log("Attempting logout, redirecting to /login");
-    localStorage.removeItem('foresight_hasCompletedSetup'); // Clear setup flag
+    console.log("Attempting logout: Clearing app data and redirecting to /login");
+
+    // Clear application-specific localStorage items
+    if (typeof window !== "undefined") {
+      APP_LOCAL_STORAGE_KEYS.forEach(key => {
+        try {
+          localStorage.removeItem(key);
+          console.log(`Removed ${key} from localStorage.`);
+        } catch (e) {
+          console.error(`Error removing ${key} from localStorage:`, e);
+        }
+      });
+    }
+    
+    // Clear browser cache (limited capability, focuses on soft reload)
+    // Note: Programmatically clearing all browser cache is not directly possible due to security restrictions.
+    // This just ensures a fresh fetch of the login page assets.
+    // For a more thorough cache clearing, users would need to do it manually via browser settings.
+
+    // The signOut function from NextAuth.js will handle clearing its session cookies.
     try {
-      await signOut({ callbackUrl: '/login' });
+      await signOut({ callbackUrl: '/login', redirect: true }); // Ensure redirect happens
     } catch (error) {
       console.error("Error during signOut:", error);
       // Fallback redirect if signOut itself fails for some reason
