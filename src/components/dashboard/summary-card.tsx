@@ -11,24 +11,24 @@ import { useCurrency } from "@/contexts/currency-context";
 
 interface SummaryCardProps {
   data: SummaryCardData;
-  // index prop removed as it's no longer used for staggered animation here
+  index: number; 
 }
 
 const cardVariants = {
   hidden: { opacity: 0, y: 20, scale: 0.98 },
-  visible: { // No longer a function, animation is uniform
+  visible: (i: number) => ({ 
     opacity: 1,
     y: 0,
     scale: 1,
     transition: {
-      delay: 0.1, // Uniform delay for all summary cards
+      delay: 0.1 + i * 0.1, 
       duration: 0.4,
       ease: "easeOut",
     },
-  },
+  }),
 };
 
-export function SummaryCard({ data }: SummaryCardProps) {
+export function SummaryCard({ data, index }: SummaryCardProps) {
   const { selectedCurrency, convertAmount } = useCurrency();
   const [animatedRawValue, setAnimatedRawValue] = useState(0); 
 
@@ -59,7 +59,7 @@ export function SummaryCard({ data }: SummaryCardProps) {
 
   return (
     <motion.div
-      // custom prop removed
+      custom={index}
       variants={cardVariants}
       initial="hidden"
       animate="visible"

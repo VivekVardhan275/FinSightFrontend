@@ -13,9 +13,9 @@ import { useBudgetContext } from '@/contexts/budget-context';
 import type { SummaryCardData, Transaction, Budget } from '@/types';
 import { DollarSign, CreditCard, TrendingUp, PiggyBank } from 'lucide-react';
 
-const cardVariants = {
+const cardVariants = { // This was for the CHARTS in the original version
   hidden: { opacity: 0, y: 20, scale: 0.98 },
-  visible: { // No longer a function, so 'custom' prop won't apply this way
+  visible: {
     opacity: 1,
     y: 0,
     scale: 1,
@@ -181,8 +181,8 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {currentMonthDashboardData.map((data) => (
-          <SummaryCard key={data.title} data={data} />
+        {currentMonthDashboardData.map((data, index) => (
+          <SummaryCard key={data.title} data={data} index={index} />
         ))}
       </div>
 
