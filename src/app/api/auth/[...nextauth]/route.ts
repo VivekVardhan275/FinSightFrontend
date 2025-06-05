@@ -45,7 +45,7 @@ if (!authSecret) {
 const providers = [];
 
 if (googleClientId && googleClientSecret) {
-  console.info("\x1b[36m%s\x1b[0m", `NextAuth.js: Using Google Client ID: ${googleClientId}`);
+  console.info("\x1b[36m%s\x1b[0m", `NextAuth.js: Using Google Client ID: '${googleClientId}' (from GOOGLE_CLIENT_ID in .env.local)`);
   providers.push(
     GoogleProvider({
       clientId: googleClientId,
@@ -55,25 +55,25 @@ if (googleClientId && googleClientSecret) {
   if (authUrl) {
     const expectedGoogleCallback = `${authUrl}/api/auth/callback/google`;
     console.info(
-      "\x1b[36m%s\x1b[0m", 
-      `NextAuth.js: Expected Google callback URL: ${expectedGoogleCallback}`
+      "\x1b[36m%s\x1b[0m",
+      `NextAuth.js: The EXPECTED Google callback URL for THIS application is: ${expectedGoogleCallback}`
     );
     console.info(
-      "\x1b[36m%s\x1b[0m", 
-      `           ACTION: Ensure this EXACT URL is listed as an 'Authorized redirect URI' for Client ID '${googleClientId}' in your Google Cloud Console.`
+      "\x1b[36m%s\x1b[0m",
+      `           ACTION: In your Google Cloud Console, for Client ID '${googleClientId}', ensure this EXACT URL is listed as an 'Authorized redirect URI'.`
     );
   }
 } else {
   console.warn(
-    "\x1b[33m%s\x1b[0m", 
+    "\x1b[33m%s\x1b[0m",
     "WARNING: Missing Google OAuth environment variables (GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET). Google login will be disabled."
   );
-  if (!googleClientId) console.warn("\x1b[33m%s\x1b[0m", "  - GOOGLE_CLIENT_ID is missing.");
-  if (!googleClientSecret) console.warn("\x1b[33m%s\x1b[0m", "  - GOOGLE_CLIENT_SECRET is missing.");
+  if (!googleClientId) console.warn("\x1b[33m%s\x1b[0m", "  - GOOGLE_CLIENT_ID is missing from .env.local.");
+  if (!googleClientSecret) console.warn("\x1b[33m%s\x1b[0m", "  - GOOGLE_CLIENT_SECRET is missing from .env.local.");
 }
 
 if (githubClientId && githubClientSecret) {
-  console.info("\x1b[36m%s\x1b[0m", `NextAuth.js: Using GitHub Client ID: ${githubClientId}`);
+  console.info("\x1b[36m%s\x1b[0m", `NextAuth.js: Using GitHub Client ID: '${githubClientId}' (from GITHUB_CLIENT_ID in .env.local)`);
   providers.push(
     GithubProvider({
       clientId: githubClientId,
@@ -83,12 +83,12 @@ if (githubClientId && githubClientSecret) {
   if (authUrl) {
     const expectedGitHubCallback = `${authUrl}/api/auth/callback/github`;
     console.info(
-      "\x1b[36m%s\x1b[0m", 
-      `NextAuth.js: Expected GitHub callback URL: ${expectedGitHubCallback}`
+      "\x1b[36m%s\x1b[0m",
+      `NextAuth.js: The EXPECTED GitHub callback URL for THIS application is: ${expectedGitHubCallback}`
     );
     console.info(
-      "\x1b[36m%s\x1b[0m", 
-      `           ACTION: Ensure this EXACT URL is set as the 'Authorization callback URL' for Client ID '${githubClientId}' in your GitHub OAuth App settings.`
+      "\x1b[36m%s\x1b[0m",
+      `           ACTION: In your GitHub OAuth App settings, for Client ID '${githubClientId}', ensure this EXACT URL is set as the 'Authorization callback URL'.`
     );
   }
 } else {
@@ -96,8 +96,8 @@ if (githubClientId && githubClientSecret) {
     "\x1b[33m%s\x1b[0m",
     "WARNING: Missing GitHub OAuth environment variables (GITHUB_CLIENT_ID or GITHUB_CLIENT_SECRET). GitHub login will be disabled."
   );
-  if (!githubClientId) console.warn("\x1b[33m%s\x1b[0m", "  - GITHUB_CLIENT_ID is missing.");
-  if (!githubClientSecret) console.warn("\x1b[33m%s\x1b[0m", "  - GITHUB_CLIENT_SECRET is missing.");
+  if (!githubClientId) console.warn("\x1b[33m%s\x1b[0m", "  - GITHUB_CLIENT_ID is missing from .env.local.");
+  if (!githubClientSecret) console.warn("\x1b[33m%s\x1b[0m", "  - GITHUB_CLIENT_SECRET is missing from .env.local.");
 }
 
 if (providers.length === 0 && !criticalEnvError) {
@@ -113,10 +113,6 @@ if (criticalEnvError) {
     "\x1b[31m%s\x1b[0m",
     "NextAuth.js Initialization Errors: Due to the critical errors listed above, authentication may not function correctly. Please review your .env.local file and OAuth provider configurations."
   );
-  // If absolutely no providers can be set up and critical env vars are missing, 
-  // NextAuth might still try to initialize with an empty providers array, leading to runtime issues.
-  // It's better to have it explicitly fail or use a placeholder if that helps with startup.
-  // For now, we'll let it proceed, and NextAuth will handle the empty providers array.
 }
 
 
@@ -127,7 +123,7 @@ export const authOptions: NextAuthOptions = {
   },
   // NextAuth.js v5 uses the AUTH_SECRET environment variable automatically if set.
   // The 'secret' option here is not needed if AUTH_SECRET is set.
-  // secret: authSecret, 
+  // secret: authSecret,
 
   pages: {
     signIn: '/login',
