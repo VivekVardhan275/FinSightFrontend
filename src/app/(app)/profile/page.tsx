@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"; // Removed AvatarImage
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -73,7 +73,7 @@ export default function ProfilePage() {
   }
 
   const getInitials = (name: string) => {
-    if (!name) return "";
+    if (!name) return "?"; // Fallback for empty name
     const names = name.split(' ');
     let initials = names[0].substring(0, 1).toUpperCase();
     if (names.length > 1) {
@@ -99,12 +99,19 @@ export default function ProfilePage() {
   };
 
   const handleSaveChanges = () => {
+    // In a real app, you'd call an API to save these changes.
+    // For now, we'll just update the local state and show a toast.
+    // If using a global state management like Zustand or Redux for user profile,
+    // you'd dispatch an action here.
+    // For this prototype, the changes are local to this component and `useAuthState`'s user object
+    // isn't directly updated from here.
     console.log("Saving profile:", { displayName, phoneNumber, dateOfBirth, gender });
     toast({
       title: "Profile Updated",
       description: "Your personal information has been (simulated) saved.",
     });
     setIsEditingPersonalInfo(false);
+    // Update initial values for next edit session
     setInitialDisplayNameForEdit(displayName);
     setInitialPhoneNumberForEdit(phoneNumber);
     setInitialDateOfBirthForEdit(dateOfBirth);
@@ -114,7 +121,7 @@ export default function ProfilePage() {
   const handleEmailClick = () => {
     toast({
       title: "Email Address",
-      description: "Your email address cannot be changed.",
+      description: "Your email address cannot be changed.", // Or, "Email is managed by your OAuth provider."
     });
   };
 
@@ -147,17 +154,18 @@ export default function ProfilePage() {
         <Card className="md:col-span-1 shadow-lg">
           <CardHeader className="items-center text-center">
             <Avatar className="h-24 w-24 mb-4 border-2 border-primary">
-              <AvatarImage src={user.imageUrl} alt={displayName} data-ai-hint="avatar person" />
-              <AvatarFallback className="text-3xl">{getInitials(displayName)}</AvatarFallback>
+              {/* AvatarImage removed */}
+              <AvatarFallback className="text-3xl">{getInitials(displayName || user.name)}</AvatarFallback>
             </Avatar>
-            <CardTitle className="text-2xl font-headline">{displayName}</CardTitle>
+            <CardTitle className="text-2xl font-headline">{displayName || user.name}</CardTitle>
             <CardDescription className="flex items-center justify-center gap-1">
               <Mail className="h-4 w-4 text-muted-foreground" />
               {user.email}
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">
-            <Button variant="outline" disabled>
+            {/* Button to edit profile picture can be removed or kept disabled as image functionality is removed */}
+            <Button variant="outline" disabled> 
               <Edit3 className="mr-2 h-4 w-4" /> Edit Profile Picture
             </Button>
           </CardContent>
@@ -183,7 +191,7 @@ export default function ProfilePage() {
                   onChange={(e) => setDisplayName(e.target.value)}
                 />
               ) : (
-                <ReadOnlyFieldDisplay value={displayName} placeholder="Enter your full name" />
+                <ReadOnlyFieldDisplay value={displayName || user.name} placeholder="Enter your full name" />
               )}
             </div>
 
@@ -194,7 +202,7 @@ export default function ProfilePage() {
                 onClick={handleEmailClick}
                 className={cn(
                   "flex h-10 w-full items-center rounded-md border border-transparent bg-transparent px-3 py-2 text-sm",
-                  "cursor-not-allowed"
+                  "cursor-not-allowed opacity-70" // Made it look more disabled
                 )}
               >
                 {user.email}
