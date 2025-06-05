@@ -46,6 +46,12 @@ if (googleClientId && googleClientSecret) {
       clientSecret: googleClientSecret,
     })
   );
+  if (authUrl) {
+    console.info(
+      "\x1b[36m%s\x1b[0m", // Cyan color for info
+      `NextAuth.js: Expected Google callback URL: ${authUrl}/api/auth/callback/google`
+    );
+  }
 } else {
   console.warn(
     "\x1b[33m%s\x1b[0m", // Yellow color for warning
@@ -60,6 +66,12 @@ if (githubClientId && githubClientSecret) {
       clientSecret: githubClientSecret,
     })
   );
+  if (authUrl) {
+    console.info(
+      "\x1b[36m%s\x1b[0m", // Cyan color for info
+      `NextAuth.js: Expected GitHub callback URL: ${authUrl}/api/auth/callback/github`
+    );
+  }
 } else {
   console.warn(
     "\x1b[33m%s\x1b[0m",
