@@ -9,60 +9,62 @@ const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
 const githubClientId = process.env.GITHUB_CLIENT_ID;
 const githubClientSecret = process.env.GITHUB_CLIENT_SECRET;
 const authSecret = process.env.AUTH_SECRET;
-let authUrl = process.env.AUTH_URL;
-const nextAuthUrl = process.env.NEXTAUTH_URL; // Check for the older variable
+let envAuthUrl = process.env.AUTH_URL;
+const envNextAuthUrl = process.env.NEXTAUTH_URL;
 
 // --- CRITICAL ENVIRONMENT VARIABLE CHECKS ---
 let criticalEnvError = false;
 let guidanceMessages: string[] = [];
+let effectiveAuthUrlForLogging = envAuthUrl;
 
-if (authUrl && nextAuthUrl && authUrl !== nextAuthUrl) {
+if (envAuthUrl && envNextAuthUrl && envAuthUrl !== envNextAuthUrl) {
   console.warn(
     "\x1b[33m%s\x1b[0m", // Yellow color for warning
-    `WARNING: Both \`AUTH_URL\` ("${authUrl}") and \`NEXTAUTH_URL\` ("${nextAuthUrl}") are set in your environment, and they are different. ` +
-    "It's strongly recommended to use only `AUTH_URL` with newer versions of NextAuth.js (Auth.js v5). " +
-    "Please remove `NEXTAUTH_URL` or ensure it matches `AUTH_URL` to avoid potential conflicts."
+    `WARNING: Both \`AUTH_URL\` ("${envAuthUrl}") and \`NEXTAUTH_URL\` ("${envNextAuthUrl}") are set in your environment, and they are different. ` +
+    "NextAuth.js v4 might prioritize `NEXTAUTH_URL`. It's strongly recommended to use only `AUTH_URL` and remove `NEXTAUTH_URL`."
   );
-  // You might decide to prioritize one, or halt if they conflict and are different.
-  // For now, we'll proceed using AUTH_URL if set, otherwise log further warnings.
-} else if (authUrl && nextAuthUrl && authUrl === nextAuthUrl) {
-    // Both are set but are the same. Prefer AUTH_URL.
-     console.info(
+  // For logging purposes, we'll still prefer AUTH_URL if set. The programmatic adjustment later will handle runtime.
+  effectiveAuthUrlForLogging = envAuthUrl;
+} else if (envAuthUrl && envNextAuthUrl && envAuthUrl === envNextAuthUrl) {
+    console.info(
         "\x1b[36m%s\x1b[0m",
-        `INFO: Both \`AUTH_URL\` and \`NEXTAUTH_URL\` are set to "${authUrl}". Using \`AUTH_URL\`. Consider removing \`NEXTAUTH_URL\`.`
+        `INFO: Both \`AUTH_URL\` and \`NEXTAUTH_URL\` are set to "${envAuthUrl}". Using \`AUTH_URL\`. Consider removing \`NEXTAUTH_URL\`.`
+    );
+    effectiveAuthUrlForLogging = envAuthUrl;
+} else if (!envAuthUrl && envNextAuthUrl) {
+  console.warn(
+    "\x1b[33m%s\x1b[0m", // Yellow color for warning
+    `WARNING: \`NEXTAUTH_URL\` ("${envNextAuthUrl}") is set, but \`AUTH_URL\` is not. ` +
+    "Newer versions of NextAuth.js (Auth.js v5) prefer `AUTH_URL`. " +
+    "Using `NEXTAUTH_URL` as a fallback for now, but consider renaming it to `AUTH_URL` in your .env.local file."
+  );
+  effectiveAuthUrlForLogging = envNextAuthUrl;
+} else if (envAuthUrl && !envNextAuthUrl) {
+  effectiveAuthUrlForLogging = envAuthUrl;
+   console.info(
+        "\x1b[36m%s\x1b[0m",
+        `INFO: \`AUTH_URL\` is set to "${envAuthUrl}" and \`NEXTAUTH_URL\` is not set. This is the preferred configuration.`
     );
 }
 
 
-if (!authUrl && nextAuthUrl) {
-  console.warn(
-    "\x1b[33m%s\x1b[0m", // Yellow color for warning
-    `WARNING: \`NEXTAUTH_URL\` ("${nextAuthUrl}") is set, but \`AUTH_URL\` is not. ` +
-    "Newer versions of NextAuth.js (Auth.js v5) prefer `AUTH_URL`. " +
-    "Using `NEXTAUTH_URL` as a fallback, but consider renaming it to `AUTH_URL` in your .env.local file."
-  );
-  authUrl = nextAuthUrl; // Use NEXTAUTH_URL as a fallback
-}
-
-
-if (!authUrl) {
+if (!effectiveAuthUrlForLogging) {
   console.error(
     "\x1b[31m%s\x1b[0m", // Red color for error
-    "CRITICAL ERROR: `AUTH_URL` (or `NEXTAUTH_URL`) environment variable is NOT SET in your .env.local file. " +
+    "CRITICAL ERROR: Neither `AUTH_URL` nor `NEXTAUTH_URL` environment variable is SET in your .env.local file. " +
     "This is REQUIRED for NextAuth.js to function correctly. " +
-    "Set it to your application's base URL (e.g., http://localhost:9002 for local development). " +
+    "Set `AUTH_URL` to your application's base URL (e.g., http://localhost:9002 for local development). " +
     "Ensure it does NOT have a trailing slash."
   );
   criticalEnvError = true;
-} else if (authUrl.endsWith('/')) {
+} else if (effectiveAuthUrlForLogging.endsWith('/')) {
   console.warn(
     "\x1b[33m%s\x1b[0m", // Yellow color for warning
-    `WARNING: Your auth URL ("${authUrl}") in .env.local has a trailing slash. ` +
+    `WARNING: Your auth URL ("${effectiveAuthUrlForLogging}") in .env.local has a trailing slash. ` +
     "It is strongly recommended to remove it (e.g., use 'http://localhost:9002' instead of 'http://localhost:9002/')."
   );
-  // Do not set criticalEnvError = true for this, it's just a warning.
 } else {
-    guidanceMessages.push(`\x1b[36mNextAuth.js is using auth URL: ${authUrl}\x1b[0m (derived from AUTH_URL or NEXTAUTH_URL)`);
+    guidanceMessages.push(`\x1b[36mNextAuth.js determined effective auth URL for logging: ${effectiveAuthUrlForLogging}\x1b[0m`);
 }
 
 
@@ -87,14 +89,14 @@ if (googleClientId && googleClientSecret) {
       clientSecret: googleClientSecret,
     })
   );
-  if (authUrl && !authUrl.endsWith('/')) {
-    const expectedGoogleCallback = `${authUrl}/api/auth/callback/google`;
+  if (effectiveAuthUrlForLogging && !effectiveAuthUrlForLogging.endsWith('/')) {
+    const expectedGoogleCallback = `${effectiveAuthUrlForLogging}/api/auth/callback/google`;
     guidanceMessages.push(
       `\x1b[32mGOOGLE DEBUG ACTION:\x1b[0m In your Google Cloud Console, for the OAuth Client ID \x1b[33m'${googleClientId}'\x1b[0m, ensure the following URL is listed EXACTLY under "Authorized redirect URIs": \x1b[33m${expectedGoogleCallback}\x1b[0m`
     );
-  } else if (authUrl) {
+  } else if (effectiveAuthUrlForLogging) {
     guidanceMessages.push(
-        `\x1b[33mWARNING: Cannot generate precise Google callback URL guidance because auth URL ("${authUrl}") has issues. Please fix it first.\x1b[0m`
+        `\x1b[33mWARNING: Cannot generate precise Google callback URL guidance because effective auth URL ("${effectiveAuthUrlForLogging}") for logging has issues. Please fix it first.\x1b[0m`
     );
   }
 } else {
@@ -114,14 +116,14 @@ if (githubClientId && githubClientSecret) {
       clientSecret: githubClientSecret,
     })
   );
-  if (authUrl && !authUrl.endsWith('/')) { 
-    const expectedGitHubCallback = `${authUrl}/api/auth/callback/github`;
+  if (effectiveAuthUrlForLogging && !effectiveAuthUrlForLogging.endsWith('/')) { 
+    const expectedGitHubCallback = `${effectiveAuthUrlForLogging}/api/auth/callback/github`;
      guidanceMessages.push(
       `\x1b[32mGITHUB DEBUG ACTION:\x1b[0m In your GitHub OAuth App settings, for the Client ID \x1b[33m'${githubClientId}'\x1b[0m, ensure the following URL is set EXACTLY as the "Authorization callback URL": \x1b[33m${expectedGitHubCallback}\x1b[0m`
     );
-  } else if (authUrl) {
+  } else if (effectiveAuthUrlForLogging) {
      guidanceMessages.push(
-        `\x1b[33mWARNING: Cannot generate precise GitHub callback URL guidance because auth URL ("${authUrl}") has issues. Please fix it first.\x1b[0m`
+        `\x1b[33mWARNING: Cannot generate precise GitHub callback URL guidance because effective auth URL ("${effectiveAuthUrlForLogging}") for logging has issues. Please fix it first.\x1b[0m`
     );
   }
 } else {
@@ -149,9 +151,33 @@ if (criticalEnvError) {
 }
 
 if (guidanceMessages.length > 0) {
-    console.info("\n\x1b[34m%s\x1b[0m", "--- NextAuth.js Configuration Summary & Actions ---");
+    console.info("\n\x1b[34m%s\x1b[0m", "--- NextAuth.js Configuration Summary & Actions (before runtime adjustment) ---");
     guidanceMessages.forEach(msg => console.info(msg));
-    console.info("\x1b[34m%s\x1b[0m", "-------------------------------------------------");
+    console.info("\x1b[34m%s\x1b[0m", "--------------------------------------------------------------------------");
+}
+
+// Programmatic adjustment to ensure NEXTAUTH_URL is aligned with AUTH_URL if AUTH_URL is correctly set to port 9002.
+// This is because NextAuth v4 respects NEXTAUTH_URL.
+if (process.env.AUTH_URL && process.env.AUTH_URL.includes(':9002')) {
+    const currentNextAuthUrl = process.env.NEXTAUTH_URL;
+    if (currentNextAuthUrl !== process.env.AUTH_URL) {
+        console.warn(
+            "\x1b[33m%s\x1b[0m",
+            `RUNTIME ADJUSTMENT: \`AUTH_URL\` is "${process.env.AUTH_URL}" and \`NEXTAUTH_URL\` is "${currentNextAuthUrl || 'not set'}". ` +
+            "Forcing NextAuth.js to use AUTH_URL by setting `process.env.NEXTAUTH_URL`."
+        );
+        process.env.NEXTAUTH_URL = process.env.AUTH_URL;
+         console.info(
+            "\x1b[36m%s\x1b[0m",
+            `RUNTIME ADJUSTMENT: \`process.env.NEXTAUTH_URL\` is now "${process.env.NEXTAUTH_URL}".`
+        );
+    }
+} else if (process.env.AUTH_URL) {
+    console.warn(
+        "\x1b[33m%s\x1b[0m",
+        `WARNING: \`AUTH_URL\` is "${process.env.AUTH_URL}" but does not seem to be the expected "http://localhost:9002". ` +
+        "No runtime adjustment made for `NEXTAUTH_URL` based on this. Ensure your `.env.local` is correct."
+    );
 }
 
 
@@ -160,7 +186,7 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt", 
   },
-  secret: authSecret, // Explicitly using the defined authSecret
+  secret: authSecret,
   pages: {
     signIn: '/login',
   },
@@ -180,3 +206,4 @@ const handler = NextAuth(authOptions);
 
 export { handler as GET, handler as POST };
 
+    
