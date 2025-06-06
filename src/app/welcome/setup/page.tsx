@@ -90,13 +90,7 @@ export default function SetupPage() {
     }
   }, [user, authStateIsLoading]);
 
-  // Sync formCurrency with initialGlobalCurrency if it changes and is different
-  useEffect(() => {
-    if (initialGlobalCurrency !== formCurrency) {
-      setFormCurrency(initialGlobalCurrency);
-    }
-  }, [initialGlobalCurrency, formCurrency]);
-
+  // Removed problematic useEffect that was resetting formCurrency to initialGlobalCurrency
 
   const handleSaveSetup = useCallback(async () => {
     if (!user || !user.email) {
@@ -381,6 +375,8 @@ export default function SetupPage() {
     </div>
   );
 }
+    
+
     
 
     
