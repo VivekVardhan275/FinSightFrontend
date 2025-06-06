@@ -3,7 +3,6 @@
 
 import type { Transaction } from '@/types';
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
-// import { sampleTransactions } from '@/lib/placeholder-data'; // No longer using sampleTransactions as primary fallback
 import axios from 'axios';
 import { useAuthState } from '@/hooks/use-auth-state';
 
@@ -27,12 +26,11 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const fetchAttemptedForUserRef = useRef<string | null>(null);
 
-  const userEmail = user?.email; // Stable variable for user's email
+  const userEmail = user?.email;
 
   useEffect(() => {
     if (authStatus === 'loading') {
-      // Still waiting for auth to resolve, ensure isLoading is true if not already.
-      if (!isLoading) setIsLoading(true);
+      if(!isLoading) setIsLoading(true); // Ensure loading is true while auth resolves
       return;
     }
 
@@ -44,47 +42,47 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
         axios.get(`${TRANSACTION_API_BASE_URL}?email=${encodeURIComponent(userEmail)}`)
           .then(response => {
             const apiData = response.data;
-            if (Array.isArray(apiData)) {
-              const newSortedData = apiData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-              setTransactions(currentData => {
-                if (JSON.stringify(currentData) === JSON.stringify(newSortedData)) {
-                  return currentData;
-                }
-                return newSortedData;
-              });
-            } else {
-              console.warn("API did not return an array for transactions, defaulting to empty.");
-              setTransactions([]);
-            }
+            const newSortedData = Array.isArray(apiData)
+              ? apiData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+              : [];
+            
+            setTransactions(currentData => {
+              if (JSON.stringify(currentData) === JSON.stringify(newSortedData)) {
+                return currentData;
+              }
+              return newSortedData;
+            });
           })
           .catch(error => {
-            console.error("Error fetching transactions from API, defaulting to empty:", error);
-            setTransactions([]);
+            console.error("Error fetching transactions from API:", error);
+            setTransactions([]); // Default to empty on error
             fetchAttemptedForUserRef.current = null; // Allow retry on error
           })
           .finally(() => {
             setIsLoading(false);
           });
       } else {
-        // Fetch already attempted for this userEmail. If isLoading is true, it means an earlier stage
-        // might have set it, and now auth is resolved, so we can set it to false.
-        if (isLoading) setIsLoading(false);
+         // Data already fetched or fetch attempt made for this user, ensure loading is false
+         if (isLoading) setIsLoading(false);
       }
     } else if (authStatus === 'unauthenticated') {
       const stored = localStorage.getItem('app-transactions');
+      let parsed: Transaction[] = [];
       try {
-        const parsed = stored ? JSON.parse(stored) : []; // Default to empty array
-         setTransactions(currentData => JSON.stringify(currentData) === JSON.stringify(parsed) ? currentData : parsed);
+        parsed = stored ? JSON.parse(stored) : [];
       } catch (e) {
         console.error("Error parsing transactions from localStorage for unauthenticated user", e);
-        setTransactions([]);
+        parsed = [];
       }
+      setTransactions(currentData => JSON.stringify(currentData) === JSON.stringify(parsed) ? currentData : parsed);
       if (isLoading) setIsLoading(false);
       fetchAttemptedForUserRef.current = null;
     }
-  }, [userEmail, authStatus]); // isLoading is intentionally omitted to prevent loops
+  // Removed isLoading from dependency array
+  }, [userEmail, authStatus]); 
 
   useEffect(() => {
+    // Save to localStorage only when not loading, and fetch has been attempted for the current user (or unauthenticated)
     if (!isLoading && (fetchAttemptedForUserRef.current === userEmail || authStatus === 'unauthenticated')) {
       localStorage.setItem('app-transactions', JSON.stringify(transactions));
     }
