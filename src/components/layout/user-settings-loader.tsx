@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuthState } from '@/hooks/use-auth-state';
 import { useTheme } from 'next-themes';
 import { useCurrency, type Currency as AppCurrency } from '@/contexts/currency-context';
@@ -18,68 +18,61 @@ const FONT_SIZE_CLASSES: Record<FontSizeSetting, string> = {
   large: "font-size-large",
 };
 
-// Flag to ensure settings are fetched only once per session/user login
-let initialSettingsFetchedForSession = false;
-
 export function UserSettingsLoader() {
   const { user, status } = useAuthState();
   const { setTheme } = useTheme();
   const { setSelectedCurrency } = useCurrency();
-  const [isLoading, setIsLoading] = useState(false);
+  const [isFetchingSettings, setIsFetchingSettings] = useState(false); // Renamed for clarity
+  const settingsFetchedForUserRef = useRef<string | null>(null);
 
   const applyFontSize = useCallback((fontSize: FontSizeSetting) => {
-    localStorage.setItem("app-font-size", fontSize);
-    const htmlElement = document.documentElement;
-    Object.values(FONT_SIZE_CLASSES).forEach(cls => htmlElement.classList.remove(cls));
-    if (FONT_SIZE_CLASSES[fontSize]) {
-      htmlElement.classList.add(FONT_SIZE_CLASSES[fontSize]);
-    } else {
-      // Fallback to medium if an invalid size is somehow fetched
-      htmlElement.classList.add(FONT_SIZE_CLASSES.medium);
-      localStorage.setItem("app-font-size", "medium");
+    if (typeof window !== "undefined") {
+        localStorage.setItem("app-font-size", fontSize);
+        const htmlElement = document.documentElement;
+        Object.values(FONT_SIZE_CLASSES).forEach(cls => htmlElement.classList.remove(cls));
+        if (FONT_SIZE_CLASSES[fontSize]) {
+          htmlElement.classList.add(FONT_SIZE_CLASSES[fontSize]);
+        } else {
+          htmlElement.classList.add(FONT_SIZE_CLASSES.medium);
+          localStorage.setItem("app-font-size", "medium");
+        }
     }
   }, []);
 
   useEffect(() => {
-    if (
-      status === 'authenticated' &&
-      user?.email &&
-      user?.hasCompletedSetup === true && // Ensure setup is complete
-      !initialSettingsFetchedForSession &&
-      !isLoading
-    ) {
-      setIsLoading(true);
-      initialSettingsFetchedForSession = true; // Set flag immediately to prevent re-fetch attempts
+    if (status === 'authenticated' && user?.email && user?.hasCompletedSetup === true) {
+      if (settingsFetchedForUserRef.current !== user.email) {
+        setIsFetchingSettings(true);
+        settingsFetchedForUserRef.current = user.email;
 
-      axios.get(`${SETTINGS_API_URL}?email=${encodeURIComponent(user.email)}`)
-        .then(response => {
-          const fetchedSettings = response.data;
+        axios.get(`${SETTINGS_API_URL}?email=${encodeURIComponent(user.email)}`)
+          .then(response => {
+            const fetchedSettings = response.data;
 
-          if (fetchedSettings.theme && ["light", "dark", "system"].includes(fetchedSettings.theme)) {
-            setTheme(fetchedSettings.theme as ThemeSetting);
-          }
-          if (fetchedSettings.fontSize && FONT_SIZE_CLASSES[fetchedSettings.fontSize as FontSizeSetting]) {
-            applyFontSize(fetchedSettings.fontSize as FontSizeSetting);
-          }
-          if (fetchedSettings.currency) {
-            setSelectedCurrency(fetchedSettings.currency as AppCurrency);
-          }
-          // console.log("User settings applied from UserSettingsLoader");
-        })
-        .catch(error => {
-          console.error("UserSettingsLoader: Error fetching user settings:", error);
-          // Fallback to defaults or localStorage is implicitly handled by individual context providers / root layout
-          initialSettingsFetchedForSession = false; // Allow retry if fetch failed, e.g. on next login.
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
+            if (fetchedSettings.theme && ["light", "dark", "system"].includes(fetchedSettings.theme)) {
+              setTheme(fetchedSettings.theme as ThemeSetting);
+              localStorage.setItem("app-theme", fetchedSettings.theme); // Persist theme from API
+            }
+            if (fetchedSettings.fontSize && FONT_SIZE_CLASSES[fetchedSettings.fontSize as FontSizeSetting]) {
+              applyFontSize(fetchedSettings.fontSize as FontSizeSetting);
+            }
+            if (fetchedSettings.currency) {
+              setSelectedCurrency(fetchedSettings.currency as AppCurrency);
+              localStorage.setItem("app-currency", fetchedSettings.currency); // Persist currency from API
+            }
+          })
+          .catch(error => {
+            console.error("UserSettingsLoader: Error fetching user settings:", error);
+            settingsFetchedForUserRef.current = null; // Allow retry on error for this user
+          })
+          .finally(() => {
+            setIsFetchingSettings(false);
+          });
+      }
     } else if (status === 'unauthenticated') {
-        // Reset flag if user logs out
-        initialSettingsFetchedForSession = false;
+        settingsFetchedForUserRef.current = null; // Reset if user logs out
     }
-  }, [user, status, setTheme, setSelectedCurrency, applyFontSize, isLoading]);
+  }, [user, status, setTheme, setSelectedCurrency, applyFontSize]); // Removed isFetchingSettings from dependencies
 
-  // This component does not render anything itself
   return null;
 }

@@ -25,53 +25,56 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const { user, status: authStatus } = useAuthState();
   const [isLoading, setIsLoading] = useState(true);
-  const fetchAttemptedForUserRef = useRef<string | null>(null); // Ref to track fetch per user
+  const fetchAttemptedForUserRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (authStatus === 'loading') {
-      setIsLoading(true);
-      return; 
+      setIsLoading(true); // Ensure loading is true while auth is resolving
+      return;
     }
 
     if (authStatus === 'authenticated' && user?.email) {
-      if (fetchAttemptedForUserRef.current === user.email) {
-        // Data already fetched or fetch attempt made for this user, prevent re-fetch.
-        // If isLoading is true here, it means the fetch is in progress or .finally() hasn't run.
-        // If fetch is complete, isLoading should be false.
-        return;
-      }
+      // Only fetch if it hasn't been attempted for the current user.email
+      if (fetchAttemptedForUserRef.current !== user.email) {
+        setIsLoading(true);
+        fetchAttemptedForUserRef.current = user.email; // Mark that fetch is being attempted for this user
 
-      setIsLoading(true);
-      fetchAttemptedForUserRef.current = user.email; 
-
-      axios.get(`${TRANSACTION_API_BASE_URL}?email=${encodeURIComponent(user.email)}`)
-        .then(response => {
-          if (Array.isArray(response.data)) {
-            setTransactions(response.data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-          } else {
-            console.warn("API did not return an array for transactions, falling back to localStorage.");
+        axios.get(`${TRANSACTION_API_BASE_URL}?email=${encodeURIComponent(user.email)}`)
+          .then(response => {
+            if (Array.isArray(response.data)) {
+              setTransactions(response.data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+            } else {
+              console.warn("API did not return an array for transactions, falling back to localStorage.");
+              const stored = localStorage.getItem('app-transactions');
+              setTransactions(stored ? JSON.parse(stored) : sampleTransactions);
+            }
+          })
+          .catch(error => {
+            console.error("Error fetching transactions from API, falling back to localStorage:", error);
             const stored = localStorage.getItem('app-transactions');
-            setTransactions(stored ? JSON.parse(stored) : sampleTransactions);
-          }
-        })
-        .catch(error => {
-          console.error("Error fetching transactions from API, falling back to localStorage:", error);
-          const stored = localStorage.getItem('app-transactions');
-          try {
-            setTransactions(stored ? JSON.parse(stored) : sampleTransactions);
-          } catch (e) {
-            console.error("Error parsing transactions from localStorage during fallback", e);
-            setTransactions(sampleTransactions);
-          }
-          fetchAttemptedForUserRef.current = null; // Allow retry on error if user session changes or on next load
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
-    } else if (authStatus === 'unauthenticated') {
-      if (fetchAttemptedForUserRef.current !== null) { 
-        fetchAttemptedForUserRef.current = null; 
+            try {
+              setTransactions(stored ? JSON.parse(stored) : sampleTransactions);
+            } catch (e) {
+              console.error("Error parsing transactions from localStorage during fallback", e);
+              setTransactions(sampleTransactions);
+            }
+            fetchAttemptedForUserRef.current = null; // Allow retry on error for this user
+          })
+          .finally(() => {
+            setIsLoading(false);
+          });
+      } else {
+        // Fetch already attempted for this user. If it was successful, data is loaded.
+        // If it failed, fetchAttemptedForUserRef was reset, and it might retry if user object changes.
+        // Ensure isLoading is false if not actively fetching (which the above block would handle).
+        if(isLoading && !axios.interceptors.request.handlers.some(handler => handler.fulfilled?.toString().includes(TRANSACTION_API_BASE_URL))) {
+             // This check for active axios request is a bit hacky, ideally not needed if logic is perfect.
+             // The main idea is: if fetch was attempted and we are not in the process of fetching, isLoading should be false.
+             // The finally() block of the fetch handles this for the current fetch.
+        }
       }
+    } else if (authStatus === 'unauthenticated') {
+      fetchAttemptedForUserRef.current = null; // Reset fetch attempt on logout
       const stored = localStorage.getItem('app-transactions');
       try {
         setTransactions(stored ? JSON.parse(stored) : sampleTransactions);
@@ -79,15 +82,16 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
         console.error("Error parsing transactions from localStorage for unauthenticated user", e);
         setTransactions(sampleTransactions);
       }
-      setIsLoading(false);
+      setIsLoading(false); // Done loading for unauthenticated state
     }
-  }, [user, authStatus]); // Dependencies are user and authStatus.
+  }, [user, authStatus]); // Dependencies are user and authStatus
 
   useEffect(() => {
-    if (!isLoading && (fetchAttemptedForUserRef.current || authStatus === 'unauthenticated')) {
+    // Save to localStorage only when not loading and data fetch has been settled for the current state (either successful or unauth)
+    if (!isLoading && (fetchAttemptedForUserRef.current === user?.email || authStatus === 'unauthenticated')) {
       localStorage.setItem('app-transactions', JSON.stringify(transactions));
     }
-  }, [transactions, isLoading, authStatus]);
+  }, [transactions, isLoading, user, authStatus]);
 
   const addTransaction = useCallback((transaction: Transaction) => {
     setTransactions(prev => [transaction, ...prev].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));

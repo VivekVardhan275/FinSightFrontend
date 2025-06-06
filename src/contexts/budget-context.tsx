@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { Budget, Transaction, BudgetFromApi as BudgetFromApiType } from '@/types'; // Adjusted import for clarity
+import type { Budget, Transaction, BudgetFromApi as BudgetFromApiType } from '@/types';
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
 import { sampleBudgets } from '@/lib/placeholder-data';
 import axios from 'axios';
@@ -9,14 +9,13 @@ import { useAuthState } from '@/hooks/use-auth-state';
 
 const BUDGET_API_BASE_URL = "http://localhost:8080/api/user/budgets";
 
-// Type for budget data received from API (without 'spent')
-type BudgetFromApi = Omit<BudgetFromApiType, 'spent'>; // Ensure this matches what backend sends
+type BudgetFromApi = Omit<BudgetFromApiType, 'spent' | 'id'> & { id: string }; // Backend sends ID, but not spent
 
 interface BudgetContextType {
   budgets: Budget[];
   isLoading: boolean;
-  addBudget: (budgetFromApi: BudgetFromApi) => Budget;
-  updateBudget: (budgetDataFromApi: BudgetFromApi) => void;
+  addBudget: (budgetFromApi: BudgetFromApi) => Budget; // Expects budget with ID from API, without spent
+  updateBudget: (budgetDataFromApi: BudgetFromApi) => void; // Expects budget with ID from API, without spent
   deleteBudget: (budgetId: string) => void;
   getBudgetById: (budgetId: string) => Budget | undefined;
   updateBudgetSpentAmount: (budgetId: string, transactions: Transaction[]) => void;
@@ -29,80 +28,85 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const { user, status: authStatus } = useAuthState();
   const [isLoading, setIsLoading] = useState(true);
-  const fetchAttemptedForUserRef = useRef<string | null>(null); // Ref to track fetch per user
+  const fetchAttemptedForUserRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (authStatus === 'loading') {
-      setIsLoading(true);
-      return; 
+      setIsLoading(true); // Ensure loading is true while auth is resolving
+      return;
     }
 
     if (authStatus === 'authenticated' && user?.email) {
-      if (fetchAttemptedForUserRef.current === user.email) {
-        // Data already fetched or fetch attempt made for this user, prevent re-fetch.
-        return;
-      }
-      
-      setIsLoading(true);
-      fetchAttemptedForUserRef.current = user.email;
+      if (fetchAttemptedForUserRef.current !== user.email) {
+        setIsLoading(true);
+        fetchAttemptedForUserRef.current = user.email;
 
-      axios.get<{ budgets: BudgetFromApi[] }>(`${BUDGET_API_BASE_URL}?email=${encodeURIComponent(user.email)}`)
-        .then(response => {
-          const apiData = response.data.budgets || response.data; 
-          if (Array.isArray(apiData)) {
-            const initializedBudgets = apiData.map(b => ({ ...b, spent: 0 })) // Initialize spent
-              .sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category));
-            setBudgets(initializedBudgets);
-          } else {
-            console.warn("API did not return an array for budgets, falling back to localStorage.");
+        axios.get<{ budgets: Array<Omit<BudgetFromApiType, 'spent'>> }>(`${BUDGET_API_BASE_URL}?email=${encodeURIComponent(user.email)}`)
+          .then(response => {
+            const apiData = response.data.budgets || response.data;
+            if (Array.isArray(apiData)) {
+              const initializedBudgets = apiData
+                .map(b => ({ ...b, spent: 0 })) // Initialize spent as 0
+                .sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category));
+              setBudgets(initializedBudgets);
+            } else {
+              console.warn("API did not return an array for budgets, falling back to localStorage.");
+              const stored = localStorage.getItem('app-budgets');
+              setBudgets(stored ? JSON.parse(stored) : sampleBudgets.map(b => ({...b, spent: 0 })));
+            }
+          })
+          .catch(error => {
+            console.error("Error fetching budgets from API, falling back to localStorage:", error);
             const stored = localStorage.getItem('app-budgets');
-            setBudgets(stored ? JSON.parse(stored) : sampleBudgets.map(b => ({...b, spent: 0 })));
-          }
-        })
-        .catch(error => {
-          console.error("Error fetching budgets from API, falling back to localStorage:", error);
-          const stored = localStorage.getItem('app-budgets');
-          try {
-            setBudgets(stored ? JSON.parse(stored) : sampleBudgets.map(b => ({...b, spent: 0 })));
-          } catch (e) {
-            console.error("Error parsing budgets from localStorage during fallback", e);
-            setBudgets(sampleBudgets.map(b => ({...b, spent: 0 })));
-          }
-          fetchAttemptedForUserRef.current = null; // Allow retry on error
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
-    } else if (authStatus === 'unauthenticated') {
-      if (fetchAttemptedForUserRef.current !== null) {
-        fetchAttemptedForUserRef.current = null;
+            try {
+              setBudgets(stored ? JSON.parse(stored) : sampleBudgets.map(b => ({...b, spent: 0 })));
+            } catch (e) {
+              console.error("Error parsing budgets from localStorage during fallback", e);
+              setBudgets(sampleBudgets.map(b => ({...b, spent: 0 })));
+            }
+            fetchAttemptedForUserRef.current = null; // Allow retry on error for this user
+          })
+          .finally(() => {
+            setIsLoading(false);
+          });
+      } else {
+        // Fetch already attempted for this user.
+        // If it's still loading from a previous attempt, finally() will handle setIsLoading(false).
       }
+    } else if (authStatus === 'unauthenticated') {
+      fetchAttemptedForUserRef.current = null; // Reset fetch attempt on logout
       const stored = localStorage.getItem('app-budgets');
       try {
         setBudgets(stored ? JSON.parse(stored) : sampleBudgets.map(b => ({...b, spent: 0 })));
       } catch (e) {
         setBudgets(sampleBudgets.map(b => ({...b, spent: 0 })));
       }
-      setIsLoading(false);
+      setIsLoading(false); // Done loading for unauthenticated state
     }
-  }, [user, authStatus]); // Dependencies are user and authStatus.
+  }, [user, authStatus]); // Dependencies are user and authStatus
 
   useEffect(() => {
-    if (!isLoading && (fetchAttemptedForUserRef.current || authStatus === 'unauthenticated')) {
+    // Save to localStorage only when not loading and data fetch has been settled
+    if (!isLoading && (fetchAttemptedForUserRef.current === user?.email || authStatus === 'unauthenticated')) {
       localStorage.setItem('app-budgets', JSON.stringify(budgets));
     }
-  }, [budgets, isLoading, authStatus]);
+  }, [budgets, isLoading, user, authStatus]);
 
   const addBudget = useCallback((budgetFromApi: BudgetFromApi): Budget => {
+    // budgetFromApi comes from backend, includes ID, but not 'spent'.
+    // Frontend initializes 'spent' to 0.
     const budgetWithSpent = { ...budgetFromApi, spent: 0 };
     setBudgets(prev => [budgetWithSpent, ...prev].sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category)));
     return budgetWithSpent;
   }, []);
 
   const updateBudget = useCallback((budgetDataFromApi: BudgetFromApi) => {
+    // budgetDataFromApi comes from backend (e.g. after a PUT), includes ID, but not 'spent'.
+    // Frontend preserves its locally calculated 'spent' for the matching budget.
     setBudgets(prev => prev.map(b => {
         if (b.id === budgetDataFromApi.id) {
-            return { ...b, ...budgetDataFromApi, spent: b.spent }; // Preserve existing spent, update others
+            // Update all fields from API response, but keep existing 'spent'
+            return { ...budgetDataFromApi, spent: b.spent };
         }
         return b;
     }).sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category)));
@@ -139,9 +143,9 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
                  (tDate.getMonth() + 1) === budgetMonth &&
                  t.type === 'expense';
         })
-        .reduce((sum, t) => sum + t.amount, 0); 
+        .reduce((sum, t) => sum + t.amount, 0);
 
-      if (targetBudget.spent === newSpent) return prevBudgets; 
+      if (targetBudget.spent === newSpent) return prevBudgets;
 
       const updatedBudgets = [...prevBudgets];
       updatedBudgets[targetBudgetIndex] = { ...targetBudget, spent: newSpent };
