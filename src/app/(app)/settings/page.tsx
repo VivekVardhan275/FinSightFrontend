@@ -19,7 +19,7 @@ import { DeleteAccountDialog } from "@/components/settings/delete-account-dialog
 import { Separator } from "@/components/ui/separator";
 
 const SETTINGS_API_URL = "http://localhost:8080/api/user/settings";
-const ACCOUNT_API_URL = "http://localhost:8080/api/user/account"; // Conceptual
+const ACCOUNT_DELETE_API_URL = "http://localhost:8080/api/user/account/delete";
 
 const pageHeaderBlockMotionVariants = {
   initial: { opacity: 0, x: -20 },
@@ -44,7 +44,7 @@ const initializeFromLocalStorage = <T,>(
   key: string,
   defaultValue: T,
   validator?: (value: any) => boolean,
-  parser?: (storedValue: string) => T
+  parser?: (storedValue: string) => T 
 ): T => {
   if (typeof window === "undefined") {
     return defaultValue;
@@ -53,12 +53,13 @@ const initializeFromLocalStorage = <T,>(
     const storedValue = localStorage.getItem(key);
     if (storedValue !== null) {
       let valueToUse: T;
-      if (parser) {
+      if (parser) { 
         valueToUse = parser(storedValue);
       } else {
-        // If no parser, assume the storedValue is the correct type (e.g., string)
-        // This cast is safe if T is indeed string or a subtype of string
-        valueToUse = storedValue as unknown as T;
+        // For simple string values or when no parser is needed.
+        // Cast 'as unknown as T' is used because storedValue is string, 
+        // but T could be a more specific string literal type (like ThemeSetting).
+        valueToUse = storedValue as unknown as T; 
       }
       if (validator ? validator(valueToUse) : true) {
         return valueToUse;
@@ -72,7 +73,7 @@ const initializeFromLocalStorage = <T,>(
 
 
 export default function SettingsPage() {
-  const { user, isLoading: authLoading, appLogout } = useAuthState();
+  const { user, isLoading: authLoading, logout } = useAuthState(); // Destructure logout
   const { theme: activeGlobalTheme, setTheme: setGlobalTheme } = useTheme();
   const { toast } = useToast();
   const { selectedCurrency: globalSelectedCurrency, setSelectedCurrency: setGlobalSelectedCurrency } = useCurrency();
@@ -197,35 +198,37 @@ export default function SettingsPage() {
     }
     setIsDeletingAccount(true);
     try {
-      // Simulate API call for account deletion
-      // In a real app, replace this with: await axios.delete(`${ACCOUNT_API_URL}?email=${encodeURIComponent(user.email)}`);
-      await new Promise(resolve => setTimeout(resolve, 1500)); 
+      await axios.delete(`${ACCOUNT_DELETE_API_URL}?email=${encodeURIComponent(user.email)}`);
 
       toast({
-        title: "Account Deletion Initiated",
-        description: "Your account deletion process has started. You will be logged out.",
+        title: "Account Deletion Successful",
+        description: "Your account has been deleted. You will be logged out.",
         variant: "default",
       });
       setIsDeleteAccountDialogOpen(false);
+      
       // Wait for toast to be visible then logout
+      // The logout function from useAuthState handles localStorage clearing and NextAuth signOut
       setTimeout(async () => {
-        await appLogout(); 
-        // router.push('/login') is handled by useAuthState after logout
+        await logout(); 
       }, 2000);
+
     } catch (error) {
       console.error("Error deleting account:", error);
       let errorMessage = "Failed to delete your account. Please try again.";
       if (axios.isAxiosError(error) && error.response?.data?.message) {
         errorMessage = error.response.data.message;
+      } else if (axios.isAxiosError(error) && error.response?.status) {
+        errorMessage = `Failed to delete account. Server responded with status ${error.response.status}.`;
       }
       toast({
         title: "Account Deletion Failed",
         description: errorMessage,
         variant: "destructive",
       });
-      setIsDeletingAccount(false); // Keep dialog open or allow retry
+      setIsDeletingAccount(false); // Keep dialog open or allow retry if API call failed
     }
-    // No finally here for setIsDeletingAccount, as logout will unmount component
+    // No finally here for setIsDeletingAccount, as logout will unmount component on success
   };
 
 
@@ -383,4 +386,6 @@ export default function SettingsPage() {
     </div>
   );
 }
+    
+
     
