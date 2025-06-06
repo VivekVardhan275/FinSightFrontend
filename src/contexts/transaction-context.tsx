@@ -30,14 +30,37 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (authStatus === 'loading') {
-      if(!isLoading) setIsLoading(true); // Ensure loading is true while auth resolves
-      return;
+      if (!isLoading) setIsLoading(true);
+      return; // Early exit if auth is still loading
     }
 
-    if (authStatus === 'authenticated' && userEmail) {
+    if (authStatus === 'unauthenticated') {
+      const stored = localStorage.getItem('app-transactions');
+      let parsed: Transaction[] = [];
+      try {
+        parsed = stored ? JSON.parse(stored) : [];
+      } catch (e) {
+        console.error("Error parsing transactions from localStorage for unauthenticated user", e);
+        // Keep parsed as empty array
+      }
+      // Only update if different to prevent potential loops if localStorage parsing is unstable
+      setTransactions(currentData => {
+        if (JSON.stringify(currentData) === JSON.stringify(parsed)) {
+          return currentData;
+        }
+        return parsed;
+      });
+      if (isLoading) setIsLoading(false);
+      fetchAttemptedForUserRef.current = null; // Reset fetch attempt flag
+      return; // Early exit
+    }
+
+    // At this point, authStatus === 'authenticated'
+    if (userEmail) {
       if (fetchAttemptedForUserRef.current !== userEmail) {
-        setIsLoading(true);
-        fetchAttemptedForUserRef.current = userEmail;
+        // Need to fetch for this user
+        if (!isLoading) setIsLoading(true); // Set loading before initiating fetch
+        fetchAttemptedForUserRef.current = userEmail; // Mark fetch as attempted for this user
 
         axios.get(`${TRANSACTION_API_BASE_URL}?email=${encodeURIComponent(userEmail)}`)
           .then(response => {
@@ -56,33 +79,36 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
           .catch(error => {
             console.error("Error fetching transactions from API:", error);
             setTransactions([]); // Default to empty on error
-            fetchAttemptedForUserRef.current = null; // Allow retry on error
+            fetchAttemptedForUserRef.current = null; // Allow retry on error for this user
           })
           .finally(() => {
             setIsLoading(false);
           });
       } else {
-         // Data already fetched or fetch attempt made for this user, ensure loading is false
-         if (isLoading) setIsLoading(false);
+        // Fetch already attempted or in progress for this user.
+        // If isLoading is true, it means a fetch is ongoing, .finally() will set it to false.
+        // If isLoading is false, it means fetch completed.
+        // This branch might imply that isLoading should be false if not actively fetching.
+        if (isLoading) {
+             // This case should ideally be handled by the .finally() of an active fetch.
+             // If we reach here and isLoading is true, but no fetch is active for *this current userEmail*,
+             // it's a sign that isLoading might be stuck. However, the primary control is the fetch block.
+             // For safety, if fetchAttemptedForUserRef.current === userEmail (meaning not actively starting a NEW fetch)
+             // and isLoading is true, it might be stale from a previous state.
+             // However, to avoid race conditions, it's safer to let .finally() handle it.
+             // If no fetch is active, isLoading should eventually become false.
+        }
       }
-    } else if (authStatus === 'unauthenticated') {
-      const stored = localStorage.getItem('app-transactions');
-      let parsed: Transaction[] = [];
-      try {
-        parsed = stored ? JSON.parse(stored) : [];
-      } catch (e) {
-        console.error("Error parsing transactions from localStorage for unauthenticated user", e);
-        parsed = [];
-      }
-      setTransactions(currentData => JSON.stringify(currentData) === JSON.stringify(parsed) ? currentData : parsed);
+    } else {
+      // Authenticated, but no userEmail (e.g., session issue or partial user object)
       if (isLoading) setIsLoading(false);
-      fetchAttemptedForUserRef.current = null;
+      setTransactions([]); // No user context, clear transactions
+      fetchAttemptedForUserRef.current = null; // Reset fetch attempt flag
     }
-  // Removed isLoading from dependency array
-  }, [userEmail, authStatus]); 
+  }, [userEmail, authStatus]); // isLoading is intentionally omitted
 
   useEffect(() => {
-    // Save to localStorage only when not loading, and fetch has been attempted for the current user (or unauthenticated)
+    // Save to localStorage only when not loading, AND fetch has been attempted/resolved for current user OR user is unauthenticated
     if (!isLoading && (fetchAttemptedForUserRef.current === userEmail || authStatus === 'unauthenticated')) {
       localStorage.setItem('app-transactions', JSON.stringify(transactions));
     }
