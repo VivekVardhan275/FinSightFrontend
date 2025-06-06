@@ -10,13 +10,16 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useTheme } from "next-themes";
 import { useToast } from "@/hooks/use-toast";
-import { Palette, Globe, Save, RotateCw } from "lucide-react";
+import { Palette, Globe, Save, RotateCw, ShieldAlert, Trash2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useCurrency, type Currency as AppCurrency } from "@/contexts/currency-context";
 import { useAuthState } from "@/hooks/use-auth-state";
 import axios from "axios";
+import { DeleteAccountDialog } from "@/components/settings/delete-account-dialog";
+import { Separator } from "@/components/ui/separator";
 
 const SETTINGS_API_URL = "http://localhost:8080/api/user/settings";
+const ACCOUNT_API_URL = "http://localhost:8080/api/user/account"; // Conceptual
 
 const pageHeaderBlockMotionVariants = {
   initial: { opacity: 0, x: -20 },
@@ -37,11 +40,11 @@ const FONT_SIZE_CLASSES: Record<FontSizeSetting, string> = {
   large: "font-size-large",
 };
 
-// Helper to initialize from localStorage, ensuring it only runs client-side
 const initializeFromLocalStorage = <T,>(
   key: string,
   defaultValue: T,
-  validator?: (value: any) => boolean
+  validator?: (value: any) => boolean,
+  parser?: (storedValue: string) => T
 ): T => {
   if (typeof window === "undefined") {
     return defaultValue;
@@ -49,55 +52,56 @@ const initializeFromLocalStorage = <T,>(
   try {
     const storedValue = localStorage.getItem(key);
     if (storedValue !== null) {
-      const parsedValue = JSON.parse(storedValue) as T; // Assuming JSON.parse is okay for simple types
+      const parsedValue = parser ? parser(storedValue) : (storedValue as unknown as T);
       if (validator ? validator(parsedValue) : true) {
         return parsedValue;
       }
     }
   } catch (error) {
-    console.error(`Error reading ${key} from localStorage`, error);
+    // console.error(`Error reading ${key} from localStorage`, error);
   }
   return defaultValue;
 };
 
 
 export default function SettingsPage() {
-  const { user, isLoading: authLoading } = useAuthState();
+  const { user, isLoading: authLoading, appLogout } = useAuthState();
   const { theme: activeGlobalTheme, setTheme: setGlobalTheme } = useTheme();
   const { toast } = useToast();
   const { selectedCurrency: globalSelectedCurrency, setSelectedCurrency: setGlobalSelectedCurrency } = useCurrency();
 
-  // Local form states
+  // Local form states for appearance and regional
   const [formTheme, setFormTheme] = useState<ThemeSetting>("system");
   const [formFontSize, setFormFontSize] = useState<FontSizeSetting>("medium");
   const [formCurrency, setFormCurrency] = useState<AppCurrency>("INR");
   
   const [isSettingsReflectingGlobal, setIsSettingsReflectingGlobal] = useState(false);
-  const [isSaving, setIsSaving] = useState(false); // For save operation
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+
+  // Account Deletion State
+  const [isDeleteAccountDialogOpen, setIsDeleteAccountDialogOpen] = useState(false);
+  const [confirmationCode, setConfirmationCode] = useState("");
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   // Effect to initialize form states from global/localStorage once auth is resolved
   useEffect(() => {
     if (!authLoading && !isSettingsReflectingGlobal) {
-      // Initialize formTheme from activeGlobalTheme (which should be loaded by UserSettingsLoader/next-themes)
       if (activeGlobalTheme && ["light", "dark", "system"].includes(activeGlobalTheme)) {
         setFormTheme(activeGlobalTheme as ThemeSetting);
       } else {
-        // Fallback to localStorage if activeGlobalTheme isn't set yet, or default
         setFormTheme(initializeFromLocalStorage<ThemeSetting>("app-theme", "system", (v) =>
           ["light", "dark", "system"].includes(v)
         ));
       }
 
-      // Initialize formFontSize from localStorage
       setFormFontSize(initializeFromLocalStorage<FontSizeSetting>("app-font-size", "medium", (v) =>
         !!FONT_SIZE_CLASSES[v as FontSizeSetting]
       ));
       
-      // Initialize formCurrency from global context
       if (globalSelectedCurrency) {
         setFormCurrency(globalSelectedCurrency);
       }
-      setIsSettingsReflectingGlobal(true); // Mark that initial sync is done
+      setIsSettingsReflectingGlobal(true);
     }
   }, [authLoading, activeGlobalTheme, globalSelectedCurrency, isSettingsReflectingGlobal]);
 
@@ -107,26 +111,24 @@ export default function SettingsPage() {
         toast({ title: "Error", description: "User not authenticated.", variant: "destructive" });
         return;
     }
-    setIsSaving(true);
+    setIsSavingSettings(true);
 
-    // 1. Apply settings globally and to localStorage
-    setGlobalTheme(formTheme); // Apply to next-themes
+    setGlobalTheme(formTheme); 
     localStorage.setItem("app-theme", formTheme);
 
-    setGlobalSelectedCurrency(formCurrency); // Apply to currency context (which also saves to localStorage)
+    setGlobalSelectedCurrency(formCurrency);
 
-    localStorage.setItem("app-font-size", formFontSize); // Save font size
-    if (typeof window !== "undefined") { // Apply font size to DOM
+    localStorage.setItem("app-font-size", formFontSize); 
+    if (typeof window !== "undefined") {
         const htmlElement = document.documentElement;
         Object.values(FONT_SIZE_CLASSES).forEach(cls => htmlElement.classList.remove(cls));
         if (FONT_SIZE_CLASSES[formFontSize]) {
           htmlElement.classList.add(FONT_SIZE_CLASSES[formFontSize]);
         } else {
-          htmlElement.classList.add(FONT_SIZE_CLASSES.medium); // Default
+          htmlElement.classList.add(FONT_SIZE_CLASSES.medium);
         }
     }
 
-    // 2. Prepare payload for backend
     const settingsToSaveToBackend = {
       theme: formTheme,
       fontSize: formFontSize,
@@ -134,7 +136,6 @@ export default function SettingsPage() {
     };
 
     try {
-      // 3. Make API call to save settings to the backend
       await axios.put(`${SETTINGS_API_URL}?email=${encodeURIComponent(user.email)}`, settingsToSaveToBackend);
       
       toast({
@@ -153,11 +154,60 @@ export default function SettingsPage() {
         variant: "destructive",
       });
     } finally {
-      setIsSaving(false);
+      setIsSavingSettings(false);
     }
   };
 
-  if (authLoading || !isSettingsReflectingGlobal) { // Show loading until initial form values are set
+  const generateConfirmationCode = () => {
+    return Math.random().toString(36).substring(2, 8).toUpperCase();
+  };
+
+  const handleOpenDeleteDialog = () => {
+    setConfirmationCode(generateConfirmationCode());
+    setIsDeleteAccountDialogOpen(true);
+  };
+
+  const handleConfirmAccountDeletion = async () => {
+    if (!user || !user.email) {
+      toast({ title: "Authentication Error", description: "User session not found. Please re-login.", variant: "destructive" });
+      setIsDeleteAccountDialogOpen(false);
+      return;
+    }
+    setIsDeletingAccount(true);
+    try {
+      // Simulate API call for account deletion
+      // In a real app, replace this with: await axios.delete(`${ACCOUNT_API_URL}?email=${encodeURIComponent(user.email)}`);
+      await new Promise(resolve => setTimeout(resolve, 1500)); 
+
+      toast({
+        title: "Account Deletion Initiated",
+        description: "Your account deletion process has started. You will be logged out.",
+        variant: "default",
+      });
+      setIsDeleteAccountDialogOpen(false);
+      // Wait for toast to be visible then logout
+      setTimeout(async () => {
+        await appLogout(); 
+        // router.push('/login') is handled by useAuthState after logout
+      }, 2000);
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      let errorMessage = "Failed to delete your account. Please try again.";
+      if (axios.isAxiosError(error) && error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+      toast({
+        title: "Account Deletion Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      setIsDeletingAccount(false); // Keep dialog open or allow retry
+    }
+    // No finally here for setIsDeletingAccount, as logout will unmount component
+  };
+
+
+  if (authLoading || !isSettingsReflectingGlobal) {
     return (
       <div className="flex h-full items-center justify-center">
         <RotateCw className="mr-2 h-6 w-6 animate-spin text-primary" />
@@ -198,7 +248,7 @@ export default function SettingsPage() {
               <Select 
                 value={formTheme} 
                 onValueChange={(value: string) => setFormTheme(value as ThemeSetting)}
-                disabled={isSaving}
+                disabled={isSavingSettings}
               >
                 <SelectTrigger id="theme-select">
                   <SelectValue placeholder="Select theme" />
@@ -217,7 +267,7 @@ export default function SettingsPage() {
                 value={formFontSize} 
                 onValueChange={(value: string) => setFormFontSize(value as FontSizeSetting)} 
                 className="flex space-x-4"
-                disabled={isSaving}
+                disabled={isSavingSettings}
               >
                 <div>
                   <RadioGroupItem value="small" id="font-small" />
@@ -252,7 +302,7 @@ export default function SettingsPage() {
               <Select 
                 value={formCurrency} 
                 onValueChange={(value: string) => setFormCurrency(value as AppCurrency)}
-                disabled={isSaving}
+                disabled={isSavingSettings}
               >
                 <SelectTrigger id="currency-select">
                   <SelectValue placeholder="Select currency" />
@@ -270,13 +320,46 @@ export default function SettingsPage() {
         </Card>
       </motion.div>
 
+      <motion.div initial="initial" animate="animate" variants={cardMotionVariants(0.3)} viewport={{ once: true }}>
+        <Card className="shadow-lg border-destructive/50">
+          <CardHeader>
+            <CardTitle className="flex items-center font-headline text-destructive">
+              <ShieldAlert className="mr-2 h-6 w-6" />
+              Account Settings
+            </CardTitle>
+            <CardDescription>Manage your account status and data.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <h3 className="text-md font-semibold">Delete Account</h3>
+              <p className="text-sm text-muted-foreground mb-3">
+                Permanently delete your account and all associated data. This action cannot be undone.
+              </p>
+              <Button variant="destructive" onClick={handleOpenDeleteDialog} disabled={isSavingSettings || isDeletingAccount}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete My Account
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
       <motion.div initial="initial" animate="animate" variants={cardMotionVariants(0.4)} className="flex justify-end pt-4" viewport={{ once: true }}>
-        <Button onClick={handleSaveSettings} size="lg" disabled={isSaving}>
-          {isSaving && <RotateCw className="mr-2 h-5 w-5 animate-spin" />}
-          {isSaving ? "Saving..." : "Save All Settings"}
+        <Button onClick={handleSaveSettings} size="lg" disabled={isSavingSettings || isDeletingAccount}>
+          {isSavingSettings && <RotateCw className="mr-2 h-5 w-5 animate-spin" />}
+          {isSavingSettings ? "Saving..." : "Save All Settings"}
         </Button>
       </motion.div>
+
+      <DeleteAccountDialog
+        open={isDeleteAccountDialogOpen}
+        onOpenChange={setIsDeleteAccountDialogOpen}
+        confirmationCodeToMatch={confirmationCode}
+        onConfirmDelete={handleConfirmAccountDeletion}
+        isDeleting={isDeletingAccount}
+      />
     </div>
   );
 }
 
+    
