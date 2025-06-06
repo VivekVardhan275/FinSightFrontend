@@ -22,7 +22,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useCurrency } from "@/contexts/currency-context";
 import { useNotification } from "@/contexts/notification-context";
 import { NotificationBell } from "@/components/layout/notification-bell";
-import { TransactionProvider, useTransactionContext } from "@/contexts/transaction-context";
+import { TransactionProvider } from "@/contexts/transaction-context";
 import { BudgetProvider, useBudgetContext } from "@/contexts/budget-context";
 import { formatCurrency } from "@/lib/utils";
 import { UserSettingsLoader } from "@/components/layout/user-settings-loader"; // Import the new loader
@@ -57,64 +57,68 @@ function BudgetNotificationEffect() {
 
     const currentMonthBudgets = getBudgetsByMonth(currentYear, currentMonth);
 
-    currentMonthBudgets.forEach(budget => {
-      const currentSpentUSD = budget.spent;
-      const allocatedUSD = budget.allocated;
-      const percentageSpent = allocatedUSD > 0 ? (currentSpentUSD / allocatedUSD) * 100 : 0;
-      const budgetId = budget.id;
-
-      const displaySpent = convertAmount(currentSpentUSD, selectedCurrency);
-      const displayAllocated = convertAmount(allocatedUSD, selectedCurrency);
-
-      const exceededKey = `layout-${budgetId}-exceeded`;
-      const nearingKey = `layout-${budgetId}-nearing`; // Nearing 85%
-
-      let newSet = new Set(notifiedLayoutBudgets);
+    setNotifiedLayoutBudgets(prevNotifiedSet => {
+      let newSet = new Set(prevNotifiedSet);
       let changed = false;
 
-      if (currentSpentUSD > allocatedUSD) { // Exceeded
-        if (!notifiedLayoutBudgets.has(exceededKey)) {
-          addNotification({
-            title: "Budget Exceeded!",
-            description: `You've exceeded budget for ${budget.category} (${budget.month}). Spent: ${formatCurrency(displaySpent, selectedCurrency)}, Allocated: ${formatCurrency(displayAllocated, selectedCurrency)}.`,
-            type: "error",
-            href: "/budgets"
-          });
-          newSet.add(exceededKey);
-          if (newSet.has(nearingKey)) newSet.delete(nearingKey);
-          changed = true;
+      currentMonthBudgets.forEach(budget => {
+        const currentSpentINR = budget.spent; // Assuming budget.spent is in INR from context
+        const allocatedINR = budget.allocated; // Assuming budget.allocated is in INR from context
+        const percentageSpent = allocatedINR > 0 ? (currentSpentINR / allocatedINR) * 100 : 0;
+        const budgetId = budget.id;
+
+        // Convert to selectedCurrency for display in notification
+        const displaySpent = convertAmount(currentSpentINR, selectedCurrency);
+        const displayAllocated = convertAmount(allocatedINR, selectedCurrency);
+
+        const exceededKey = `layout-${budgetId}-exceeded`;
+        const nearingKey = `layout-${budgetId}-nearing`; // Nearing 85%
+
+        if (currentSpentINR > allocatedINR) { // Exceeded
+          if (!prevNotifiedSet.has(exceededKey)) {
+            addNotification({
+              title: "Budget Exceeded!",
+              description: `You've exceeded budget for ${budget.category} (${budget.month}). Spent: ${formatCurrency(displaySpent, selectedCurrency)}, Allocated: ${formatCurrency(displayAllocated, selectedCurrency)}.`,
+              type: "error",
+              href: "/budgets"
+            });
+            newSet.add(exceededKey);
+            if (newSet.has(nearingKey)) newSet.delete(nearingKey); // Remove nearing if now exceeded
+            changed = true;
+          }
+        } else if (percentageSpent >= 85) { // Nearing limit (but not exceeded)
+          if (!prevNotifiedSet.has(nearingKey) && !prevNotifiedSet.has(exceededKey)) {
+            addNotification({
+              title: "Budget Nearing Limit",
+              description: `Spent ${percentageSpent.toFixed(0)}% of budget for ${budget.category} (${budget.month}). Spent: ${formatCurrency(displaySpent, selectedCurrency)}, Allocated: ${formatCurrency(displayAllocated, selectedCurrency)}.`,
+              type: "warning",
+              href: "/budgets"
+            });
+            newSet.add(nearingKey);
+            changed = true;
+          }
+        } else { // Neither exceeded nor nearing 85% - reset notification state for this budget
+          if (prevNotifiedSet.has(nearingKey)) {
+            newSet.delete(nearingKey);
+            changed = true;
+          }
+          if (prevNotifiedSet.has(exceededKey)) {
+            newSet.delete(exceededKey);
+            changed = true;
+          }
         }
-      } else if (percentageSpent >= 85) { // Nearing limit (but not exceeded)
-        if (!notifiedLayoutBudgets.has(nearingKey) && !notifiedLayoutBudgets.has(exceededKey)) {
-          addNotification({
-            title: "Budget Nearing Limit",
-            description: `Spent ${percentageSpent.toFixed(0)}% of budget for ${budget.category} (${budget.month}). Spent: ${formatCurrency(displaySpent, selectedCurrency)}, Allocated: ${formatCurrency(displayAllocated, selectedCurrency)}.`,
-            type: "warning",
-            href: "/budgets"
-          });
-          newSet.add(nearingKey);
-          changed = true;
-        }
-      } else { // Neither exceeded nor nearing 85% - reset notification state for this budget
-        if (newSet.has(nearingKey)) {
-          newSet.delete(nearingKey);
-          changed = true;
-        }
-        if (newSet.has(exceededKey)) {
-          newSet.delete(exceededKey);
-          changed = true;
-        }
-      }
+      });
 
       if (changed) {
-        setNotifiedLayoutBudgets(newSet);
+        return newSet;
       }
+      return prevNotifiedSet; // Important: return previous set if no changes
     });
-  }, [budgets, notifiedLayoutBudgets, getBudgetsByMonth, convertAmount, selectedCurrency, addNotification, formatCurrency]);
+  }, [budgets, getBudgetsByMonth, convertAmount, selectedCurrency, addNotification, formatCurrency]); // Removed notifiedLayoutBudgets from here
 
   useEffect(() => {
     checkAndNotifyGlobalBudgets();
-  }, [budgets, selectedCurrency, checkAndNotifyGlobalBudgets]);
+  }, [budgets, selectedCurrency, checkAndNotifyGlobalBudgets]); // checkAndNotifyGlobalBudgets ref is more stable now
   
   return null;
 }
