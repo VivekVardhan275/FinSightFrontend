@@ -52,13 +52,20 @@ const initializeFromLocalStorage = <T,>(
   try {
     const storedValue = localStorage.getItem(key);
     if (storedValue !== null) {
-      const parsedValue = parser ? parser(storedValue) : (storedValue as unknown as T);
-      if (validator ? validator(parsedValue) : true) {
-        return parsedValue;
+      let valueToUse: T;
+      if (parser) {
+        valueToUse = parser(storedValue);
+      } else {
+        // If no parser, assume the storedValue is the correct type (e.g., string)
+        // This cast is safe if T is indeed string or a subtype of string
+        valueToUse = storedValue as unknown as T;
+      }
+      if (validator ? validator(valueToUse) : true) {
+        return valueToUse;
       }
     }
   } catch (error) {
-    // console.error(`Error reading ${key} from localStorage`, error);
+    // console.error(`Error reading ${key} from localStorage for key "${key}":`, error);
   }
   return defaultValue;
 };
@@ -86,20 +93,31 @@ export default function SettingsPage() {
   // Effect to initialize form states from global/localStorage once auth is resolved
   useEffect(() => {
     if (!authLoading && !isSettingsReflectingGlobal) {
-      if (activeGlobalTheme && ["light", "dark", "system"].includes(activeGlobalTheme)) {
-        setFormTheme(activeGlobalTheme as ThemeSetting);
-      } else {
-        setFormTheme(initializeFromLocalStorage<ThemeSetting>("app-theme", "system", (v) =>
-          ["light", "dark", "system"].includes(v)
-        ));
-      }
+      // Initialize theme
+      const initialTheme = initializeFromLocalStorage<ThemeSetting>(
+        "app-theme",
+        "system",
+        (v) => ["light", "dark", "system"].includes(v)
+      );
+      setFormTheme(activeGlobalTheme && ["light", "dark", "system"].includes(activeGlobalTheme) ? activeGlobalTheme as ThemeSetting : initialTheme);
 
-      setFormFontSize(initializeFromLocalStorage<FontSizeSetting>("app-font-size", "medium", (v) =>
-        !!FONT_SIZE_CLASSES[v as FontSizeSetting]
+      // Initialize font size
+      setFormFontSize(initializeFromLocalStorage<FontSizeSetting>(
+        "app-font-size",
+        "medium",
+        (v) => !!FONT_SIZE_CLASSES[v as FontSizeSetting]
       ));
       
+      // Initialize currency
       if (globalSelectedCurrency) {
         setFormCurrency(globalSelectedCurrency);
+      } else {
+        const storedCurrency = localStorage.getItem("app-currency") as AppCurrency | null;
+        if (storedCurrency && ["INR", "USD", "EUR", "GBP"].includes(storedCurrency)) {
+            setFormCurrency(storedCurrency);
+        } else {
+            setFormCurrency("INR"); // Default if global is not set and local is invalid/missing
+        }
       }
       setIsSettingsReflectingGlobal(true);
     }
@@ -113,11 +131,15 @@ export default function SettingsPage() {
     }
     setIsSavingSettings(true);
 
+    // Apply and save theme
     setGlobalTheme(formTheme); 
     localStorage.setItem("app-theme", formTheme);
 
+    // Apply and save currency
     setGlobalSelectedCurrency(formCurrency);
+    // useCurrency context handles localStorage for currency
 
+    // Apply and save font size
     localStorage.setItem("app-font-size", formFontSize); 
     if (typeof window !== "undefined") {
         const htmlElement = document.documentElement;
@@ -125,7 +147,7 @@ export default function SettingsPage() {
         if (FONT_SIZE_CLASSES[formFontSize]) {
           htmlElement.classList.add(FONT_SIZE_CLASSES[formFontSize]);
         } else {
-          htmlElement.classList.add(FONT_SIZE_CLASSES.medium);
+          htmlElement.classList.add(FONT_SIZE_CLASSES.medium); // Default if somehow invalid
         }
     }
 
@@ -361,5 +383,4 @@ export default function SettingsPage() {
     </div>
   );
 }
-
     
