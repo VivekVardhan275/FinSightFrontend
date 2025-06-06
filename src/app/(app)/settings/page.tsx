@@ -16,7 +16,7 @@ import { useCurrency, type Currency as AppCurrency } from "@/contexts/currency-c
 import { useAuthState } from "@/hooks/use-auth-state";
 import axios from "axios";
 
-const SETTINGS_API_URL = "http://localhost:8080/api/user/settings"; // Keep for potential save later
+const SETTINGS_API_URL = "http://localhost:8080/api/user/settings";
 
 const pageHeaderBlockMotionVariants = {
   initial: { opacity: 0, x: -20 },
@@ -37,11 +37,11 @@ const FONT_SIZE_CLASSES: Record<FontSizeSetting, string> = {
   large: "font-size-large",
 };
 
+// Helper to initialize from localStorage, ensuring it only runs client-side
 const initializeFromLocalStorage = <T,>(
   key: string,
   defaultValue: T,
-  validator?: (value: any) => boolean,
-  parser?: (storedValue: string) => T
+  validator?: (value: any) => boolean
 ): T => {
   if (typeof window === "undefined") {
     return defaultValue;
@@ -49,7 +49,7 @@ const initializeFromLocalStorage = <T,>(
   try {
     const storedValue = localStorage.getItem(key);
     if (storedValue !== null) {
-      const parsedValue = parser ? parser(storedValue) : (storedValue as unknown as T);
+      const parsedValue = JSON.parse(storedValue) as T; // Assuming JSON.parse is okay for simple types
       if (validator ? validator(parsedValue) : true) {
         return parsedValue;
       }
@@ -63,125 +63,101 @@ const initializeFromLocalStorage = <T,>(
 
 export default function SettingsPage() {
   const { user, isLoading: authLoading } = useAuthState();
-  const { theme: activeTheme, setTheme } = useTheme(); // activeTheme is from next-themes
+  const { theme: activeGlobalTheme, setTheme: setGlobalTheme } = useTheme();
   const { toast } = useToast();
-  const { selectedCurrency, setSelectedCurrency } = useCurrency();
+  const { selectedCurrency: globalSelectedCurrency, setSelectedCurrency: setGlobalSelectedCurrency } = useCurrency();
 
-  // Local form states, initialized from localStorage or context
-  const [currentTheme, setCurrentTheme] = useState<ThemeSetting>(() =>
-    initializeFromLocalStorage<ThemeSetting>("app-theme", "system", (v) =>
-      ["light", "dark", "system"].includes(v)
-    )
-  );
-  const [fontSize, setFontSize] = useState<FontSizeSetting>(() =>
-    initializeFromLocalStorage<FontSizeSetting>("app-font-size", "medium", (v) =>
-      !!FONT_SIZE_CLASSES[v as FontSizeSetting]
-    )
-  );
-  // Local selectedCurrency is now primarily driven by useCurrency hook
-  // For the form, we can just use selectedCurrency directly from the context for display
-  // and setSelectedCurrency for updates.
+  // Local form states
+  const [formTheme, setFormTheme] = useState<ThemeSetting>("system");
+  const [formFontSize, setFormFontSize] = useState<FontSizeSetting>("medium");
+  const [formCurrency, setFormCurrency] = useState<AppCurrency>("INR");
+  
+  const [isSettingsReflectingGlobal, setIsSettingsReflectingGlobal] = useState(false);
+  const [isSaving, setIsSaving] = useState(false); // For save operation
 
-  const [isSettingsLoading, setIsSettingsLoading] = useState(true); // To manage perceived loading
-
-  // API call for fetching initial settings has been removed.
-  // UserSettingsLoader handles this. This page reflects already loaded settings.
+  // Effect to initialize form states from global/localStorage once auth is resolved
   useEffect(() => {
-    // If auth is still loading, or user details are not yet available,
-    // settings might not be fully loaded by UserSettingsLoader.
-    // We simply mark settings as "loaded" for this page once auth is resolved.
-    if (!authLoading) {
-      setIsSettingsLoading(false);
-      // Re-sync local form theme state if UserSettingsLoader might have updated it via setTheme
-      const storedAppTheme = localStorage.getItem("app-theme") as ThemeSetting | null;
-      if (storedAppTheme && storedAppTheme !== currentTheme) {
-          setCurrentTheme(storedAppTheme);
+    if (!authLoading && !isSettingsReflectingGlobal) {
+      // Initialize formTheme from activeGlobalTheme (which should be loaded by UserSettingsLoader/next-themes)
+      if (activeGlobalTheme && ["light", "dark", "system"].includes(activeGlobalTheme)) {
+        setFormTheme(activeGlobalTheme as ThemeSetting);
+      } else {
+        // Fallback to localStorage if activeGlobalTheme isn't set yet, or default
+        setFormTheme(initializeFromLocalStorage<ThemeSetting>("app-theme", "system", (v) =>
+          ["light", "dark", "system"].includes(v)
+        ));
       }
-       // Re-sync local font size state if UserSettingsLoader might have updated it
-      const storedFontSize = localStorage.getItem("app-font-size") as FontSizeSetting | null;
-      if (storedFontSize && FONT_SIZE_CLASSES[storedFontSize] && storedFontSize !== fontSize) {
-          setFontSize(storedFontSize);
+
+      // Initialize formFontSize from localStorage
+      setFormFontSize(initializeFromLocalStorage<FontSizeSetting>("app-font-size", "medium", (v) =>
+        !!FONT_SIZE_CLASSES[v as FontSizeSetting]
+      ));
+      
+      // Initialize formCurrency from global context
+      if (globalSelectedCurrency) {
+        setFormCurrency(globalSelectedCurrency);
       }
+      setIsSettingsReflectingGlobal(true); // Mark that initial sync is done
     }
-  }, [authLoading, currentTheme, fontSize]);
+  }, [authLoading, activeGlobalTheme, globalSelectedCurrency, isSettingsReflectingGlobal]);
 
-
-  // Effect to align local currentTheme with next-themes' activeTheme IF `app-theme` (our localStorage key)
-  // was not set AND activeTheme is valid. This is mostly for initial hydration or system changes.
-  useEffect(() => {
-    const storedAppTheme = localStorage.getItem("app-theme");
-    if (!storedAppTheme && activeTheme && ["light", "dark", "system"].includes(activeTheme)) {
-      // Only update local state if it's different, to prevent potential loops
-      if (currentTheme !== activeTheme) {
-        setCurrentTheme(activeTheme as ThemeSetting);
-      }
-    }
-  }, [activeTheme, currentTheme]); // Added currentTheme dependency
-
-  // Persist theme to localStorage AND apply using next-themes when currentTheme (local form state) changes.
-  useEffect(() => {
-    localStorage.setItem("app-theme", currentTheme);
-    if (activeTheme !== currentTheme) { // Apply only if different from what next-themes already has
-        setTheme(currentTheme);
-    }
-  }, [currentTheme, setTheme, activeTheme]);
-
-  // Persist font size to localStorage AND apply to HTML element when fontSize (local form state) changes.
-  useEffect(() => {
-    localStorage.setItem("app-font-size", fontSize);
-    const htmlElement = document.documentElement;
-    Object.values(FONT_SIZE_CLASSES).forEach(cls => htmlElement.classList.remove(cls));
-    if (FONT_SIZE_CLASSES[fontSize]) {
-      htmlElement.classList.add(FONT_SIZE_CLASSES[fontSize]);
-    }
-  }, [fontSize]);
-
-  // Currency is managed by CurrencyProvider, which handles localStorage.
-  // The Select component for currency will use `selectedCurrency` from context for its value
-  // and `setSelectedCurrency` from context for its onValueChange.
 
   const handleSaveSettings = async () => {
     if (!user || !user.email) {
         toast({ title: "Error", description: "User not authenticated.", variant: "destructive" });
         return;
     }
-    // This function will save to localStorage (already done by useEffects)
-    // AND make an API call to save settings to the backend.
-    // For now, local changes are immediately applied by useEffects.
+    setIsSaving(true);
 
-    // TODO: Implement PUT request to backend here.
-    // Example payload for backend:
-    const settingsToSave = {
-      theme: currentTheme,
-      fontSize: fontSize,
-      currency: selectedCurrency, // from useCurrency context
+    // 1. Apply settings globally and to localStorage
+    setGlobalTheme(formTheme); // Apply to next-themes
+    localStorage.setItem("app-theme", formTheme);
+
+    setGlobalSelectedCurrency(formCurrency); // Apply to currency context (which also saves to localStorage)
+
+    localStorage.setItem("app-font-size", formFontSize); // Save font size
+    if (typeof window !== "undefined") { // Apply font size to DOM
+        const htmlElement = document.documentElement;
+        Object.values(FONT_SIZE_CLASSES).forEach(cls => htmlElement.classList.remove(cls));
+        if (FONT_SIZE_CLASSES[formFontSize]) {
+          htmlElement.classList.add(FONT_SIZE_CLASSES[formFontSize]);
+        } else {
+          htmlElement.classList.add(FONT_SIZE_CLASSES.medium); // Default
+        }
+    }
+
+    // 2. Prepare payload for backend
+    const settingsToSaveToBackend = {
+      theme: formTheme,
+      fontSize: formFontSize,
+      currency: formCurrency,
     };
 
     try {
-      // Simulate API call for now or implement actual axios.put
-      // await axios.put(`${SETTINGS_API_URL}?email=${encodeURIComponent(user.email)}`, settingsToSave);
+      // 3. Make API call to save settings to the backend
+      await axios.put(`${SETTINGS_API_URL}?email=${encodeURIComponent(user.email)}`, settingsToSaveToBackend);
       
-      // Since local changes are already applied by useEffects,
-      // we just need to confirm to the user.
-      localStorage.setItem("app-theme", currentTheme);
-      localStorage.setItem("app-font-size", fontSize);
-      // selectedCurrency is already updated in context and localStorage by setSelectedCurrency
-
       toast({
-        title: "Settings Applied",
-        description: "Your preferences have been updated locally. Backend save is conceptual.",
+        title: "Settings Saved",
+        description: "Your preferences have been successfully saved and applied.",
       });
     } catch (error) {
-      console.error("Error saving settings to backend (conceptual):", error);
+      console.error("Error saving settings to backend:", error);
+      let errorMessage = "Could not save your preferences to the server. Local changes have been applied.";
+      if (axios.isAxiosError(error) && error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
       toast({
         title: "Error Saving Settings",
-        description: "Could not save preferences to the server. Local changes applied.",
+        description: errorMessage,
         variant: "destructive",
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  if (authLoading || isSettingsLoading) {
+  if (authLoading || !isSettingsReflectingGlobal) { // Show loading until initial form values are set
     return (
       <div className="flex h-full items-center justify-center">
         <RotateCw className="mr-2 h-6 w-6 animate-spin text-primary" />
@@ -203,7 +179,7 @@ export default function SettingsPage() {
           Settings
         </h1>
         <p className="text-muted-foreground">
-          Customize your application experience.
+          Customize your application experience. Changes are applied upon saving.
         </p>
       </motion.div>
 
@@ -219,7 +195,11 @@ export default function SettingsPage() {
           <CardContent className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="theme-select">Theme</Label>
-              <Select value={currentTheme} onValueChange={(value: string) => setCurrentTheme(value as ThemeSetting)}>
+              <Select 
+                value={formTheme} 
+                onValueChange={(value: string) => setFormTheme(value as ThemeSetting)}
+                disabled={isSaving}
+              >
                 <SelectTrigger id="theme-select">
                   <SelectValue placeholder="Select theme" />
                 </SelectTrigger>
@@ -233,7 +213,12 @@ export default function SettingsPage() {
 
             <div className="space-y-2">
               <Label>Font Size</Label>
-              <RadioGroup value={fontSize} onValueChange={(value: string) => setFontSize(value as FontSizeSetting)} className="flex space-x-4">
+              <RadioGroup 
+                value={formFontSize} 
+                onValueChange={(value: string) => setFormFontSize(value as FontSizeSetting)} 
+                className="flex space-x-4"
+                disabled={isSaving}
+              >
                 <div>
                   <RadioGroupItem value="small" id="font-small" />
                   <Label htmlFor="font-small" className="ml-2 cursor-pointer">Small</Label>
@@ -264,7 +249,11 @@ export default function SettingsPage() {
           <CardContent className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="currency-select">Currency</Label>
-              <Select value={selectedCurrency} onValueChange={(value: string) => setSelectedCurrency(value as AppCurrency)}>
+              <Select 
+                value={formCurrency} 
+                onValueChange={(value: string) => setFormCurrency(value as AppCurrency)}
+                disabled={isSaving}
+              >
                 <SelectTrigger id="currency-select">
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
@@ -282,11 +271,12 @@ export default function SettingsPage() {
       </motion.div>
 
       <motion.div initial="initial" animate="animate" variants={cardMotionVariants(0.4)} className="flex justify-end pt-4" viewport={{ once: true }}>
-        <Button onClick={handleSaveSettings} size="lg">
-          <Save className="mr-2 h-5 w-5" />
-          Save All Settings
+        <Button onClick={handleSaveSettings} size="lg" disabled={isSaving}>
+          {isSaving && <RotateCw className="mr-2 h-5 w-5 animate-spin" />}
+          {isSaving ? "Saving..." : "Save All Settings"}
         </Button>
       </motion.div>
     </div>
   );
 }
+
