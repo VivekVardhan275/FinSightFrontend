@@ -3,7 +3,7 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
-import { PlusCircle, RotateCw } from "lucide-react";
+import { PlusCircle, RotateCw, ListChecks as NoTransactionsIcon } from "lucide-react"; // Added NoTransactionsIcon
 import { DataTable } from "@/components/transactions/data-table";
 import { getColumns } from "@/components/transactions/transaction-table-columns";
 import type { Transaction, TransactionFormData } from "@/types";
@@ -39,6 +39,11 @@ const buttonMotionVariants = {
 const tableMotionVariants = {
   initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0, transition: { duration: 0.5, delay: 0.25 } },
+};
+
+const emptyStateMotionVariants = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.5, delay: 0.2 } },
 };
 
 
@@ -139,7 +144,6 @@ export default function TransactionsPage() {
     }
     setIsSaving(true);
 
-    // Convert formData.amount (in selectedCurrency) to INR for backend storage
     const amountInINR = formData.amount / (conversionRates[selectedCurrency] || 1);
     const formattedDate = format(formData.date, "yyyy-MM-dd");
 
@@ -149,18 +153,16 @@ export default function TransactionsPage() {
 
     const isActualEditOperation = editingTransaction !== null;
 
-    // Duplicate and similarity checks (amounts are compared in INR)
     if (!isActualEditOperation) {
         const similarExistingTx = transactions.find(existingTx =>
             existingTx.date === formattedDate &&
             existingTx.description.toLowerCase() === formTxDescriptionLower &&
             existingTx.category.toLowerCase() === formTxCategoryLower &&
             existingTx.type === formTxType &&
-            existingTx.amount !== amountInINR // Compare INR amounts
+            existingTx.amount !== amountInINR 
         );
 
         if (similarExistingTx) {
-            // Convert existingTx.amount (INR) back to selectedCurrency for display in notification
             const oldAmountInSelectedCurrency = convertAmount(similarExistingTx.amount, selectedCurrency);
             const formattedOldAmount = formatCurrency(oldAmountInSelectedCurrency, selectedCurrency);
             addNotification({
@@ -181,7 +183,7 @@ export default function TransactionsPage() {
         return existingTx.date === formattedDate &&
                existingTx.description.toLowerCase() === formTxDescriptionLower &&
                existingTx.category.toLowerCase() === formTxCategoryLower &&
-               existingTx.amount === amountInINR && // Compare INR amounts
+               existingTx.amount === amountInINR && 
                existingTx.type === formTxType;
     });
 
@@ -198,7 +200,7 @@ export default function TransactionsPage() {
 
     let originalTransactionDetailsForEdit: { category: string; date: string; type: 'income' | 'expense', amount: number } | undefined = undefined;
 
-    const dataForApi = { // Data to be sent to API (amount in INR)
+    const dataForApi = { 
         date: formattedDate,
         description: formData.description,
         category: formData.category,
@@ -213,12 +215,11 @@ export default function TransactionsPage() {
             category: editingTransaction.category, 
             date: editingTransaction.date, 
             type: editingTransaction.type, 
-            amount: editingTransaction.amount // This is in INR from context
+            amount: editingTransaction.amount 
         };
-        // For PUT, include the ID in the object sent to API
         const transactionToUpdate: Transaction = { ...dataForApi, id: editingTransaction.id };
-        const response = await axios.put(`${TRANSACTION_API_BASE_URL}/${editingTransaction.id}?email=${encodeURIComponent(user.email)}`, transactionToUpdate);
-        savedTransaction = response.data as Transaction; // Assume backend returns the updated object
+        const response = await axios.put<Transaction>(`${TRANSACTION_API_BASE_URL}/${editingTransaction.id}?email=${encodeURIComponent(user.email)}`, transactionToUpdate);
+        savedTransaction = response.data; 
         updateTransaction(savedTransaction);
         addNotification({
             title: `Transaction Updated`,
@@ -228,9 +229,8 @@ export default function TransactionsPage() {
         });
 
       } else {
-        // For POST, backend generates ID and returns the full object
-        const response = await axios.post(`${TRANSACTION_API_BASE_URL}?email=${encodeURIComponent(user.email)}`, dataForApi);
-        savedTransaction = response.data as Transaction; // Backend returns Transaction with ID
+        const response = await axios.post<Transaction>(`${TRANSACTION_API_BASE_URL}?email=${encodeURIComponent(user.email)}`, dataForApi);
+        savedTransaction = response.data; 
         addTransaction(savedTransaction);
         addNotification({
             title: `Transaction Added`,
@@ -295,9 +295,26 @@ export default function TransactionsPage() {
           <RotateCw className="mr-2 h-6 w-6 animate-spin text-primary" />
           <p className="text-muted-foreground">Loading transactions...</p>
         </div>
-      ) : (
+      ) : transactions.length > 0 ? (
         <motion.div initial="initial" animate="animate" variants={tableMotionVariants} viewport={{ once: true }}>
           <DataTable columns={columns} data={transactions} />
+        </motion.div>
+      ) : (
+        <motion.div
+          className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/30 p-12 text-center"
+          initial="initial"
+          animate="animate"
+          variants={emptyStateMotionVariants}
+          viewport={{ once: true }}
+        >
+            <NoTransactionsIcon className="mx-auto h-12 w-12 text-muted-foreground" />
+            <h3 className="mt-4 text-xl font-semibold">No transactions yet</h3>
+            <p className="mb-4 mt-2 text-sm text-muted-foreground">
+              Get started by adding your first income or expense.
+            </p>
+            <Button onClick={handleAddTransaction}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Add Transaction
+            </Button>
         </motion.div>
       )}
 
@@ -333,3 +350,4 @@ export default function TransactionsPage() {
     </div>
   );
 }
+
