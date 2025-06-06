@@ -57,51 +57,47 @@ export function useAuthState() {
             if (response.data && typeof response.data.hasCompletedSetup === 'boolean') {
               updateSession({ user: { ...session.user, hasCompletedSetup: response.data.hasCompletedSetup } });
             } else {
+              // Fallback if API response is not as expected
               updateSession({ user: { ...session.user, hasCompletedSetup: false } });
             }
           })
           .catch(error => {
             console.error("Error calling 'first-check' API:", error);
+            // On error, assume setup is not complete to guide user appropriately
             updateSession({ user: { ...session.user, hasCompletedSetup: false } });
-            firstCheckInitiatedForUserRef.current = null; 
+            firstCheckInitiatedForUserRef.current = null; // Allow retry on next evaluation if API fails
           })
           .finally(() => {
             setIsApiCheckInProgress(false);
           });
       }
     } else if (status === 'unauthenticated') {
+      // Reset the ref if user becomes unauthenticated (e.g., session expires, explicit logout)
       firstCheckInitiatedForUserRef.current = null;
     }
   }, [session, status, updateSession, isApiCheckInProgress]);
 
 
   const navigateBasedOnAuthAndSetup = useCallback(() => {
-    // Determine if we are still waiting for critical information
     const isWaitingForAuth = isLoadingFromAuth;
     const isWaitingForApiCheck = status === 'authenticated' && user?.hasCompletedSetup === undefined && isApiCheckInProgress;
 
     if (isWaitingForAuth || isWaitingForApiCheck) {
-      return; // Don't navigate yet, wait for critical info
+      return; 
     }
 
     if (status === 'authenticated') {
       if (user?.hasCompletedSetup === true) {
-        // User is authenticated and setup is complete
         if (pathname === '/login' || pathname === '/welcome/setup') {
           router.replace('/dashboard');
         }
       } else if (user?.hasCompletedSetup === false) {
-        // User is authenticated, but setup is NOT complete
         if (pathname !== '/welcome/setup') {
           router.replace('/welcome/setup');
         }
       }
-      // If user.hasCompletedSetup is still undefined here (and isApiCheckInProgress is false),
-      // it means the API check might have failed or the logic to update session didn't complete.
-      // In this scenario, they would typically be stuck on the current page or redirected to setup as a fallback from session update.
     } else if (status === 'unauthenticated') {
-      // User is not authenticated
-      if (pathname !== '/login' && pathname !== '/welcome/setup') {
+      if (pathname !== '/login' && pathname !== '/welcome/setup') { // Allow access to setup page if someone has a direct link but is unauth
         router.replace('/login');
       }
     }
@@ -109,12 +105,11 @@ export function useAuthState() {
 
   useEffect(() => {
     navigateBasedOnAuthAndSetup();
-  }, [navigateBasedOnAuthAndSetup]); // navigateBasedOnAuthAndSetup lists its own dependencies
+  }, [navigateBasedOnAuthAndSetup]);
 
   const loginWithGoogle = useCallback(async () => {
     try {
       firstCheckInitiatedForUserRef.current = null;
-      // The callbackUrl will be hit, and then useAuthState will determine final redirection.
       const result = await signIn('google', { callbackUrl: '/dashboard', redirect: false });
       if (result?.url) router.push(result.url); 
       else if (result?.error) console.error("NextAuth signIn error (Google):", result.error);
@@ -135,7 +130,7 @@ export function useAuthState() {
   }, [router]);
 
   const appLogout = useCallback(async () => {
-    firstCheckInitiatedForUserRef.current = null;
+    firstCheckInitiatedForUserRef.current = null; // Reset fetch attempt flag
     if (typeof window !== "undefined") {
       APP_LOCAL_STORAGE_KEYS.forEach(key => {
         try {
@@ -146,14 +141,15 @@ export function useAuthState() {
       });
     }
     try {
+      // callbackUrl ensures user is redirected to login page after sign out completes
       await signOut({ callbackUrl: '/login', redirect: true });
     } catch (error) {
       console.error("Error during signOut:", error);
-      router.push('/login'); // Fallback redirect
+      // Fallback redirect if signOut itself fails to redirect
+      router.push('/login');
     }
   }, [router]);
 
-  // isLoading now reflects combined loading state: NextAuth session + API check for setup status
   const combinedIsLoading = isLoadingFromAuth || (status === 'authenticated' && user?.hasCompletedSetup === undefined && isApiCheckInProgress);
 
   return {
