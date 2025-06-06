@@ -2,7 +2,6 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-// import { useRouter, usePathname } from "next/navigation"; // No longer needed for direct redirection
 import { AppLogo } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,15 +10,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
-import { useAuthState } from "@/hooks/use-auth-state"; // Removed AppUser type import as user is directly from hook
+import { useAuthState } from "@/hooks/use-auth-state"; 
 import { useTheme } from "next-themes";
 import { useCurrency, type Currency as AppCurrency } from "@/contexts/currency-context";
 import { useToast } from "@/hooks/use-toast";
-import { User as UserIconLucide, Palette, Globe, Save } from "lucide-react";
+import { User as UserIconLucide, Palette, Globe, Save, RotateCw } from "lucide-react";
 import { motion } from "framer-motion";
-// import { cn } from "@/lib/utils"; // Not used here anymore
 import axios from "axios";
-import { useRouter } from "next/navigation"; // Keep for programmatic navigation after save
+import { useRouter } from "next/navigation"; 
 
 
 type ThemeSetting = "light" | "dark" | "system";
@@ -59,89 +57,84 @@ const USER_SETUP_API_URL = "http://localhost:8080/api/user/setup";
 
 export default function SetupPage() {
   const { user, isLoading: authStateIsLoading, status, updateSession } = useAuthState();
-  const router = useRouter(); // Keep for navigation *after* successful save
-  // const pathname = usePathname(); // No longer needed for redirection logic here
-  const { theme: activeTheme, setTheme } = useTheme();
-  const { selectedCurrency, setSelectedCurrency: setGlobalCurrency } = useCurrency();
+  const router = useRouter(); 
+  
+  const { setTheme: setGlobalTheme } = useTheme();
+  const { selectedCurrency: initialGlobalCurrency, setSelectedCurrency: setGlobalCurrencyContext } = useCurrency();
   const { toast } = useToast();
 
-  const [displayName, setDisplayName] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [dateOfBirth, setDateOfBirth] = useState("");
-  const [gender, setGender] = useState("");
+  // Personal Information States
+  const [formDisplayName, setFormDisplayName] = useState("");
+  const [formPhoneNumber, setFormPhoneNumber] = useState("");
+  const [formDateOfBirth, setFormDateOfBirth] = useState("");
+  const [formGender, setFormGender] = useState("");
 
-  const [currentTheme, setCurrentTheme] = useState<ThemeSetting>(() =>
+  // Appearance & Regional Form States
+  const [formTheme, setFormTheme] = useState<ThemeSetting>(() =>
     initializeFromLocalStorage<ThemeSetting>("app-theme", "system", (v) =>
       ["light", "dark", "system"].includes(v)
     )
   );
-  const [fontSize, setFontSize] = useState<FontSizeSetting>(() =>
+  const [formFontSize, setFormFontSize] = useState<FontSizeSetting>(() =>
     initializeFromLocalStorage<FontSizeSetting>("app-font-size", "medium", (v) =>
       !!FONT_SIZE_CLASSES[v as FontSizeSetting]
     )
   );
-  const [currentSelectedCurrency, setCurrentSelectedCurrency] = useState<AppCurrency>(selectedCurrency);
+  const [formCurrency, setFormCurrency] = useState<AppCurrency>(initialGlobalCurrency);
   
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    // The useAuthState hook now handles initial redirection based on auth status and setup completion.
-    // This page should primarily focus on collecting setup data if the user is here.
     if (user && !authStateIsLoading) {
-      setDisplayName(user.name || "");
+      setFormDisplayName(user.name || "");
     }
   }, [user, authStateIsLoading]);
 
-
+  // Sync formCurrency with initialGlobalCurrency if it changes (e.g. UserSettingsLoader runs later)
   useEffect(() => {
-    const storedAppTheme = localStorage.getItem("app-theme");
-    if (!storedAppTheme && activeTheme && ["light", "dark", "system"].includes(activeTheme)) {
-      setCurrentTheme(activeTheme as ThemeSetting);
-    }
-  }, [activeTheme]);
-
-  useEffect(() => {
-    setTheme(currentTheme);
-  }, [currentTheme, setTheme]);
-
-  useEffect(() => {
-    const htmlElement = document.documentElement;
-    Object.values(FONT_SIZE_CLASSES).forEach(cls => htmlElement.classList.remove(cls));
-    if (FONT_SIZE_CLASSES[fontSize]) {
-      htmlElement.classList.add(FONT_SIZE_CLASSES[fontSize]);
-    }
-  }, [fontSize]);
-
-  useEffect(() => {
-    setCurrentSelectedCurrency(selectedCurrency);
-  }, [selectedCurrency]);
+    setFormCurrency(initialGlobalCurrency);
+  }, [initialGlobalCurrency]);
 
 
   const handleSaveSetup = useCallback(async () => {
     if (!user || !user.email) {
       toast({ title: "Error", description: "User information is missing. Please try logging in again.", variant: "destructive" });
-      router.push('/login'); // Redirect to login if user context is lost
+      router.push('/login'); 
       return;
     }
     setIsSaving(true);
 
     const setupPayload = {
       email: user.email, 
-      displayName: displayName || user.name, 
-      phoneNumber: phoneNumber || null, 
-      dateOfBirth: dateOfBirth || null, 
-      gender: gender || null, 
-      theme: currentTheme,
-      fontSize: fontSize,
-      currency: currentSelectedCurrency,
+      displayName: formDisplayName || user.name, 
+      phoneNumber: formPhoneNumber || null, 
+      dateOfBirth: formDateOfBirth || null, 
+      gender: formGender || null, 
+      theme: formTheme,
+      fontSize: formFontSize,
+      currency: formCurrency,
     };
 
     try {
       await axios.post(USER_SETUP_API_URL, setupPayload);
-      localStorage.setItem("app-theme", currentTheme);
-      localStorage.setItem("app-font-size", fontSize);
-      setGlobalCurrency(currentSelectedCurrency);
-      await updateSession({ user: { ...user, name: displayName, hasCompletedSetup: true } }); 
+
+      // Apply settings globally AFTER successful save
+      setGlobalTheme(formTheme); 
+      localStorage.setItem("app-theme", formTheme);
+
+      localStorage.setItem("app-font-size", formFontSize);
+      const htmlElement = document.documentElement;
+      Object.values(FONT_SIZE_CLASSES).forEach(cls => htmlElement.classList.remove(cls));
+      if (FONT_SIZE_CLASSES[formFontSize]) {
+        htmlElement.classList.add(FONT_SIZE_CLASSES[formFontSize]);
+      } else {
+         htmlElement.classList.add(FONT_SIZE_CLASSES.medium); // Default if invalid
+      }
+      
+      setGlobalCurrencyContext(formCurrency);
+      // Note: useCurrency context already saves to localStorage
+
+      await updateSession({ user: { ...user, name: formDisplayName, hasCompletedSetup: true } }); 
       
       toast({
         title: "Setup Complete!",
@@ -149,10 +142,7 @@ export default function SetupPage() {
         variant: "default"
       });
       
-      // Wait for toast to be visible, then navigate.
-      // useAuthState will pick up the updated session and navigate to /dashboard.
-      // Explicit navigation here can be a fallback.
-      await new Promise(resolve => setTimeout(resolve, 500)); 
+      await new Promise(resolve => setTimeout(resolve, 300)); 
       router.push('/dashboard');
 
     } catch (error) {
@@ -170,25 +160,25 @@ export default function SetupPage() {
       setIsSaving(false);
     }
 
-  }, [user, displayName, phoneNumber, dateOfBirth, gender, currentTheme, fontSize, currentSelectedCurrency, setGlobalCurrency, router, toast, updateSession]);
+  }, [
+      user, formDisplayName, formPhoneNumber, formDateOfBirth, formGender, 
+      formTheme, formFontSize, formCurrency, 
+      setGlobalCurrencyContext, setGlobalTheme, router, toast, updateSession
+    ]);
 
   if (authStateIsLoading || (status === 'authenticated' && user?.hasCompletedSetup === undefined)) {
-    // If auth state is loading OR if user is authenticated but setup status is still being checked by useAuthState
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <RotateCw className="mr-2 h-6 w-6 animate-spin text-primary" />
         <p>Loading setup...</p>
       </div>
     );
   }
   
-  // If useAuthState determined user is authenticated AND setup is complete, it will redirect to /dashboard.
-  // If useAuthState determined user is unauthenticated, it will redirect to /login.
-  // This page should only render its form if status is 'authenticated' AND user.hasCompletedSetup is false.
   if (status !== 'authenticated' || (status === 'authenticated' && user?.hasCompletedSetup !== false)) {
-    // This means either unauthenticated, or authenticated and setup already done.
-    // useAuthState should handle the redirect. Show a generic message.
     return (
         <div className="flex min-h-screen items-center justify-center bg-background p-4">
+          <RotateCw className="mr-2 h-6 w-6 animate-spin text-primary" />
           <p>Redirecting...</p>
         </div>
      );
@@ -223,8 +213,8 @@ export default function SetupPage() {
                   <Label htmlFor="fullName">Full Name</Label>
                   <Input 
                     id="fullName" 
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
+                    value={formDisplayName}
+                    onChange={(e) => setFormDisplayName(e.target.value)}
                     placeholder="Your full name"
                     disabled={isSaving}
                   />
@@ -245,8 +235,8 @@ export default function SetupPage() {
                     id="phone" 
                     type="tel" 
                     placeholder="(123) 456-7890" 
-                    value={phoneNumber} 
-                    onChange={(e) => setPhoneNumber(e.target.value)} 
+                    value={formPhoneNumber} 
+                    onChange={(e) => setFormPhoneNumber(e.target.value)} 
                     disabled={isSaving}
                   />
                 </div>
@@ -255,14 +245,15 @@ export default function SetupPage() {
                   <Input 
                     id="dateOfBirth" 
                     type="date" 
-                    value={dateOfBirth} 
-                    onChange={(e) => setDateOfBirth(e.target.value)} 
+                    value={formDateOfBirth} 
+                    onChange={(e) => setFormDateOfBirth(e.target.value)} 
                     disabled={isSaving}
+                    max={new Date().toISOString().split("T")[0]} 
                   />
                 </div>
                 <div className="space-y-1.5 md:col-span-2">
                   <Label htmlFor="gender">Gender (Optional)</Label>
-                  <Select value={gender} onValueChange={setGender} disabled={isSaving}>
+                  <Select value={formGender} onValueChange={setFormGender} disabled={isSaving}>
                     <SelectTrigger id="gender">
                       <SelectValue placeholder="Select gender" />
                     </SelectTrigger>
@@ -287,7 +278,7 @@ export default function SetupPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="theme-select">Theme</Label>
-                  <Select value={currentTheme} onValueChange={(value: string) => setCurrentTheme(value as ThemeSetting)} disabled={isSaving}>
+                  <Select value={formTheme} onValueChange={(value: string) => setFormTheme(value as ThemeSetting)} disabled={isSaving}>
                     <SelectTrigger id="theme-select">
                       <SelectValue placeholder="Select theme" />
                     </SelectTrigger>
@@ -300,7 +291,7 @@ export default function SetupPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label>Font Size</Label>
-                  <RadioGroup value={fontSize} onValueChange={(value: string) => setFontSize(value as FontSizeSetting)} className="flex space-x-4 pt-2" disabled={isSaving}>
+                  <RadioGroup value={formFontSize} onValueChange={(value: string) => setFormFontSize(value as FontSizeSetting)} className="flex space-x-4 pt-2" disabled={isSaving}>
                     <div>
                       <RadioGroupItem value="small" id="font-small" />
                       <Label htmlFor="font-small" className="ml-2 cursor-pointer">Small</Label>
@@ -327,7 +318,7 @@ export default function SetupPage() {
               </div>
                <div className="space-y-1.5">
                 <Label htmlFor="currency-select">Default Currency</Label>
-                <Select value={currentSelectedCurrency} onValueChange={(value: string) => setCurrentSelectedCurrency(value as AppCurrency)} disabled={isSaving}>
+                <Select value={formCurrency} onValueChange={(value: string) => setFormCurrency(value as AppCurrency)} disabled={isSaving}>
                   <SelectTrigger id="currency-select">
                     <SelectValue placeholder="Select currency" />
                   </SelectTrigger>
@@ -345,7 +336,7 @@ export default function SetupPage() {
             
             <div className="flex justify-end">
               <Button onClick={handleSaveSetup} size="lg" disabled={isSaving || status === 'loading'}>
-                <Save className="mr-2 h-5 w-5" />
+                {isSaving ? <RotateCw className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-5 w-5" />}
                 {isSaving? "Saving..." : "Save and Continue"}
               </Button>
             </div>
