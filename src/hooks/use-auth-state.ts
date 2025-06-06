@@ -49,37 +49,41 @@ export function useAuthState() {
 
   useEffect(() => {
     if (status === 'authenticated' && session?.user?.email && session.user.hasCompletedSetup === undefined) {
-      if (firstCheckInitiatedForUserRef.current !== session.user.email && !isApiCheckInProgress) {
-        firstCheckInitiatedForUserRef.current = session.user.email;
+      const userEmailForCheck = session.user.email;
+      // Primary guard: only proceed if this check hasn't been initiated for the current user email
+      // AND an API call isn't already in progress (secondary guard for rapid re-renders before ref updates)
+      if (firstCheckInitiatedForUserRef.current !== userEmailForCheck && !isApiCheckInProgress) {
+        firstCheckInitiatedForUserRef.current = userEmailForCheck;
         setIsApiCheckInProgress(true);
-        axios.get(`${EXTERNAL_API_FIRST_CHECK_URL}?email=${encodeURIComponent(session.user.email)}`)
+        axios.get(`${EXTERNAL_API_FIRST_CHECK_URL}?email=${encodeURIComponent(userEmailForCheck)}`)
           .then(response => {
             if (response.data && typeof response.data.hasCompletedSetup === 'boolean') {
               updateSession({ user: { ...session.user, hasCompletedSetup: response.data.hasCompletedSetup } });
             } else {
-              // Fallback if API response is not as expected
               updateSession({ user: { ...session.user, hasCompletedSetup: false } });
             }
           })
           .catch(error => {
             console.error("Error calling 'first-check' API:", error);
-            // On error, assume setup is not complete to guide user appropriately
             updateSession({ user: { ...session.user, hasCompletedSetup: false } });
-            firstCheckInitiatedForUserRef.current = null; // Allow retry on next evaluation if API fails
+            firstCheckInitiatedForUserRef.current = null; 
           })
           .finally(() => {
             setIsApiCheckInProgress(false);
           });
       }
     } else if (status === 'unauthenticated') {
-      // Reset the ref if user becomes unauthenticated (e.g., session expires, explicit logout)
       firstCheckInitiatedForUserRef.current = null;
+      if(isApiCheckInProgress) setIsApiCheckInProgress(false); // Reset if user logs out during check
     }
-  }, [session, status, updateSession, isApiCheckInProgress]);
+  // Removed isApiCheckInProgress from dependency array.
+  // updateSession is memoized. session and status are from next-auth and should be stable unless auth state changes.
+  }, [session, status, updateSession]);
 
 
   const navigateBasedOnAuthAndSetup = useCallback(() => {
     const isWaitingForAuth = isLoadingFromAuth;
+    // Condition for waiting: Auth is loading OR user is authenticated but setup status is unknown AND API check is active
     const isWaitingForApiCheck = status === 'authenticated' && user?.hasCompletedSetup === undefined && isApiCheckInProgress;
 
     if (isWaitingForAuth || isWaitingForApiCheck) {
@@ -96,8 +100,11 @@ export function useAuthState() {
           router.replace('/welcome/setup');
         }
       }
+      // If user.hasCompletedSetup is still undefined here, it means API check finished but didn't set it (edge case)
+      // or API check never ran (e.g. userEmail was null). Defaulting to setup page might be safest.
+      // However, the earlier `isWaitingForApiCheck` should mostly cover this.
     } else if (status === 'unauthenticated') {
-      if (pathname !== '/login' && pathname !== '/welcome/setup') { // Allow access to setup page if someone has a direct link but is unauth
+      if (pathname !== '/login' && pathname !== '/welcome/setup') { 
         router.replace('/login');
       }
     }
@@ -110,6 +117,7 @@ export function useAuthState() {
   const loginWithGoogle = useCallback(async () => {
     try {
       firstCheckInitiatedForUserRef.current = null;
+      setIsApiCheckInProgress(false); // Reset before sign-in attempt
       const result = await signIn('google', { callbackUrl: '/dashboard', redirect: false });
       if (result?.url) router.push(result.url); 
       else if (result?.error) console.error("NextAuth signIn error (Google):", result.error);
@@ -121,6 +129,7 @@ export function useAuthState() {
   const loginWithGitHub = useCallback(async () => {
     try {
       firstCheckInitiatedForUserRef.current = null;
+      setIsApiCheckInProgress(false); // Reset before sign-in attempt
       const result = await signIn('github', { callbackUrl: '/dashboard', redirect: false });
       if (result?.url) router.push(result.url); 
       else if (result?.error) console.error("NextAuth signIn error (GitHub):", result.error);
@@ -130,7 +139,8 @@ export function useAuthState() {
   }, [router]);
 
   const appLogout = useCallback(async () => {
-    firstCheckInitiatedForUserRef.current = null; // Reset fetch attempt flag
+    firstCheckInitiatedForUserRef.current = null; 
+    setIsApiCheckInProgress(false); // Reset on logout
     if (typeof window !== "undefined") {
       APP_LOCAL_STORAGE_KEYS.forEach(key => {
         try {
@@ -141,15 +151,16 @@ export function useAuthState() {
       });
     }
     try {
-      // callbackUrl ensures user is redirected to login page after sign out completes
       await signOut({ callbackUrl: '/login', redirect: true });
     } catch (error) {
       console.error("Error during signOut:", error);
-      // Fallback redirect if signOut itself fails to redirect
       router.push('/login');
     }
   }, [router]);
 
+  // isLoading now reflects:
+  // 1. NextAuth session is loading OR
+  // 2. User is authenticated, hasCompletedSetup is still undefined (meaning API call pending or in progress), AND the API call is marked as in progress.
   const combinedIsLoading = isLoadingFromAuth || (status === 'authenticated' && user?.hasCompletedSetup === undefined && isApiCheckInProgress);
 
   return {
@@ -159,7 +170,7 @@ export function useAuthState() {
     loginWithGitHub,
     logout: appLogout,
     isAuthenticated: status === 'authenticated',
-    status,
+    status, // Expose raw status for more granular checks if needed
     updateSession,
   };
 }
