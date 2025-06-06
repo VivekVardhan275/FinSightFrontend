@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuthState } from '@/hooks/use-auth-state';
 import { GithubIcon } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+// import { useRouter } from 'next/navigation'; // No longer needed for direct redirection here
+// import { useEffect } from 'react'; // No longer needed for direct redirection here
 import { motion } from 'framer-motion';
 
 // Google logo SVG
@@ -31,20 +31,13 @@ const GoogleLogo = () => (
 
 export default function LoginPage() {
   const { loginWithGoogle, loginWithGitHub, isAuthenticated, isLoading, status } = useAuthState();
-  // const router = useRouter(); // No longer needed directly here for redirection
 
-  // useEffect(() => {
-  //   // useAuthState hook now handles redirection logic based on auth status and setup completion.
-  //   // This useEffect can be simplified or removed if all redirection is handled by the hook.
-  //   if (isAuthenticated && status === 'authenticated') {
-  //     // The hook should ideally redirect to /dashboard or /welcome/setup
-  //     // router.replace('/dashboard'); // This might conflict with hook's logic. Best to let hook manage.
-  //   }
-  // }, [isAuthenticated, status, router]); // Removed router from deps
+  // The useAuthState hook now handles redirection logic based on auth status and setup completion.
+  // This page simply renders the login UI or a loading state.
 
   if (isLoading || (isAuthenticated && status === 'authenticated')) {
-    // Show a loading state or null if redirecting (Auth.js status 'loading' or already 'authenticated')
-    // useAuthState hook is responsible for navigation if authenticated.
+    // Show a loading/redirecting state if useAuthState is still processing or if already authenticated.
+    // useAuthState will handle navigating away (to /dashboard or /welcome/setup).
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <p>Loading...</p>
@@ -75,7 +68,7 @@ export default function LoginPage() {
                 onClick={loginWithGoogle} 
                 className="w-full transition-all hover:shadow-lg hover:scale-105" 
                 size="lg"
-                disabled={isLoading} // status === 'loading'
+                disabled={status === 'loading'} // Use status from useAuthState for disable state
                 asChild
               >
                 <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
@@ -88,7 +81,7 @@ export default function LoginPage() {
                 variant="outline"
                 className="w-full transition-all hover:shadow-lg hover:scale-105 border-foreground/20 hover:bg-accent/10 hover:text-foreground" 
                 size="lg"
-                disabled={isLoading} // status === 'loading'
+                disabled={status === 'loading'} // Use status from useAuthState
                 asChild
               >
                 <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>

@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useAuthState } from "@/hooks/use-auth-state";
 import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
+import { usePathname } from "next/navigation"; // Removed useRouter
 import React, { useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCurrency } from "@/contexts/currency-context";
@@ -25,7 +25,7 @@ import { NotificationBell } from "@/components/layout/notification-bell";
 import { TransactionProvider } from "@/contexts/transaction-context";
 import { BudgetProvider, useBudgetContext } from "@/contexts/budget-context";
 import { formatCurrency } from "@/lib/utils";
-import { UserSettingsLoader } from "@/components/layout/user-settings-loader"; // Import the new loader
+import { UserSettingsLoader } from "@/components/layout/user-settings-loader";
 
 function BudgetNotificationEffect() {
   const { budgets, getBudgetsByMonth } = useBudgetContext();
@@ -39,7 +39,7 @@ function BudgetNotificationEffect() {
       try {
         setNotifiedLayoutBudgets(new Set(JSON.parse(storedNotified)));
       } catch (e) {
-        // console.error("Error parsing layout notified budgets from localStorage", e); // Keep console clean
+        // console.error("Error parsing layout notified budgets from localStorage", e);
       }
     }
   }, []);
@@ -53,7 +53,7 @@ function BudgetNotificationEffect() {
 
     const currentDate = new Date();
     const currentYear = currentDate.getFullYear();
-    const currentMonth = currentDate.getMonth() + 1; // 1-indexed
+    const currentMonth = currentDate.getMonth() + 1;
 
     const currentMonthBudgets = getBudgetsByMonth(currentYear, currentMonth);
 
@@ -62,19 +62,18 @@ function BudgetNotificationEffect() {
       let changed = false;
 
       currentMonthBudgets.forEach(budget => {
-        const currentSpentINR = budget.spent; // Assuming budget.spent is in INR from context
-        const allocatedINR = budget.allocated; // Assuming budget.allocated is in INR from context
+        const currentSpentINR = budget.spent;
+        const allocatedINR = budget.allocated;
         const percentageSpent = allocatedINR > 0 ? (currentSpentINR / allocatedINR) * 100 : 0;
         const budgetId = budget.id;
 
-        // Convert to selectedCurrency for display in notification
         const displaySpent = convertAmount(currentSpentINR, selectedCurrency);
         const displayAllocated = convertAmount(allocatedINR, selectedCurrency);
 
         const exceededKey = `layout-${budgetId}-exceeded`;
-        const nearingKey = `layout-${budgetId}-nearing`; // Nearing 85%
+        const nearingKey = `layout-${budgetId}-nearing`;
 
-        if (currentSpentINR > allocatedINR) { // Exceeded
+        if (currentSpentINR > allocatedINR) {
           if (!prevNotifiedSet.has(exceededKey)) {
             addNotification({
               title: "Budget Exceeded!",
@@ -83,10 +82,10 @@ function BudgetNotificationEffect() {
               href: "/budgets"
             });
             newSet.add(exceededKey);
-            if (newSet.has(nearingKey)) newSet.delete(nearingKey); // Remove nearing if now exceeded
+            if (newSet.has(nearingKey)) newSet.delete(nearingKey);
             changed = true;
           }
-        } else if (percentageSpent >= 85) { // Nearing limit (but not exceeded)
+        } else if (percentageSpent >= 85) {
           if (!prevNotifiedSet.has(nearingKey) && !prevNotifiedSet.has(exceededKey)) {
             addNotification({
               title: "Budget Nearing Limit",
@@ -97,7 +96,7 @@ function BudgetNotificationEffect() {
             newSet.add(nearingKey);
             changed = true;
           }
-        } else { // Neither exceeded nor nearing 85% - reset notification state for this budget
+        } else {
           if (prevNotifiedSet.has(nearingKey)) {
             newSet.delete(nearingKey);
             changed = true;
@@ -112,13 +111,13 @@ function BudgetNotificationEffect() {
       if (changed) {
         return newSet;
       }
-      return prevNotifiedSet; // Important: return previous set if no changes
+      return prevNotifiedSet;
     });
-  }, [budgets, getBudgetsByMonth, convertAmount, selectedCurrency, addNotification, formatCurrency]); // Removed notifiedLayoutBudgets from here
+  }, [budgets, getBudgetsByMonth, convertAmount, selectedCurrency, addNotification, formatCurrency]);
 
   useEffect(() => {
     checkAndNotifyGlobalBudgets();
-  }, [budgets, selectedCurrency, checkAndNotifyGlobalBudgets]); // checkAndNotifyGlobalBudgets ref is more stable now
+  }, [budgets, selectedCurrency, checkAndNotifyGlobalBudgets]);
   
   return null;
 }
@@ -128,71 +127,40 @@ export default function AuthenticatedAppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isLoading, isAuthenticated, status } = useAuthState();
-  const router = useRouter();
+  const { user, isLoading: authStateIsLoading, status } = useAuthState();
   const pathname = usePathname();
 
-  useEffect(() => {
-    if (isLoading || status === 'loading') return; 
+  // The useAuthState hook now handles the primary redirection logic.
+  // This layout component focuses on rendering based on the resolved state.
 
-    const setupCompleted = user?.hasCompletedSetup === true;
-
-    if (status === 'authenticated') {
-      if (setupCompleted) {
-        if (pathname === '/login' || pathname === '/welcome/setup') {
-          router.replace('/dashboard');
-        }
-      } else {
-        if (pathname !== '/welcome/setup') {
-          router.replace('/welcome/setup');
-        }
-      }
-    } else if (status === 'unauthenticated') {
-      if (pathname !== '/login' && pathname !== '/welcome/setup') { 
-        router.replace('/login');
-      }
-    }
-  }, [user, isLoading, status, pathname, router]);
-
-
-  if (isLoading || status === 'loading' || (status === 'authenticated' && user?.hasCompletedSetup === undefined) ) {
+  if (authStateIsLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
-        <p>Loading application...</p>
+        <p>Loading application...</p> {/* Covers initial session load AND first-check API call duration */}
       </div>
     );
   }
   
-  if (status === 'unauthenticated' && pathname !== '/login' && pathname !== '/welcome/setup') {
-     return (
-        <div className="flex h-screen items-center justify-center bg-background">
-          <p>Redirecting to login...</p>
-        </div>
-     );
-  }
-
-  if (status === 'authenticated' && !user?.hasCompletedSetup && pathname !== '/welcome/setup') {
-       return (
-        <div className="flex h-screen items-center justify-center bg-background">
-          <p>Redirecting to setup...</p>
-        </div>
-      );
-  }
-
-  if ((pathname === '/login' || pathname === '/welcome/setup') && status === 'authenticated' && user?.hasCompletedSetup) {
+  // If not authenticated, or authenticated but setup is not complete,
+  // useAuthState will redirect. This layout should not render its main content in those cases.
+  // This implicitly means if we proceed, status === 'authenticated' && user.hasCompletedSetup === true.
+  if (status !== 'authenticated' || (status === 'authenticated' && user?.hasCompletedSetup !== true)) {
+    // This state should typically lead to a redirect by useAuthState.
+    // Rendering null here prevents brief flashes of layout content on unauthorized access.
+    // Pages like /login or /welcome/setup are not wrapped by this layout.
     return (
         <div className="flex h-screen items-center justify-center bg-background">
-          <p>Redirecting to dashboard...</p>
+          <p>Redirecting...</p> {/* Generic redirect message */}
         </div>
-      );
+    );
   }
   
+  // At this point, user is authenticated and setup is complete.
   return (
     <TransactionProvider>
       <BudgetProvider>
-        {/* UserSettingsLoader will fetch and apply settings if user is authenticated and setup is complete */}
-        {isAuthenticated && user?.hasCompletedSetup && <UserSettingsLoader />}
-        {isAuthenticated && user?.hasCompletedSetup && <BudgetNotificationEffect />}
+        <UserSettingsLoader /> {/* Fetches and applies settings */}
+        <BudgetNotificationEffect /> {/* Handles budget notifications */}
         <SidebarProvider defaultOpen>
           <Sidebar variant="sidebar" collapsible="icon" side="left" className="border-r">
             <SidebarHeader className="p-4 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-2 transition-all duration-200 ease-linear">
@@ -207,24 +175,20 @@ export default function AuthenticatedAppLayout({
               <SidebarNav />
             </SidebarContent>
             <SidebarFooter className="p-4">
-              {/* You can add footer items like settings or help here */}
+              {/* Footer items can go here */}
             </SidebarFooter>
           </Sidebar>
           <SidebarRail />
           <SidebarInset>
-            {/* Top Navigation Bar */}
             <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background/80 px-4 backdrop-blur-md sm:px-6">
               <div className="flex items-center gap-2">
                 <SidebarTrigger />
               </div>
-
               <div className="flex items-center gap-4">
-                {isAuthenticated && user?.hasCompletedSetup && <NotificationBell />}
-                {isAuthenticated && <UserNav />}
+                <NotificationBell />
+                <UserNav />
               </div>
             </header>
-
-            {/* Page Content */}
             <AnimatePresence mode="wait">
               <motion.main
                 key={pathname}

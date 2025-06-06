@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useRouter, usePathname } from "next/navigation";
+// import { useRouter, usePathname } from "next/navigation"; // No longer needed for direct redirection
 import { AppLogo } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,14 +11,16 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
-import { useAuthState, type AppUser } from "@/hooks/use-auth-state";
+import { useAuthState } from "@/hooks/use-auth-state"; // Removed AppUser type import as user is directly from hook
 import { useTheme } from "next-themes";
 import { useCurrency, type Currency as AppCurrency } from "@/contexts/currency-context";
 import { useToast } from "@/hooks/use-toast";
 import { User as UserIconLucide, Palette, Globe, Save } from "lucide-react";
 import { motion } from "framer-motion";
-import { cn } from "@/lib/utils";
-import axios from "axios"; // Import axios
+// import { cn } from "@/lib/utils"; // Not used here anymore
+import axios from "axios";
+import { useRouter } from "next/navigation"; // Keep for programmatic navigation after save
+
 
 type ThemeSetting = "light" | "dark" | "system";
 type FontSizeSetting = "small" | "medium" | "large";
@@ -29,7 +31,6 @@ const FONT_SIZE_CLASSES: Record<FontSizeSetting, string> = {
   large: "font-size-large",
 };
 
-// Helper to initialize state from localStorage
 const initializeFromLocalStorage = <T,>(
   key: string,
   defaultValue: T,
@@ -48,7 +49,7 @@ const initializeFromLocalStorage = <T,>(
       }
     }
   } catch (error) {
-    // console.error(`Error reading ${key} from localStorage`, error); // Keep console clean
+    // console.error(`Error reading ${key} from localStorage`, error);
   }
   return defaultValue;
 };
@@ -57,20 +58,18 @@ const USER_SETUP_API_URL = "http://localhost:8080/api/user/setup";
 
 
 export default function SetupPage() {
-  const { user, isLoading: authLoading, status, isAuthenticated, updateSession } = useAuthState();
-  const router = useRouter();
-  const pathname = usePathname();
+  const { user, isLoading: authStateIsLoading, status, updateSession } = useAuthState();
+  const router = useRouter(); // Keep for navigation *after* successful save
+  // const pathname = usePathname(); // No longer needed for redirection logic here
   const { theme: activeTheme, setTheme } = useTheme();
   const { selectedCurrency, setSelectedCurrency: setGlobalCurrency } = useCurrency();
   const { toast } = useToast();
 
-  // Profile states
   const [displayName, setDisplayName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [gender, setGender] = useState("");
 
-  // Settings states
   const [currentTheme, setCurrentTheme] = useState<ThemeSetting>(() =>
     initializeFromLocalStorage<ThemeSetting>("app-theme", "system", (v) =>
       ["light", "dark", "system"].includes(v)
@@ -86,20 +85,12 @@ export default function SetupPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (!authLoading && status === 'unauthenticated' && pathname !== '/login') {
-      router.replace('/login');
-      return;
-    }
-    // If authenticated and setup already complete (from session), redirect to dashboard
-    if (status === 'authenticated' && user?.hasCompletedSetup) {
-      router.replace('/dashboard');
-      return;
-    }
-
-    if (user) {
+    // The useAuthState hook now handles initial redirection based on auth status and setup completion.
+    // This page should primarily focus on collecting setup data if the user is here.
+    if (user && !authStateIsLoading) {
       setDisplayName(user.name || "");
     }
-  }, [user, authLoading, status, router, pathname]);
+  }, [user, authStateIsLoading]);
 
 
   useEffect(() => {
@@ -127,9 +118,9 @@ export default function SetupPage() {
 
 
   const handleSaveSetup = useCallback(async () => {
-    if (!user || !user.email) { // Ensure user and email are present
+    if (!user || !user.email) {
       toast({ title: "Error", description: "User information is missing. Please try logging in again.", variant: "destructive" });
-      router.push('/login');
+      router.push('/login'); // Redirect to login if user context is lost
       return;
     }
     setIsSaving(true);
@@ -146,15 +137,10 @@ export default function SetupPage() {
     };
 
     try {
-      // Step 1: Send data to your backend API
       await axios.post(USER_SETUP_API_URL, setupPayload);
-
-      // Step 2: Persist app settings to localStorage (these are client-side preferences)
       localStorage.setItem("app-theme", currentTheme);
       localStorage.setItem("app-font-size", fontSize);
-      setGlobalCurrency(currentSelectedCurrency); // This updates context and localStorage
-
-      // Step 3: Update the NextAuth session to mark setup as complete and update name
+      setGlobalCurrency(currentSelectedCurrency);
       await updateSession({ user: { ...user, name: displayName, hasCompletedSetup: true } }); 
       
       toast({
@@ -163,7 +149,10 @@ export default function SetupPage() {
         variant: "default"
       });
       
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Give toast time to show
+      // Wait for toast to be visible, then navigate.
+      // useAuthState will pick up the updated session and navigate to /dashboard.
+      // Explicit navigation here can be a fallback.
+      await new Promise(resolve => setTimeout(resolve, 500)); 
       router.push('/dashboard');
 
     } catch (error) {
@@ -183,7 +172,8 @@ export default function SetupPage() {
 
   }, [user, displayName, phoneNumber, dateOfBirth, gender, currentTheme, fontSize, currentSelectedCurrency, setGlobalCurrency, router, toast, updateSession]);
 
-  if (authLoading || status === 'loading' || (status === 'unauthenticated' && pathname === '/welcome/setup') || (status === 'authenticated' && user?.hasCompletedSetup === undefined) ) {
+  if (authStateIsLoading || (status === 'authenticated' && user?.hasCompletedSetup === undefined)) {
+    // If auth state is loading OR if user is authenticated but setup status is still being checked by useAuthState
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <p>Loading setup...</p>
@@ -191,11 +181,15 @@ export default function SetupPage() {
     );
   }
   
-  if (!isAuthenticated && status !== 'loading') {
-     router.replace('/login');
-     return (
+  // If useAuthState determined user is authenticated AND setup is complete, it will redirect to /dashboard.
+  // If useAuthState determined user is unauthenticated, it will redirect to /login.
+  // This page should only render its form if status is 'authenticated' AND user.hasCompletedSetup is false.
+  if (status !== 'authenticated' || (status === 'authenticated' && user?.hasCompletedSetup !== false)) {
+    // This means either unauthenticated, or authenticated and setup already done.
+    // useAuthState should handle the redirect. Show a generic message.
+    return (
         <div className="flex min-h-screen items-center justify-center bg-background p-4">
-          <p>Redirecting to login...</p>
+          <p>Redirecting...</p>
         </div>
      );
   }
@@ -219,7 +213,6 @@ export default function SetupPage() {
             <CardDescription>Please provide some initial information to personalize your experience.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-8 py-8 px-6 md:px-10">
-            {/* Personal Information Section */}
             <section className="space-y-6">
               <div className="flex items-center gap-3 mb-3">
                 <UserIconLucide className="h-6 w-6 text-primary" />
@@ -233,6 +226,7 @@ export default function SetupPage() {
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     placeholder="Your full name"
+                    disabled={isSaving}
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -242,6 +236,7 @@ export default function SetupPage() {
                     value={user?.email || ""}
                     readOnly 
                     className="cursor-not-allowed bg-muted/50"
+                    disabled={isSaving}
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -252,6 +247,7 @@ export default function SetupPage() {
                     placeholder="(123) 456-7890" 
                     value={phoneNumber} 
                     onChange={(e) => setPhoneNumber(e.target.value)} 
+                    disabled={isSaving}
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -261,11 +257,12 @@ export default function SetupPage() {
                     type="date" 
                     value={dateOfBirth} 
                     onChange={(e) => setDateOfBirth(e.target.value)} 
+                    disabled={isSaving}
                   />
                 </div>
                 <div className="space-y-1.5 md:col-span-2">
                   <Label htmlFor="gender">Gender (Optional)</Label>
-                  <Select value={gender} onValueChange={setGender}>
+                  <Select value={gender} onValueChange={setGender} disabled={isSaving}>
                     <SelectTrigger id="gender">
                       <SelectValue placeholder="Select gender" />
                     </SelectTrigger>
@@ -282,7 +279,6 @@ export default function SetupPage() {
 
             <Separator />
 
-            {/* Appearance Settings Section */}
             <section className="space-y-6">
               <div className="flex items-center gap-3 mb-3">
                 <Palette className="h-6 w-6 text-primary" />
@@ -291,7 +287,7 @@ export default function SetupPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="theme-select">Theme</Label>
-                  <Select value={currentTheme} onValueChange={(value: string) => setCurrentTheme(value as ThemeSetting)}>
+                  <Select value={currentTheme} onValueChange={(value: string) => setCurrentTheme(value as ThemeSetting)} disabled={isSaving}>
                     <SelectTrigger id="theme-select">
                       <SelectValue placeholder="Select theme" />
                     </SelectTrigger>
@@ -304,7 +300,7 @@ export default function SetupPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label>Font Size</Label>
-                  <RadioGroup value={fontSize} onValueChange={(value: string) => setFontSize(value as FontSizeSetting)} className="flex space-x-4 pt-2">
+                  <RadioGroup value={fontSize} onValueChange={(value: string) => setFontSize(value as FontSizeSetting)} className="flex space-x-4 pt-2" disabled={isSaving}>
                     <div>
                       <RadioGroupItem value="small" id="font-small" />
                       <Label htmlFor="font-small" className="ml-2 cursor-pointer">Small</Label>
@@ -324,7 +320,6 @@ export default function SetupPage() {
             
             <Separator />
 
-            {/* Regional Settings Section */}
             <section className="space-y-6">
               <div className="flex items-center gap-3 mb-3">
                 <Globe className="h-6 w-6 text-primary" />
@@ -332,7 +327,7 @@ export default function SetupPage() {
               </div>
                <div className="space-y-1.5">
                 <Label htmlFor="currency-select">Default Currency</Label>
-                <Select value={currentSelectedCurrency} onValueChange={(value: string) => setCurrentSelectedCurrency(value as AppCurrency)}>
+                <Select value={currentSelectedCurrency} onValueChange={(value: string) => setCurrentSelectedCurrency(value as AppCurrency)} disabled={isSaving}>
                   <SelectTrigger id="currency-select">
                     <SelectValue placeholder="Select currency" />
                   </SelectTrigger>
@@ -349,7 +344,7 @@ export default function SetupPage() {
             <Separator className="my-6"/>
             
             <div className="flex justify-end">
-              <Button onClick={handleSaveSetup} size="lg" disabled={isSaving || authLoading || status === 'loading'}>
+              <Button onClick={handleSaveSetup} size="lg" disabled={isSaving || status === 'loading'}>
                 <Save className="mr-2 h-5 w-5" />
                 {isSaving? "Saving..." : "Save and Continue"}
               </Button>
