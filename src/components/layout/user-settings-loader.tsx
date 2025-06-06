@@ -22,7 +22,7 @@ export function UserSettingsLoader() {
   const { user, status } = useAuthState();
   const { setTheme } = useTheme();
   const { setSelectedCurrency } = useCurrency();
-  const [isFetchingSettings, setIsFetchingSettings] = useState(false); // Renamed for clarity
+  const [isFetchingSettings, setIsFetchingSettings] = useState(false);
   const settingsFetchedForUserRef = useRef<string | null>(null);
 
   const applyFontSize = useCallback((fontSize: FontSizeSetting) => {
@@ -39,26 +39,29 @@ export function UserSettingsLoader() {
     }
   }, []);
 
-  useEffect(() => {
-    if (status === 'authenticated' && user?.email && user?.hasCompletedSetup === true) {
-      if (settingsFetchedForUserRef.current !== user.email) {
-        setIsFetchingSettings(true);
-        settingsFetchedForUserRef.current = user.email;
+  const userEmail = user?.email; // Stable variable for user's email
 
-        axios.get(`${SETTINGS_API_URL}?email=${encodeURIComponent(user.email)}`)
+  useEffect(() => {
+    if (status === 'authenticated' && userEmail && user?.hasCompletedSetup === true) {
+      // Only fetch if not already fetched for this user AND not currently fetching
+      if (settingsFetchedForUserRef.current !== userEmail && !isFetchingSettings) {
+        setIsFetchingSettings(true);
+        settingsFetchedForUserRef.current = userEmail;
+
+        axios.get(`${SETTINGS_API_URL}?email=${encodeURIComponent(userEmail)}`)
           .then(response => {
             const fetchedSettings = response.data;
 
             if (fetchedSettings.theme && ["light", "dark", "system"].includes(fetchedSettings.theme)) {
               setTheme(fetchedSettings.theme as ThemeSetting);
-              localStorage.setItem("app-theme", fetchedSettings.theme); // Persist theme from API
+              localStorage.setItem("app-theme", fetchedSettings.theme);
             }
             if (fetchedSettings.fontSize && FONT_SIZE_CLASSES[fetchedSettings.fontSize as FontSizeSetting]) {
               applyFontSize(fetchedSettings.fontSize as FontSizeSetting);
             }
             if (fetchedSettings.currency) {
               setSelectedCurrency(fetchedSettings.currency as AppCurrency);
-              localStorage.setItem("app-currency", fetchedSettings.currency); // Persist currency from API
+              localStorage.setItem("app-currency", fetchedSettings.currency);
             }
           })
           .catch(error => {
@@ -70,9 +73,12 @@ export function UserSettingsLoader() {
           });
       }
     } else if (status === 'unauthenticated') {
-        settingsFetchedForUserRef.current = null; // Reset if user logs out
+        settingsFetchedForUserRef.current = null;
+        if (isFetchingSettings) setIsFetchingSettings(false); // Reset if user logs out during fetch
     }
-  }, [user, status, setTheme, setSelectedCurrency, applyFontSize]); // Removed isFetchingSettings from dependencies
+  // Removed isFetchingSettings from dependencies.
+  // Dependencies are now userEmail, status, user?.hasCompletedSetup, and stable functions.
+  }, [userEmail, status, user?.hasCompletedSetup, setTheme, setSelectedCurrency, applyFontSize]);
 
   return null;
 }
