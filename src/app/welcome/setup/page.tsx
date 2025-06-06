@@ -90,10 +90,12 @@ export default function SetupPage() {
     }
   }, [user, authStateIsLoading]);
 
-  // Sync formCurrency with initialGlobalCurrency if it changes (e.g. UserSettingsLoader runs later)
+  // Sync formCurrency with initialGlobalCurrency if it changes and is different
   useEffect(() => {
-    setFormCurrency(initialGlobalCurrency);
-  }, [initialGlobalCurrency]);
+    if (initialGlobalCurrency !== formCurrency) {
+      setFormCurrency(initialGlobalCurrency);
+    }
+  }, [initialGlobalCurrency, formCurrency]);
 
 
   const handleSaveSetup = useCallback(async () => {
@@ -166,6 +168,36 @@ export default function SetupPage() {
       setGlobalCurrencyContext, setGlobalTheme, router, toast, updateSession
     ]);
 
+  // Memoized event handlers
+  const handleDisplayNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormDisplayName(e.target.value);
+  }, []);
+
+  const handlePhoneNumberChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormPhoneNumber(e.target.value);
+  }, []);
+
+  const handleDateOfBirthChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormDateOfBirth(e.target.value);
+  }, []);
+
+  const handleGenderChange = useCallback((value: string) => {
+    setFormGender(value);
+  }, []);
+
+  const handleThemeChange = useCallback((value: string) => {
+    setFormTheme(value as ThemeSetting);
+  }, []);
+
+  const handleFontSizeChange = useCallback((value: string) => {
+    setFormFontSize(value as FontSizeSetting);
+  }, []);
+  
+  const handleCurrencyChange = useCallback((value: string) => {
+    setFormCurrency(value as AppCurrency);
+  }, []);
+
+
   if (authStateIsLoading || (status === 'authenticated' && user?.hasCompletedSetup === undefined)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -214,7 +246,7 @@ export default function SetupPage() {
                   <Input 
                     id="fullName" 
                     value={formDisplayName}
-                    onChange={(e) => setFormDisplayName(e.target.value)}
+                    onChange={handleDisplayNameChange}
                     placeholder="Your full name"
                     disabled={isSaving}
                   />
@@ -236,7 +268,7 @@ export default function SetupPage() {
                     type="tel" 
                     placeholder="(123) 456-7890" 
                     value={formPhoneNumber} 
-                    onChange={(e) => setFormPhoneNumber(e.target.value)} 
+                    onChange={handlePhoneNumberChange} 
                     disabled={isSaving}
                   />
                 </div>
@@ -246,14 +278,14 @@ export default function SetupPage() {
                     id="dateOfBirth" 
                     type="date" 
                     value={formDateOfBirth} 
-                    onChange={(e) => setFormDateOfBirth(e.target.value)} 
+                    onChange={handleDateOfBirthChange} 
                     disabled={isSaving}
                     max={new Date().toISOString().split("T")[0]} 
                   />
                 </div>
                 <div className="space-y-1.5 md:col-span-2">
                   <Label htmlFor="gender">Gender (Optional)</Label>
-                  <Select value={formGender} onValueChange={setFormGender} disabled={isSaving}>
+                  <Select value={formGender} onValueChange={handleGenderChange} disabled={isSaving}>
                     <SelectTrigger id="gender">
                       <SelectValue placeholder="Select gender" />
                     </SelectTrigger>
@@ -278,7 +310,7 @@ export default function SetupPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="theme-select">Theme</Label>
-                  <Select value={formTheme} onValueChange={(value: string) => setFormTheme(value as ThemeSetting)} disabled={isSaving}>
+                  <Select value={formTheme} onValueChange={handleThemeChange} disabled={isSaving}>
                     <SelectTrigger id="theme-select">
                       <SelectValue placeholder="Select theme" />
                     </SelectTrigger>
@@ -291,7 +323,7 @@ export default function SetupPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label>Font Size</Label>
-                  <RadioGroup value={formFontSize} onValueChange={(value: string) => setFormFontSize(value as FontSizeSetting)} className="flex space-x-4 pt-2" disabled={isSaving}>
+                  <RadioGroup value={formFontSize} onValueChange={handleFontSizeChange} className="flex space-x-4 pt-2" disabled={isSaving}>
                     <div>
                       <RadioGroupItem value="small" id="font-small" />
                       <Label htmlFor="font-small" className="ml-2 cursor-pointer">Small</Label>
@@ -318,7 +350,7 @@ export default function SetupPage() {
               </div>
                <div className="space-y-1.5">
                 <Label htmlFor="currency-select">Default Currency</Label>
-                <Select value={formCurrency} onValueChange={(value: string) => setFormCurrency(value as AppCurrency)} disabled={isSaving}>
+                <Select value={formCurrency} onValueChange={handleCurrencyChange} disabled={isSaving}>
                   <SelectTrigger id="currency-select">
                     <SelectValue placeholder="Select currency" />
                   </SelectTrigger>
@@ -349,4 +381,6 @@ export default function SetupPage() {
     </div>
   );
 }
+    
+
     
