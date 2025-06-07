@@ -72,8 +72,7 @@ const emptyStateMotionVariants = {
 export default function BudgetsPage() {
   const { user } = useAuthState();
   const { budgets, isLoading: isLoadingBudgets, addBudget, updateBudget, deleteBudget: deleteBudgetFromContext } = useBudgetContext();
-  // transactions are used by BudgetContext internally now.
-  // const { transactions } = useTransactionContext(); 
+  const { transactions: pageTransactions, isLoading: isLoadingPageTransactions } = useTransactionContext(); // Get transactions here
   const { selectedCurrency, convertAmount, conversionRates } = useCurrency();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
@@ -84,7 +83,6 @@ export default function BudgetsPage() {
 
   const { addNotification } = useNotification();
 
-  // Removed useEffect that called updateBudgetSpentAmount, as BudgetContext now handles this reactively.
 
   const handleAddBudget = () => {
     setEditingBudget(null);
@@ -195,15 +193,14 @@ export default function BudgetsPage() {
       if (isActualEditOperation && editingBudget) {
         const response = await axios.put<BudgetFromApi>(`${BUDGET_API_BASE_URL}/${editingBudget.id}?email=${encodeURIComponent(user.email)}`, dataForApi);
         savedBudgetFromApi = response.data;
-        updateBudget(savedBudgetFromApi); // Context updates details, preserves old spent temporarily. Reactive effect in context will recalc spent.
+        // Pass the current transactions from this page's context to ensure freshness
+        updateBudget(savedBudgetFromApi, pageTransactions);
       } else {
         const response = await axios.post<BudgetFromApi>(`${BUDGET_API_BASE_URL}?email=${encodeURIComponent(user.email)}`, dataForApi);
-        savedBudgetFromApi = response.data; // Backend adds ID
-        addBudget(savedBudgetFromApi); // Context adds, initializes spent to 0. Reactive effect in context will recalc spent.
+        savedBudgetFromApi = response.data;
+        addBudget(savedBudgetFromApi); // For new budgets, spent will be 0 initially, global effect will calculate
       }
 
-      // Success notification relies on savedBudgetFromApi which has correct category/month from API.
-      // The 'spent' amount will be updated reactively by the context.
       addNotification({
           title: `Budget ${notificationAction}`,
           description: `Budget for ${savedBudgetFromApi.category} successfully ${notificationAction.toLowerCase()}.`,
@@ -248,14 +245,14 @@ export default function BudgetsPage() {
           </p>
         </div>
         <motion.div initial="initial" animate="animate" variants={buttonMotionVariants} viewport={{ once: true }}>
-          <Button onClick={handleAddBudget} disabled={isLoadingBudgets}>
+          <Button onClick={handleAddBudget} disabled={isLoadingBudgets || isLoadingPageTransactions}>
             <PlusCircle className="mr-2 h-5 w-5" />
             Add Budget
           </Button>
         </motion.div>
       </div>
 
-      {isLoadingBudgets ? (
+      {(isLoadingBudgets || isLoadingPageTransactions) ? (
         <div className="flex items-center justify-center p-10">
           <RotateCw className="mr-2 h-6 w-6 animate-spin text-primary" />
           <p className="text-muted-foreground">Loading budgets...</p>
@@ -301,7 +298,7 @@ export default function BudgetsPage() {
       <BudgetFormDialog
         open={isFormOpen}
         onOpenChange={setIsFormOpen}
-        budget={editingBudget} 
+        budget={editingBudget}
         onSave={handleSaveBudget}
         isSaving={isSaving}
       />

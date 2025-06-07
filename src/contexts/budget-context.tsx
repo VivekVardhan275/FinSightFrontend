@@ -16,10 +16,10 @@ interface BudgetContextType {
   budgets: Budget[];
   isLoading: boolean;
   addBudget: (budgetFromApi: BudgetFromApi) => Budget;
-  updateBudget: (budgetDataFromApi: BudgetFromApi) => void;
+  updateBudget: (budgetDataFromApi: BudgetFromApi, currentTransactions: Transaction[]) => void;
   deleteBudget: (budgetId: string) => void;
   getBudgetById: (budgetId: string) => Budget | undefined;
-  updateBudgetSpentAmount: (budgetId: string, allTransactions: Transaction[]) => void; 
+  updateBudgetSpentAmount: (budgetId: string, allTransactions: Transaction[]) => void;
   getBudgetsByMonth: (year: number, month: number) => Budget[];
 }
 
@@ -28,7 +28,7 @@ const BudgetContext = createContext<BudgetContextType | undefined>(undefined);
 export const BudgetProvider = ({ children }: { children: ReactNode }) => {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const { user, status: authStatus } = useAuthState();
-  const { transactions, isLoading: isLoadingTransactions } = useTransactionContext();
+  const { transactions: contextTransactions, isLoading: isLoadingTransactions } = useTransactionContext(); // Renamed to avoid conflict in updateBudget
   const [contextIsLoading, setContextIsLoading] = useState(true);
   const fetchAttemptedForUserRef = useRef<string | null>(null);
 
@@ -67,7 +67,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
     if (userEmail) {
       if (fetchAttemptedForUserRef.current !== userEmail) {
         if (!contextIsLoading) setContextIsLoading(true);
-        
+
         axios.get<{ budgets: Array<Omit<BudgetFromApiType, 'spent'>> }>(`${BUDGET_API_BASE_URL}?email=${encodeURIComponent(userEmail)}`)
           .then(response => {
             fetchAttemptedForUserRef.current = userEmail;
@@ -79,7 +79,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
               console.warn("BudgetContext (auth): API response did not contain a 'budgets' array.");
             }
             const initializedBudgets = apiBudgets
-              .map(b => ({ ...b, id: b.id.toString(), spent: 0 })) // Initialize spent to 0
+              .map(b => ({ ...b, id: b.id.toString(), spent: 0 }))
               .sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category));
             setBudgets(currentData => JSON.stringify(currentData) === JSON.stringify(initializedBudgets) ? currentData : initializedBudgets);
           })
@@ -88,10 +88,10 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
             if (axios.isAxiosError(error) && error.response) {
               console.error("Backend error message:", error.response.data?.message || error.response.data?.error || "No specific message from backend.");
               console.error("Status code:", error.response.status);
-              if (error.response.status !== 404) { 
+              if (error.response.status !== 404) {
                 fetchAttemptedForUserRef.current = null;
               } else {
-                 fetchAttemptedForUserRef.current = userEmail; 
+                 fetchAttemptedForUserRef.current = userEmail;
               }
             } else if (error instanceof Error) {
               console.error("Error details:", error.message);
@@ -115,19 +115,18 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
   }, [userEmail, authStatus, contextIsLoading]);
 
 
-  // Global effect to recalculate spent amounts when budgets or transactions change, or after loading finishes.
   useEffect(() => {
     if (contextIsLoading || isLoadingTransactions) {
-      return; // Don't calculate if base data or transactions are still loading
+      return;
     }
-  
+
     let anySpentAmountChanged = false;
     const recalculatedBudgets = budgets.map(budget => {
       const budgetMonthYear = budget.month.split('-');
       const budgetYear = parseInt(budgetMonthYear[0]);
       const budgetMonth = parseInt(budgetMonthYear[1]);
-  
-      const newSpent = transactions
+
+      const newSpent = contextTransactions // Use transactions from this context's scope
         .filter(t => {
           const tDate = new Date(t.date);
           return t.category.toLowerCase() === budget.category.toLowerCase() &&
@@ -136,18 +135,18 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
                  t.type === 'expense';
         })
         .reduce((sum, t) => sum + t.amount, 0);
-  
+
       if (budget.spent === undefined || Math.abs(budget.spent - newSpent) >= 0.001) {
         anySpentAmountChanged = true;
         return { ...budget, spent: newSpent };
       }
       return budget;
     });
-  
+
     if (anySpentAmountChanged) {
       setBudgets(recalculatedBudgets.sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category)));
     }
-  }, [budgets, transactions, contextIsLoading, isLoadingTransactions]);
+  }, [budgets, contextTransactions, contextIsLoading, isLoadingTransactions]);
 
 
   useEffect(() => {
@@ -161,54 +160,46 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
   }, [budgets, contextIsLoading, authStatus]);
 
   const addBudget = useCallback((budgetFromApi: BudgetFromApi): Budget => {
-    // Initial spent is 0. The global useEffect will calculate the correct spent amount
-    // once this new budget is added to the state and transactions are available.
-    const budgetWithSpent: Budget = { ...budgetFromApi, id: budgetFromApi.id.toString(), spent: 0 }; 
+    const budgetWithSpent: Budget = { ...budgetFromApi, id: budgetFromApi.id.toString(), spent: 0 };
     setBudgets(prev => [budgetWithSpent, ...prev].sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category)));
     return budgetWithSpent;
   }, []);
 
-  const updateBudget = useCallback((budgetDataFromApi: BudgetFromApi) => {
+  const updateBudget = useCallback((budgetDataFromApi: BudgetFromApi, currentTransactions: Transaction[]) => {
     setBudgets(prevBudgets => {
       const updatedBudgets = prevBudgets.map(b => {
-        if (b.id === budgetDataFromApi.id) {
-          let finalSpent;
-          if (isLoadingTransactions) {
-            console.warn("BudgetContext: updateBudget running while transactions are loading. Spent might be temporarily stale or reset.");
-            // If category or month changed, old spent is irrelevant. Reset to 0.
-            // Otherwise, preserve old spent, global effect will verify/fix.
-            if (b.category.toLowerCase() !== budgetDataFromApi.category.toLowerCase() || b.month !== budgetDataFromApi.month) {
-              finalSpent = 0; 
-            } else {
-              finalSpent = b.spent; 
-            }
-          } else {
-            // Transactions are loaded, calculate spent accurately for the new/updated budget details.
-            const budgetMonthYear = budgetDataFromApi.month.split('-');
-            const budgetYear = parseInt(budgetMonthYear[0]);
-            const budgetMonth = parseInt(budgetMonthYear[1]);
-            finalSpent = transactions // `transactions` from closure, fresh due to isLoadingTransactions dependency
-              .filter(t => {
-                const tDate = new Date(t.date);
-                return t.category.toLowerCase() === budgetDataFromApi.category.toLowerCase() &&
-                       tDate.getFullYear() === budgetYear &&
-                       (tDate.getMonth() + 1) === budgetMonth &&
-                       t.type === 'expense';
-              })
-              .reduce((sum, t) => sum + t.amount, 0);
-          }
-          return { 
-            // Spread API data first to get the new allocated, category, month
-            ...budgetDataFromApi, 
-            id: budgetDataFromApi.id.toString(), // Ensure id is string
-            spent: finalSpent // Assign the calculated or preserved/reset spent
+        if (b.id === budgetDataFromApi.id.toString()) {
+          const newCategory = budgetDataFromApi.category;
+          const newMonth = budgetDataFromApi.month;
+          const newAllocated = budgetDataFromApi.allocated;
+
+          // Calculate spent using the provided currentTransactions
+          const budgetMonthYear = newMonth.split('-');
+          const budgetYear = parseInt(budgetMonthYear[0]);
+          const budgetMonthNum = parseInt(budgetMonthYear[1]);
+          const calculatedSpent = currentTransactions
+            .filter(t => {
+              const tDate = new Date(t.date);
+              return t.category.toLowerCase() === newCategory.toLowerCase() &&
+                     tDate.getFullYear() === budgetYear &&
+                     (tDate.getMonth() + 1) === budgetMonthNum &&
+                     t.type === 'expense';
+            })
+            .reduce((sum, t) => sum + t.amount, 0);
+
+          return {
+            id: budgetDataFromApi.id.toString(),
+            category: newCategory,
+            allocated: newAllocated,
+            month: newMonth,
+            spent: calculatedSpent,
           };
         }
         return b;
       });
       return updatedBudgets.sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category));
     });
-  }, [transactions, isLoadingTransactions]); // `isLoadingTransactions` ensures this callback is fresh regarding transaction load state.
+  }, []); // No direct dependencies on contextTransactions or isLoadingTransactions needed here, as they are passed in.
 
   const deleteBudget = useCallback((budgetId: string) => {
     setBudgets(prev => prev.filter(b => b.id !== budgetId));
@@ -244,7 +235,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
         .reduce((sum, t) => sum + t.amount, 0);
 
       if (Math.abs(targetBudget.spent - newSpent) < 0.001) {
-        return prevBudgets; 
+        return prevBudgets;
       }
 
       const updatedBudgetsArray = [...prevBudgets];
@@ -255,15 +246,15 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 
 
   return (
-    <BudgetContext.Provider value={{ 
-        budgets, 
-        isLoading: contextIsLoading || isLoadingTransactions, 
-        addBudget, 
-        updateBudget, 
-        deleteBudget, 
-        getBudgetById, 
-        updateBudgetSpentAmount, 
-        getBudgetsByMonth 
+    <BudgetContext.Provider value={{
+        budgets,
+        isLoading: contextIsLoading || isLoadingTransactions,
+        addBudget,
+        updateBudget,
+        deleteBudget,
+        getBudgetById,
+        updateBudgetSpentAmount,
+        getBudgetsByMonth
     }}>
       {children}
     </BudgetContext.Provider>
@@ -277,5 +268,3 @@ export const useBudgetContext = (): BudgetContextType => {
   }
   return context;
 };
-
-      
