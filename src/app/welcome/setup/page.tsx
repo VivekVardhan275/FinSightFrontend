@@ -90,21 +90,25 @@ export default function SetupPage() {
     }
   }, [user, authStateIsLoading]);
 
-  // Removed problematic useEffect that was resetting formCurrency to initialGlobalCurrency
-
   const handleSaveSetup = useCallback(async () => {
     if (!user || !user.email) {
       toast({ title: "Error", description: "User information is missing. Please try logging in again.", variant: "destructive" });
       router.push('/login'); 
       return;
     }
+    
+    if (!formDateOfBirth) {
+      toast({ title: "Validation Error", description: "Date of Birth is required.", variant: "destructive" });
+      return;
+    }
+
     setIsSaving(true);
 
     const setupPayload = {
       email: user.email, 
       displayName: formDisplayName || user.name, 
       phoneNumber: formPhoneNumber || null, 
-      dateOfBirth: formDateOfBirth || null, 
+      dateOfBirth: formDateOfBirth, 
       gender: formGender || null, 
       theme: formTheme,
       fontSize: formFontSize,
@@ -267,7 +271,7 @@ export default function SetupPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="dateOfBirth">Date of Birth (Optional)</Label>
+                  <Label htmlFor="dateOfBirth">Date of Birth</Label>
                   <Input 
                     id="dateOfBirth" 
                     type="date" 
