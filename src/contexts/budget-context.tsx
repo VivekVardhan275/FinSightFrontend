@@ -10,7 +10,10 @@ import { useTransactionContext } from './transaction-context'; // Import Transac
 const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://localhost:8080";
 const BUDGET_API_BASE_URL = `${backendUrl}/api/user/budgets`;
 
-type BudgetFromApi = Omit<BudgetFromApiType, 'spent' | 'id'> & { id: string };
+// This is the type coming from the API (e.g. after a POST or PUT)
+// It doesn't have 'spent', and 'id' is a string.
+type BudgetFromApi = Omit<BudgetFromApiType, 'spent'>;
+
 
 interface BudgetContextType {
   budgets: Budget[];
@@ -19,7 +22,6 @@ interface BudgetContextType {
   updateBudget: (budgetDataFromApi: BudgetFromApi) => void;
   deleteBudget: (budgetId: string) => void;
   getBudgetById: (budgetId: string) => Budget | undefined;
-  // updateBudgetSpentAmount is kept for potential direct use, though primary updates are reactive
   updateBudgetSpentAmount: (budgetId: string, allTransactions: Transaction[]) => void;
   getBudgetsByMonth: (year: number, month: number) => Budget[];
 }
@@ -29,7 +31,7 @@ const BudgetContext = createContext<BudgetContextType | undefined>(undefined);
 export const BudgetProvider = ({ children }: { children: ReactNode }) => {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const { user, status: authStatus } = useAuthState();
-  const { transactions, isLoading: isLoadingTransactions } = useTransactionContext(); // Consume transactions
+  const { transactions, isLoading: isLoadingTransactions } = useTransactionContext();
   const [contextIsLoading, setContextIsLoading] = useState(true);
   const fetchAttemptedForUserRef = useRef<string | null>(null);
 
@@ -71,7 +73,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
         
         axios.get<{ budgets: Array<Omit<BudgetFromApiType, 'spent'>> }>(`${BUDGET_API_BASE_URL}?email=${encodeURIComponent(userEmail)}`)
           .then(response => {
-            fetchAttemptedForUserRef.current = userEmail; // Mark as attempted for this user ONLY on successful fetch start
+            fetchAttemptedForUserRef.current = userEmail;
             const apiBudgetsRaw = response.data.budgets || response.data;
             let apiBudgets: Array<Omit<BudgetFromApiType, 'spent'>> = [];
             if (Array.isArray(apiBudgetsRaw)) {
@@ -80,7 +82,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
               console.warn("BudgetContext (auth): API response did not contain a 'budgets' array.");
             }
             const initializedBudgets = apiBudgets
-              .map(b => ({ ...b, id: b.id.toString(), spent: 0 })) // Initialize spent to 0
+              .map(b => ({ ...b, id: b.id.toString(), spent: 0 }))
               .sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category));
             setBudgets(currentData => JSON.stringify(currentData) === JSON.stringify(initializedBudgets) ? currentData : initializedBudgets);
           })
@@ -89,10 +91,10 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
             if (axios.isAxiosError(error) && error.response) {
               console.error("Backend error message:", error.response.data?.message || error.response.data?.error || "No specific message from backend.");
               console.error("Status code:", error.response.status);
-              if (error.response.status !== 404) { // If not 404, allow retry
+              if (error.response.status !== 404) {
                 fetchAttemptedForUserRef.current = null;
-              } else { // For 404, mark as attempted so we don't retry for this user
-                fetchAttemptedForUserRef.current = userEmail;
+              } else {
+                 fetchAttemptedForUserRef.current = userEmail;
               }
             } else if (error instanceof Error) {
               console.error("Error details:", error.message);
@@ -103,7 +105,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
             setBudgets([]);
           })
           .finally(() => {
-            setContextIsLoading(false);
+            if (contextIsLoading) setContextIsLoading(false);
           });
       } else {
         if (contextIsLoading) setContextIsLoading(false);
@@ -115,12 +117,8 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [userEmail, authStatus, contextIsLoading]);
 
-  // Effect to recalculate all budget spent amounts when budgets or transactions change
   useEffect(() => {
     if (!contextIsLoading && !isLoadingTransactions && budgets.length > 0) {
-      // transactions might be empty if they are loading or if there are none.
-      // isLoadingTransactions tells us if they are still loading.
-      // If transactions are loaded (even if empty), we can proceed.
       let anySpentAmountChanged = false;
       const recalculatedBudgets = budgets.map(budget => {
         const budgetMonthYear = budget.month.split('-');
@@ -162,22 +160,41 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
   }, [budgets, contextIsLoading, authStatus]);
 
   const addBudget = useCallback((budgetFromApi: BudgetFromApi): Budget => {
-    // API returns budget without 'spent'. Initialize 'spent' to 0.
-    // The useEffect above will recalculate it if necessary based on existing transactions.
     const budgetWithSpent: Budget = { ...budgetFromApi, spent: 0 };
     setBudgets(prev => [budgetWithSpent, ...prev].sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category)));
     return budgetWithSpent;
   }, []);
 
   const updateBudget = useCallback((budgetDataFromApi: BudgetFromApi) => {
-    setBudgets(prev => prev.map(b => {
+    setBudgets(prevBudgets => {
+      const updatedBudgets = prevBudgets.map(b => {
         if (b.id === budgetDataFromApi.id) {
-            // Preserve existing spent amount; the reactive useEffect will update it.
-            return { ...b, ...budgetDataFromApi, spent: b.spent }; 
+          // budgetDataFromApi contains the updated fields from the API (id, category, allocated in INR, month)
+          // Recalculate spent for this specific budget immediately
+          const budgetMonthYear = budgetDataFromApi.month.split('-');
+          const budgetYear = parseInt(budgetMonthYear[0]);
+          const budgetMonth = parseInt(budgetMonthYear[1]);
+
+          const newSpentForThisBudget = transactions // `transactions` from useTransactionContext
+            .filter(t => {
+              const tDate = new Date(t.date);
+              return t.category.toLowerCase() === budgetDataFromApi.category.toLowerCase() &&
+                     tDate.getFullYear() === budgetYear &&
+                     (tDate.getMonth() + 1) === budgetMonth &&
+                     t.type === 'expense';
+            })
+            .reduce((sum, t) => sum + t.amount, 0);
+          
+          return { 
+            ...budgetDataFromApi, // has id, new category, new allocated (INR), new month
+            spent: newSpentForThisBudget // immediately calculated spent (INR)
+          };
         }
         return b;
-    }).sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category)));
-  }, []);
+      });
+      return updatedBudgets.sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category));
+    });
+  }, [transactions]); // Added transactions as a dependency
 
   const deleteBudget = useCallback((budgetId: string) => {
     setBudgets(prev => prev.filter(b => b.id !== budgetId));
@@ -192,7 +209,6 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
     return budgets.filter(b => b.month === targetMonthStr);
   }, [budgets]);
 
-  // This function can be used for imperative updates if needed, but reactive updates are preferred.
   const updateBudgetSpentAmount = useCallback((budgetId: string, allTransactions: Transaction[]) => {
     setBudgets(prevBudgets => {
       const targetBudgetIndex = prevBudgets.findIndex(b => b.id === budgetId);
@@ -238,3 +254,6 @@ export const useBudgetContext = (): BudgetContextType => {
   }
   return context;
 };
+
+
+    
