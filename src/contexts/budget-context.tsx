@@ -19,7 +19,7 @@ interface BudgetContextType {
   updateBudget: (budgetDataFromApi: BudgetFromApi) => void;
   deleteBudget: (budgetId: string) => void;
   getBudgetById: (budgetId: string) => Budget | undefined;
-  updateBudgetSpentAmount: (budgetId: string, allTransactions: Transaction[]) => void; // Kept for potential direct use, though context handles it mostly
+  updateBudgetSpentAmount: (budgetId: string, allTransactions: Transaction[]) => void; 
   getBudgetsByMonth: (year: number, month: number) => Budget[];
 }
 
@@ -79,7 +79,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
               console.warn("BudgetContext (auth): API response did not contain a 'budgets' array.");
             }
             const initializedBudgets = apiBudgets
-              .map(b => ({ ...b, id: b.id.toString(), spent: 0 }))
+              .map(b => ({ ...b, id: b.id.toString(), spent: 0 })) // Initialize spent to 0
               .sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category));
             setBudgets(currentData => JSON.stringify(currentData) === JSON.stringify(initializedBudgets) ? currentData : initializedBudgets);
           })
@@ -88,10 +88,10 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
             if (axios.isAxiosError(error) && error.response) {
               console.error("Backend error message:", error.response.data?.message || error.response.data?.error || "No specific message from backend.");
               console.error("Status code:", error.response.status);
-              if (error.response.status !== 404) { // Only reset if not a 404, to prevent re-fetch loops on "no data"
+              if (error.response.status !== 404) { 
                 fetchAttemptedForUserRef.current = null;
               } else {
-                 fetchAttemptedForUserRef.current = userEmail; // Mark as attempted for this user for 404
+                 fetchAttemptedForUserRef.current = userEmail; 
               }
             } else if (error instanceof Error) {
               console.error("Error details:", error.message);
@@ -115,36 +115,39 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
   }, [userEmail, authStatus, contextIsLoading]);
 
 
+  // Global effect to recalculate spent amounts when budgets or transactions change, or after loading finishes.
   useEffect(() => {
-    if (!contextIsLoading && !isLoadingTransactions && budgets.length >= 0) { // Allow recalculation even if budgets is empty (e.g. all deleted)
-      let anySpentAmountChanged = false;
-      const recalculatedBudgets = budgets.map(budget => {
-        const budgetMonthYear = budget.month.split('-');
-        const budgetYear = parseInt(budgetMonthYear[0]);
-        const budgetMonth = parseInt(budgetMonthYear[1]);
-
-        const newSpent = transactions
-          .filter(t => {
-            const tDate = new Date(t.date);
-            return t.category.toLowerCase() === budget.category.toLowerCase() &&
-                   tDate.getFullYear() === budgetYear &&
-                   (tDate.getMonth() + 1) === budgetMonth &&
-                   t.type === 'expense';
-          })
-          .reduce((sum, t) => sum + t.amount, 0);
-
-        if (Math.abs(budget.spent - newSpent) >= 0.001) {
-          anySpentAmountChanged = true;
-          return { ...budget, spent: newSpent };
-        }
-        return budget;
-      });
-
-      if (anySpentAmountChanged || budgets.some(b => b.spent === undefined)) { // Force update if some spent is undefined initially
-        setBudgets(recalculatedBudgets.sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category)));
-      }
+    if (contextIsLoading || isLoadingTransactions) {
+      return; // Don't calculate if base data or transactions are still loading
     }
-  }, [budgets, transactions, contextIsLoading, isLoadingTransactions, setBudgets]);
+  
+    let anySpentAmountChanged = false;
+    const recalculatedBudgets = budgets.map(budget => {
+      const budgetMonthYear = budget.month.split('-');
+      const budgetYear = parseInt(budgetMonthYear[0]);
+      const budgetMonth = parseInt(budgetMonthYear[1]);
+  
+      const newSpent = transactions
+        .filter(t => {
+          const tDate = new Date(t.date);
+          return t.category.toLowerCase() === budget.category.toLowerCase() &&
+                 tDate.getFullYear() === budgetYear &&
+                 (tDate.getMonth() + 1) === budgetMonth &&
+                 t.type === 'expense';
+        })
+        .reduce((sum, t) => sum + t.amount, 0);
+  
+      if (budget.spent === undefined || Math.abs(budget.spent - newSpent) >= 0.001) {
+        anySpentAmountChanged = true;
+        return { ...budget, spent: newSpent };
+      }
+      return budget;
+    });
+  
+    if (anySpentAmountChanged) {
+      setBudgets(recalculatedBudgets.sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category)));
+    }
+  }, [budgets, transactions, contextIsLoading, isLoadingTransactions]);
 
 
   useEffect(() => {
@@ -158,7 +161,9 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
   }, [budgets, contextIsLoading, authStatus]);
 
   const addBudget = useCallback((budgetFromApi: BudgetFromApi): Budget => {
-    const budgetWithSpent: Budget = { ...budgetFromApi, spent: 0 }; // Initial spent is 0, effect will calculate
+    // Initial spent is 0. The global useEffect will calculate the correct spent amount
+    // once this new budget is added to the state and transactions are available.
+    const budgetWithSpent: Budget = { ...budgetFromApi, id: budgetFromApi.id.toString(), spent: 0 }; 
     setBudgets(prev => [budgetWithSpent, ...prev].sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category)));
     return budgetWithSpent;
   }, []);
@@ -167,33 +172,43 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
     setBudgets(prevBudgets => {
       const updatedBudgets = prevBudgets.map(b => {
         if (b.id === budgetDataFromApi.id) {
-          // Recalculate spent for this specific budget immediately using current transactions
-          const budgetMonthYear = budgetDataFromApi.month.split('-');
-          const budgetYear = parseInt(budgetMonthYear[0]);
-          const budgetMonth = parseInt(budgetMonthYear[1]);
-
-          const newSpentForThisBudget = transactions // `transactions` from useTransactionContext's closure
-            .filter(t => {
-              const tDate = new Date(t.date);
-              return t.category.toLowerCase() === budgetDataFromApi.category.toLowerCase() &&
-                     tDate.getFullYear() === budgetYear &&
-                     (tDate.getMonth() + 1) === budgetMonth &&
-                     t.type === 'expense';
-            })
-            .reduce((sum, t) => sum + t.amount, 0);
-          
+          let finalSpent;
+          if (isLoadingTransactions) {
+            console.warn("BudgetContext: updateBudget running while transactions are loading. Spent might be temporarily stale or reset.");
+            // If category or month changed, old spent is irrelevant. Reset to 0.
+            // Otherwise, preserve old spent, global effect will verify/fix.
+            if (b.category.toLowerCase() !== budgetDataFromApi.category.toLowerCase() || b.month !== budgetDataFromApi.month) {
+              finalSpent = 0; 
+            } else {
+              finalSpent = b.spent; 
+            }
+          } else {
+            // Transactions are loaded, calculate spent accurately for the new/updated budget details.
+            const budgetMonthYear = budgetDataFromApi.month.split('-');
+            const budgetYear = parseInt(budgetMonthYear[0]);
+            const budgetMonth = parseInt(budgetMonthYear[1]);
+            finalSpent = transactions // `transactions` from closure, fresh due to isLoadingTransactions dependency
+              .filter(t => {
+                const tDate = new Date(t.date);
+                return t.category.toLowerCase() === budgetDataFromApi.category.toLowerCase() &&
+                       tDate.getFullYear() === budgetYear &&
+                       (tDate.getMonth() + 1) === budgetMonth &&
+                       t.type === 'expense';
+              })
+              .reduce((sum, t) => sum + t.amount, 0);
+          }
           return { 
-            // Spread the API data first to get the new allocated, category, month
+            // Spread API data first to get the new allocated, category, month
             ...budgetDataFromApi, 
             id: budgetDataFromApi.id.toString(), // Ensure id is string
-            spent: newSpentForThisBudget // Assign the immediately calculated spent (INR)
+            spent: finalSpent // Assign the calculated or preserved/reset spent
           };
         }
         return b;
       });
       return updatedBudgets.sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category));
     });
-  }, [transactions]); // `transactions` is a dependency here.
+  }, [transactions, isLoadingTransactions]); // `isLoadingTransactions` ensures this callback is fresh regarding transaction load state.
 
   const deleteBudget = useCallback((budgetId: string) => {
     setBudgets(prev => prev.filter(b => b.id !== budgetId));
@@ -208,7 +223,6 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
     return budgets.filter(b => b.month === targetMonthStr);
   }, [budgets]);
 
-  // This function can still be useful if a direct update is needed, though the context effect mostly handles it.
   const updateBudgetSpentAmount = useCallback((budgetId: string, allTransactions: Transaction[]) => {
     setBudgets(prevBudgets => {
       const targetBudgetIndex = prevBudgets.findIndex(b => b.id === budgetId);
@@ -233,9 +247,9 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
         return prevBudgets; 
       }
 
-      const updatedBudgets = [...prevBudgets];
-      updatedBudgets[targetBudgetIndex] = { ...targetBudget, spent: newSpent };
-      return updatedBudgets.sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category));
+      const updatedBudgetsArray = [...prevBudgets];
+      updatedBudgetsArray[targetBudgetIndex] = { ...targetBudget, spent: newSpent };
+      return updatedBudgetsArray.sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category));
     });
   }, []);
 
@@ -264,4 +278,4 @@ export const useBudgetContext = (): BudgetContextType => {
   return context;
 };
 
-    
+      
