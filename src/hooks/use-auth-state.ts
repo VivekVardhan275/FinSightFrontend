@@ -25,7 +25,8 @@ const APP_LOCAL_STORAGE_KEYS = [
   'sidebar_state',
 ];
 
-const EXTERNAL_API_FIRST_CHECK_URL = "http://localhost:8080/api/user/first-check";
+const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://localhost:8080";
+const EXTERNAL_API_FIRST_CHECK_URL = `${backendUrl}/api/user/first-check`;
 
 export function useAuthState() {
   const { data: session, status, update: updateNextAuthSession } = useSession();
@@ -35,7 +36,7 @@ export function useAuthState() {
   const firstCheckInitiatedForUserRef = useRef<string | null>(null);
 
   const isLoadingFromAuth = status === 'loading';
-  
+
   const user: AppUser | null = session?.user ? {
     name: session.user.name,
     email: session.user.email,
@@ -44,14 +45,18 @@ export function useAuthState() {
   } : null;
 
   const updateSession = useCallback(async (dataToUpdate: Partial<Session['user']>) => {
-    return updateNextAuthSession(dataToUpdate);
+    try {
+      return await updateNextAuthSession(dataToUpdate);
+    } catch (error) {
+      console.error("useAuthState: Error updating NextAuth session:", error);
+      // Potentially re-throw or handle as needed, for now just logging
+      return null;
+    }
   }, [updateNextAuthSession]);
 
   useEffect(() => {
     if (status === 'authenticated' && session?.user?.email && session.user.hasCompletedSetup === undefined) {
       const userEmailForCheck = session.user.email;
-      // Primary guard: only proceed if this check hasn't been initiated for the current user email
-      // AND an API call isn't already in progress (secondary guard for rapid re-renders before ref updates)
       if (firstCheckInitiatedForUserRef.current !== userEmailForCheck && !isApiCheckInProgress) {
         firstCheckInitiatedForUserRef.current = userEmailForCheck;
         setIsApiCheckInProgress(true);
@@ -66,7 +71,7 @@ export function useAuthState() {
           .catch(error => {
             console.error("Error calling 'first-check' API:", error);
             updateSession({ user: { ...session.user, hasCompletedSetup: false } });
-            firstCheckInitiatedForUserRef.current = null; 
+            firstCheckInitiatedForUserRef.current = null;
           })
           .finally(() => {
             setIsApiCheckInProgress(false);
@@ -74,20 +79,17 @@ export function useAuthState() {
       }
     } else if (status === 'unauthenticated') {
       firstCheckInitiatedForUserRef.current = null;
-      if(isApiCheckInProgress) setIsApiCheckInProgress(false); // Reset if user logs out during check
+      if(isApiCheckInProgress) setIsApiCheckInProgress(false);
     }
-  // Removed isApiCheckInProgress from dependency array.
-  // updateSession is memoized. session and status are from next-auth and should be stable unless auth state changes.
-  }, [session, status, updateSession]);
+  }, [session, status, updateSession, isApiCheckInProgress]);
 
 
   const navigateBasedOnAuthAndSetup = useCallback(() => {
     const isWaitingForAuth = isLoadingFromAuth;
-    // Condition for waiting: Auth is loading OR user is authenticated but setup status is unknown AND API check is active
     const isWaitingForApiCheck = status === 'authenticated' && user?.hasCompletedSetup === undefined && isApiCheckInProgress;
 
     if (isWaitingForAuth || isWaitingForApiCheck) {
-      return; 
+      return;
     }
 
     if (status === 'authenticated') {
@@ -100,11 +102,8 @@ export function useAuthState() {
           router.replace('/welcome/setup');
         }
       }
-      // If user.hasCompletedSetup is still undefined here, it means API check finished but didn't set it (edge case)
-      // or API check never ran (e.g. userEmail was null). Defaulting to setup page might be safest.
-      // However, the earlier `isWaitingForApiCheck` should mostly cover this.
     } else if (status === 'unauthenticated') {
-      if (pathname !== '/login' && pathname !== '/welcome/setup') { 
+      if (pathname !== '/login' && pathname !== '/welcome/setup') {
         router.replace('/login');
       }
     }
@@ -117,9 +116,9 @@ export function useAuthState() {
   const loginWithGoogle = useCallback(async () => {
     try {
       firstCheckInitiatedForUserRef.current = null;
-      setIsApiCheckInProgress(false); // Reset before sign-in attempt
+      setIsApiCheckInProgress(false);
       const result = await signIn('google', { callbackUrl: '/dashboard', redirect: false });
-      if (result?.url) router.push(result.url); 
+      if (result?.url) router.push(result.url);
       else if (result?.error) console.error("NextAuth signIn error (Google):", result.error);
     } catch (error) {
       console.error("Catastrophic error during Google signIn:", error);
@@ -129,9 +128,9 @@ export function useAuthState() {
   const loginWithGitHub = useCallback(async () => {
     try {
       firstCheckInitiatedForUserRef.current = null;
-      setIsApiCheckInProgress(false); // Reset before sign-in attempt
+      setIsApiCheckInProgress(false);
       const result = await signIn('github', { callbackUrl: '/dashboard', redirect: false });
-      if (result?.url) router.push(result.url); 
+      if (result?.url) router.push(result.url);
       else if (result?.error) console.error("NextAuth signIn error (GitHub):", result.error);
     } catch (error) {
       console.error("Catastrophic error during GitHub signIn:", error);
@@ -139,8 +138,8 @@ export function useAuthState() {
   }, [router]);
 
   const appLogout = useCallback(async () => {
-    firstCheckInitiatedForUserRef.current = null; 
-    setIsApiCheckInProgress(false); // Reset on logout
+    firstCheckInitiatedForUserRef.current = null;
+    setIsApiCheckInProgress(false);
     if (typeof window !== "undefined") {
       APP_LOCAL_STORAGE_KEYS.forEach(key => {
         try {
@@ -158,9 +157,6 @@ export function useAuthState() {
     }
   }, [router]);
 
-  // isLoading now reflects:
-  // 1. NextAuth session is loading OR
-  // 2. User is authenticated, hasCompletedSetup is still undefined (meaning API call pending or in progress), AND the API call is marked as in progress.
   const combinedIsLoading = isLoadingFromAuth || (status === 'authenticated' && user?.hasCompletedSetup === undefined && isApiCheckInProgress);
 
   return {
@@ -170,7 +166,7 @@ export function useAuthState() {
     loginWithGitHub,
     logout: appLogout,
     isAuthenticated: status === 'authenticated',
-    status, // Expose raw status for more granular checks if needed
+    status,
     updateSession,
   };
 }

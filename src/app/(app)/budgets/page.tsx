@@ -26,7 +26,8 @@ import { motion } from "framer-motion";
 import { useAuthState } from '@/hooks/use-auth-state';
 import axios from 'axios';
 
-const BUDGET_API_BASE_URL = "http://localhost:8080/api/user/budgets";
+const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://localhost:8080";
+const BUDGET_API_BASE_URL = `${backendUrl}/api/user/budgets`;
 
 // Type for budget data received from API (without 'spent')
 type BudgetFromApi = Omit<Budget, 'spent'>;
@@ -138,7 +139,7 @@ export default function BudgetsPage() {
     }
   };
 
-  const handleSaveBudget = async (formData: BudgetFormData) => { 
+  const handleSaveBudget = async (formData: BudgetFormData) => {
     if (!user || !user.email) {
       addNotification({ title: "Error", description: "User not authenticated. Cannot save budget.", type: "error" });
       return;
@@ -153,7 +154,7 @@ export default function BudgetsPage() {
 
     const existingBudgetWithSameCategoryMonth = budgets.find(existingBudget => {
       if (isActualEditOperation && editingBudget && existingBudget.id === editingBudget.id) {
-        return false; 
+        return false;
       }
       return existingBudget.category.toLowerCase() === newBudgetCategoryLower &&
              existingBudget.month === newBudgetMonth;
@@ -181,11 +182,11 @@ export default function BudgetsPage() {
       setIsSaving(false);
       return;
     }
-    
+
     // Data for API: category, allocated (in INR), month. 'spent' and 'id' (for new) are handled by backend/context.
-    const dataForApi = { 
+    const dataForApi = {
       category: formData.category,
-      allocated: allocatedInINR, 
+      allocated: allocatedInINR,
       month: formData.month,
     };
 
@@ -205,10 +206,10 @@ export default function BudgetsPage() {
         savedBudgetFromApi = response.data; // Backend adds ID
         finalBudgetInContext = addBudget(savedBudgetFromApi); // Context adds, initializes spent to 0
       }
-      
+
       // Recalculate spent amount for this specific budget
       updateBudgetSpentAmount(finalBudgetInContext.id, transactions);
-      
+
       addNotification({
           title: `Budget ${notificationAction}`,
           description: `Budget for ${finalBudgetInContext.category} successfully ${notificationAction.toLowerCase()}.`,
@@ -253,7 +254,7 @@ export default function BudgetsPage() {
           </Button>
         </motion.div>
       </div>
-      
+
       {isLoadingBudgets ? (
         <div className="flex items-center justify-center p-10">
           <RotateCw className="mr-2 h-6 w-6 animate-spin text-primary" />
@@ -315,8 +316,8 @@ export default function BudgetsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setBudgetToDeleteId(null)} disabled={isDeleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-                onClick={handleDeleteBudget} 
+            <AlertDialogAction
+                onClick={handleDeleteBudget}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 disabled={isDeleting}
             >

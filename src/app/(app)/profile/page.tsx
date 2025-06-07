@@ -16,7 +16,8 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import axios from "axios"; // Import axios
 
-const PROFILE_API_URL = "http://localhost:8080/api/user/profile";
+const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://localhost:8080";
+const PROFILE_API_URL = `${backendUrl}/api/user/profile`;
 
 const pageHeaderBlockMotionVariants = {
   initial: { opacity: 0, x: -20 },
@@ -49,9 +50,9 @@ export default function ProfilePage() {
   const [initialPhoneNumberForEdit, setInitialPhoneNumberForEdit] = useState("");
   const [initialDateOfBirthForEdit, setInitialDateOfBirthForEdit] = useState("");
   const [initialGenderForEdit, setInitialGenderForEdit] = useState("");
-  
+
   const [isEditingPersonalInfo, setIsEditingPersonalInfo] = useState(false);
-  
+
   const profileFetchedForUserRef = useRef<string | null>(null);
   const [isProfileDataLoading, setIsProfileDataLoading] = useState(true); // Initialize to true
   const [isSaving, setIsSaving] = useState(false);
@@ -237,7 +238,7 @@ export default function ProfilePage() {
       description: "Your email address cannot be changed here. It's tied to your login provider.",
     });
   };
-  
+
   const getFormattedGender = (genderValue: string) => {
     if (!genderValue) return ""; // Placeholder if not set
     const formatted = genderValue.charAt(0).toUpperCase() + genderValue.slice(1).replace(/_/g, " ");

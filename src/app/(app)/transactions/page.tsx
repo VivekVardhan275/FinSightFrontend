@@ -28,7 +28,8 @@ import { motion } from "framer-motion";
 import { useAuthState } from '@/hooks/use-auth-state';
 import axios from 'axios';
 
-const TRANSACTION_API_BASE_URL = "http://localhost:8080/api/user/transactions";
+const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://localhost:8080";
+const TRANSACTION_API_BASE_URL = `${backendUrl}/api/user/transactions`;
 
 
 const buttonMotionVariants = {
@@ -80,7 +81,7 @@ export default function TransactionsPage() {
     });
 
     affectedBudgets.forEach(budget => {
-      updateBudgetSpentAmount(budget.id, transactions); 
+      updateBudgetSpentAmount(budget.id, transactions);
     });
   };
 
@@ -110,7 +111,7 @@ export default function TransactionsPage() {
 
     try {
       await axios.delete(`${TRANSACTION_API_BASE_URL}/${transactionToDeleteId}?email=${encodeURIComponent(user.email)}`);
-      
+
       const transactionToDelete = transactions.find(t => t.id === transactionToDeleteId);
       deleteTransactionFromContext(transactionToDeleteId);
       addNotification({
@@ -159,7 +160,7 @@ export default function TransactionsPage() {
             existingTx.description.toLowerCase() === formTxDescriptionLower &&
             existingTx.category.toLowerCase() === formTxCategoryLower &&
             existingTx.type === formTxType &&
-            existingTx.amount !== amountInINR 
+            existingTx.amount !== amountInINR
         );
 
         if (similarExistingTx) {
@@ -175,15 +176,15 @@ export default function TransactionsPage() {
             return;
         }
     }
-    
+
     const exactDuplicateTx = transactions.find(existingTx => {
         if (isActualEditOperation && existingTx.id === editingTransaction!.id) {
-            return false; 
+            return false;
         }
         return existingTx.date === formattedDate &&
                existingTx.description.toLowerCase() === formTxDescriptionLower &&
                existingTx.category.toLowerCase() === formTxCategoryLower &&
-               existingTx.amount === amountInINR && 
+               existingTx.amount === amountInINR &&
                existingTx.type === formTxType;
     });
 
@@ -200,26 +201,26 @@ export default function TransactionsPage() {
 
     let originalTransactionDetailsForEdit: { category: string; date: string; type: 'income' | 'expense', amount: number } | undefined = undefined;
 
-    const dataForApi = { 
+    const dataForApi = {
         date: formattedDate,
         description: formData.description,
         category: formData.category,
-        amount: amountInINR, 
+        amount: amountInINR,
         type: formData.type,
     };
 
     try {
       let savedTransaction: Transaction;
       if (isActualEditOperation && editingTransaction) {
-        originalTransactionDetailsForEdit = { 
-            category: editingTransaction.category, 
-            date: editingTransaction.date, 
-            type: editingTransaction.type, 
-            amount: editingTransaction.amount 
+        originalTransactionDetailsForEdit = {
+            category: editingTransaction.category,
+            date: editingTransaction.date,
+            type: editingTransaction.type,
+            amount: editingTransaction.amount
         };
         const transactionToUpdate: Transaction = { ...dataForApi, id: editingTransaction.id };
         const response = await axios.put<Transaction>(`${TRANSACTION_API_BASE_URL}/${editingTransaction.id}?email=${encodeURIComponent(user.email)}`, transactionToUpdate);
-        savedTransaction = response.data; 
+        savedTransaction = response.data;
         updateTransaction(savedTransaction);
         addNotification({
             title: `Transaction Updated`,
@@ -230,7 +231,7 @@ export default function TransactionsPage() {
 
       } else {
         const response = await axios.post<Transaction>(`${TRANSACTION_API_BASE_URL}?email=${encodeURIComponent(user.email)}`, dataForApi);
-        savedTransaction = response.data; 
+        savedTransaction = response.data;
         addTransaction(savedTransaction);
         addNotification({
             title: `Transaction Added`,
@@ -242,7 +243,7 @@ export default function TransactionsPage() {
 
       setIsFormOpen(false);
       setEditingTransaction(null);
-      
+
       if (isActualEditOperation && originalTransactionDetailsForEdit) {
           const oldCat = originalTransactionDetailsForEdit.category;
           const oldDate = originalTransactionDetailsForEdit.date;
@@ -336,8 +337,8 @@ export default function TransactionsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setTransactionToDeleteId(null)} disabled={isDeleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleDeleteTransaction} 
+            <AlertDialogAction
+              onClick={handleDeleteTransaction}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={isDeleting}
             >
@@ -350,4 +351,3 @@ export default function TransactionsPage() {
     </div>
   );
 }
-

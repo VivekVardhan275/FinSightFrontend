@@ -18,8 +18,9 @@ import axios from "axios";
 import { DeleteAccountDialog } from "@/components/settings/delete-account-dialog";
 import { Separator } from "@/components/ui/separator";
 
-const SETTINGS_API_URL = "http://localhost:8080/api/user/settings";
-const ACCOUNT_DELETE_API_URL = "http://localhost:8080/api/user/account/delete";
+const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://localhost:8080";
+const SETTINGS_API_URL = `${backendUrl}/api/user/settings`;
+const ACCOUNT_DELETE_API_URL = `${backendUrl}/api/user/account/delete`;
 
 const pageHeaderBlockMotionVariants = {
   initial: { opacity: 0, x: -20 },
@@ -57,7 +58,6 @@ const initializeFromLocalStorage = <T,>(
         valueToUse = parser(storedValue);
       } else {
         // If no parser, assume the stored value is directly usable as type T (e.g., string literal types)
-        // This prevents JSON.parse errors for simple string values like "medium" or "dark"
         valueToUse = storedValue as unknown as T;
       }
       if (validator ? validator(valueToUse) : true) {
@@ -81,7 +81,7 @@ export default function SettingsPage() {
   const [formTheme, setFormTheme] = useState<ThemeSetting>("system");
   const [formFontSize, setFormFontSize] = useState<FontSizeSetting>("medium");
   const [formCurrency, setFormCurrency] = useState<AppCurrency>("INR");
-  
+
   const [isSettingsReflectingGlobal, setIsSettingsReflectingGlobal] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
@@ -107,7 +107,7 @@ export default function SettingsPage() {
         "medium",
         (v) => !!FONT_SIZE_CLASSES[v as FontSizeSetting]
       ));
-      
+
       // Initialize currency
       if (globalSelectedCurrency) {
         setFormCurrency(globalSelectedCurrency);
@@ -137,7 +137,7 @@ export default function SettingsPage() {
     setIsSavingSettings(true);
 
     // Apply and save theme
-    setGlobalTheme(formTheme); 
+    setGlobalTheme(formTheme);
     try {
         localStorage.setItem("app-theme", formTheme);
     } catch (e) {
@@ -151,7 +151,7 @@ export default function SettingsPage() {
 
     // Apply and save font size
     try {
-        localStorage.setItem("app-font-size", formFontSize); 
+        localStorage.setItem("app-font-size", formFontSize);
     } catch (e) {
         // console.error("Error saving app-font-size to localStorage", e);
     }
@@ -173,7 +173,7 @@ export default function SettingsPage() {
 
     try {
       await axios.put(`${SETTINGS_API_URL}?email=${encodeURIComponent(user.email)}`, settingsToSaveToBackend);
-      
+
       toast({
         title: "Settings Saved",
         description: "Your preferences have been successfully saved and applied.",
@@ -220,10 +220,10 @@ export default function SettingsPage() {
         variant: "default",
       });
       setIsDeleteAccountDialogOpen(false);
-      
+
       // Wait for toast to be visible then logout
       setTimeout(async () => {
-        await logout(); 
+        await logout();
       }, 2000);
 
     } catch (error) {
@@ -282,8 +282,8 @@ export default function SettingsPage() {
           <CardContent className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="theme-select">Theme</Label>
-              <Select 
-                value={formTheme} 
+              <Select
+                value={formTheme}
                 onValueChange={(value: string) => setFormTheme(value as ThemeSetting)}
                 disabled={isSavingSettings}
               >
@@ -300,9 +300,9 @@ export default function SettingsPage() {
 
             <div className="space-y-2">
               <Label>Font Size</Label>
-              <RadioGroup 
-                value={formFontSize} 
-                onValueChange={(value: string) => setFormFontSize(value as FontSizeSetting)} 
+              <RadioGroup
+                value={formFontSize}
+                onValueChange={(value: string) => setFormFontSize(value as FontSizeSetting)}
                 className="flex space-x-4"
                 disabled={isSavingSettings}
               >
@@ -336,8 +336,8 @@ export default function SettingsPage() {
           <CardContent className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="currency-select">Currency</Label>
-              <Select 
-                value={formCurrency} 
+              <Select
+                value={formCurrency}
                 onValueChange={(value: string) => setFormCurrency(value as AppCurrency)}
                 disabled={isSavingSettings}
               >
@@ -398,7 +398,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-    
-
-    
-

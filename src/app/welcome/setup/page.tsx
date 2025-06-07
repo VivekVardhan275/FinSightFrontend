@@ -10,14 +10,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
-import { useAuthState } from "@/hooks/use-auth-state"; 
+import { useAuthState } from "@/hooks/use-auth-state";
 import { useTheme } from "next-themes";
 import { useCurrency, type Currency as AppCurrency } from "@/contexts/currency-context";
 import { useToast } from "@/hooks/use-toast";
 import { User as UserIconLucide, Palette, Globe, Save, RotateCw } from "lucide-react";
 import { motion } from "framer-motion";
 import axios from "axios";
-import { useRouter } from "next/navigation"; 
+import { useRouter } from "next/navigation";
 
 
 type ThemeSetting = "light" | "dark" | "system";
@@ -52,13 +52,14 @@ const initializeFromLocalStorage = <T,>(
   return defaultValue;
 };
 
-const USER_SETUP_API_URL = "http://localhost:8080/api/user/setup";
+const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://localhost:8080";
+const USER_SETUP_API_URL = `${backendUrl}/api/user/setup`;
 
 
 export default function SetupPage() {
   const { user, isLoading: authStateIsLoading, status, updateSession } = useAuthState();
-  const router = useRouter(); 
-  
+  const router = useRouter();
+
   const { setTheme: setGlobalTheme } = useTheme();
   const { selectedCurrency: initialGlobalCurrency, setSelectedCurrency: setGlobalCurrencyContext } = useCurrency();
   const { toast } = useToast();
@@ -81,7 +82,7 @@ export default function SetupPage() {
     )
   );
   const [formCurrency, setFormCurrency] = useState<AppCurrency>(initialGlobalCurrency);
-  
+
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -93,10 +94,10 @@ export default function SetupPage() {
   const handleSaveSetup = useCallback(async () => {
     if (!user || !user.email) {
       toast({ title: "Error", description: "User information is missing. Please try logging in again.", variant: "destructive" });
-      router.push('/login'); 
+      router.push('/login');
       return;
     }
-    
+
     if (!formDateOfBirth) {
       toast({ title: "Validation Error", description: "Date of Birth is required.", variant: "destructive" });
       return;
@@ -105,11 +106,11 @@ export default function SetupPage() {
     setIsSaving(true);
 
     const setupPayload = {
-      email: user.email, 
-      displayName: formDisplayName || user.name, 
-      phoneNumber: formPhoneNumber || null, 
-      dateOfBirth: formDateOfBirth, 
-      gender: formGender || null, 
+      email: user.email,
+      displayName: formDisplayName || user.name,
+      phoneNumber: formPhoneNumber || null,
+      dateOfBirth: formDateOfBirth,
+      gender: formGender || null,
       theme: formTheme,
       fontSize: formFontSize,
       currency: formCurrency,
@@ -119,7 +120,7 @@ export default function SetupPage() {
       await axios.post(USER_SETUP_API_URL, setupPayload);
 
       // Apply settings globally AFTER successful save
-      setGlobalTheme(formTheme); 
+      setGlobalTheme(formTheme);
       localStorage.setItem("app-theme", formTheme);
 
       localStorage.setItem("app-font-size", formFontSize);
@@ -130,19 +131,19 @@ export default function SetupPage() {
       } else {
          htmlElement.classList.add(FONT_SIZE_CLASSES.medium); // Default if invalid
       }
-      
+
       setGlobalCurrencyContext(formCurrency);
       // Note: useCurrency context already saves to localStorage
 
-      await updateSession({ user: { ...user, name: formDisplayName, hasCompletedSetup: true } }); 
-      
+      await updateSession({ user: { ...user, name: formDisplayName, hasCompletedSetup: true } });
+
       toast({
         title: "Setup Complete!",
         description: "Your profile and preferences have been saved.",
         variant: "default"
       });
-      
-      await new Promise(resolve => setTimeout(resolve, 300)); 
+
+      await new Promise(resolve => setTimeout(resolve, 300));
       router.push('/dashboard');
 
     } catch (error) {
@@ -161,8 +162,8 @@ export default function SetupPage() {
     }
 
   }, [
-      user, formDisplayName, formPhoneNumber, formDateOfBirth, formGender, 
-      formTheme, formFontSize, formCurrency, 
+      user, formDisplayName, formPhoneNumber, formDateOfBirth, formGender,
+      formTheme, formFontSize, formCurrency,
       setGlobalCurrencyContext, setGlobalTheme, router, toast, updateSession
     ]);
 
@@ -190,7 +191,7 @@ export default function SetupPage() {
   const handleFontSizeChange = useCallback((value: string) => {
     setFormFontSize(value as FontSizeSetting);
   }, []);
-  
+
   const handleCurrencyChange = useCallback((value: string) => {
     setFormCurrency(value as AppCurrency);
   }, []);
@@ -204,7 +205,7 @@ export default function SetupPage() {
       </div>
     );
   }
-  
+
   if (status !== 'authenticated' || (status === 'authenticated' && user?.hasCompletedSetup !== false)) {
     return (
         <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -241,8 +242,8 @@ export default function SetupPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="fullName">Full Name</Label>
-                  <Input 
-                    id="fullName" 
+                  <Input
+                    id="fullName"
                     value={formDisplayName}
                     onChange={handleDisplayNameChange}
                     placeholder="Your full name"
@@ -251,34 +252,34 @@ export default function SetupPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="email">Email Address</Label>
-                  <Input 
-                    id="email" 
+                  <Input
+                    id="email"
                     value={user?.email || ""}
-                    readOnly 
+                    readOnly
                     className="cursor-not-allowed bg-muted/50"
                     disabled={isSaving}
                   />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="phone">Phone Number (Optional)</Label>
-                  <Input 
-                    id="phone" 
-                    type="tel" 
-                    placeholder="(123) 456-7890" 
-                    value={formPhoneNumber} 
-                    onChange={handlePhoneNumberChange} 
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="(123) 456-7890"
+                    value={formPhoneNumber}
+                    onChange={handlePhoneNumberChange}
                     disabled={isSaving}
                   />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="dateOfBirth">Date of Birth</Label>
-                  <Input 
-                    id="dateOfBirth" 
-                    type="date" 
-                    value={formDateOfBirth} 
-                    onChange={handleDateOfBirthChange} 
+                  <Input
+                    id="dateOfBirth"
+                    type="date"
+                    value={formDateOfBirth}
+                    onChange={handleDateOfBirthChange}
                     disabled={isSaving}
-                    max={new Date().toISOString().split("T")[0]} 
+                    max={new Date().toISOString().split("T")[0]}
                   />
                 </div>
                 <div className="space-y-1.5 md:col-span-2">
@@ -338,7 +339,7 @@ export default function SetupPage() {
                 </div>
               </div>
             </section>
-            
+
             <Separator />
 
             <section className="space-y-6">
@@ -363,7 +364,7 @@ export default function SetupPage() {
             </section>
 
             <Separator className="my-6"/>
-            
+
             <div className="flex justify-end">
               <Button onClick={handleSaveSetup} size="lg" disabled={isSaving || status === 'loading'}>
                 {isSaving ? <RotateCw className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-5 w-5" />}
@@ -379,8 +380,3 @@ export default function SetupPage() {
     </div>
   );
 }
-    
-
-    
-
-    

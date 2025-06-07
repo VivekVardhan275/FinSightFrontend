@@ -7,7 +7,8 @@ import { useTheme } from 'next-themes';
 import { useCurrency, type Currency as AppCurrency } from '@/contexts/currency-context';
 import axios from 'axios';
 
-const SETTINGS_API_URL = "http://localhost:8080/api/user/settings";
+const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://localhost:8080";
+const SETTINGS_API_URL = `${backendUrl}/api/user/settings`;
 
 type ThemeSetting = "light" | "dark" | "system";
 type FontSizeSetting = "small" | "medium" | "large";
@@ -27,6 +28,7 @@ export function UserSettingsLoader() {
 
   const applyFontSize = useCallback((fontSize: FontSizeSetting) => {
     if (typeof window !== "undefined") {
+      try {
         localStorage.setItem("app-font-size", fontSize);
         const htmlElement = document.documentElement;
         Object.values(FONT_SIZE_CLASSES).forEach(cls => htmlElement.classList.remove(cls));
@@ -36,6 +38,13 @@ export function UserSettingsLoader() {
           htmlElement.classList.add(FONT_SIZE_CLASSES.medium);
           localStorage.setItem("app-font-size", "medium");
         }
+      } catch (error) {
+        console.error("UserSettingsLoader: Error applying font size or saving to localStorage", error);
+        // Fallback to medium if error occurs
+        const htmlElement = document.documentElement;
+        Object.values(FONT_SIZE_CLASSES).forEach(cls => htmlElement.classList.remove(cls));
+        htmlElement.classList.add(FONT_SIZE_CLASSES.medium);
+      }
     }
   }, []);
 
@@ -54,14 +63,18 @@ export function UserSettingsLoader() {
 
             if (fetchedSettings.theme && ["light", "dark", "system"].includes(fetchedSettings.theme)) {
               setTheme(fetchedSettings.theme as ThemeSetting);
-              localStorage.setItem("app-theme", fetchedSettings.theme);
+              try {
+                localStorage.setItem("app-theme", fetchedSettings.theme);
+              } catch (e) {
+                console.error("UserSettingsLoader: Error saving theme to localStorage", e);
+              }
             }
             if (fetchedSettings.fontSize && FONT_SIZE_CLASSES[fetchedSettings.fontSize as FontSizeSetting]) {
               applyFontSize(fetchedSettings.fontSize as FontSizeSetting);
             }
             if (fetchedSettings.currency) {
               setSelectedCurrency(fetchedSettings.currency as AppCurrency);
-              localStorage.setItem("app-currency", fetchedSettings.currency);
+              // Currency context handles its own localStorage
             }
           })
           .catch(error => {

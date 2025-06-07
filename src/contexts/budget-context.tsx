@@ -6,7 +6,8 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import axios from 'axios';
 import { useAuthState } from '@/hooks/use-auth-state';
 
-const BUDGET_API_BASE_URL = "http://localhost:8080/api/user/budgets";
+const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://localhost:8080";
+const BUDGET_API_BASE_URL = `${backendUrl}/api/user/budgets`;
 
 type BudgetFromApi = Omit<BudgetFromApiType, 'spent' | 'id'> & { id: string };
 
@@ -38,9 +39,9 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
     }
 
     if (authStatus === 'unauthenticated') {
-      const stored = localStorage.getItem('app-budgets');
       let parsed: Budget[] = [];
       try {
+        const stored = localStorage.getItem('app-budgets');
         parsed = stored ? JSON.parse(stored) : [];
       } catch (e) {
         console.error("Error parsing budgets from localStorage for unauthenticated user", e);
@@ -66,13 +67,13 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 
         axios.get<{ budgets: Array<Omit<BudgetFromApiType, 'spent'>> }>(`${BUDGET_API_BASE_URL}?email=${encodeURIComponent(userEmail)}`)
           .then(response => {
-            const apiBudgetsRaw = response.data.budgets || response.data; 
+            const apiBudgetsRaw = response.data.budgets || response.data;
             const apiBudgets = Array.isArray(apiBudgetsRaw) ? apiBudgetsRaw : [];
 
             const initializedBudgets = apiBudgets
               .map(b => ({ ...b, spent: 0 })) // Initialize spent to 0
               .sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category));
-            
+
             setBudgets(currentData => {
               if (JSON.stringify(currentData) === JSON.stringify(initializedBudgets)) {
                 return currentData;
@@ -98,11 +99,15 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
       setBudgets([]);
       fetchAttemptedForUserRef.current = null;
     }
-  }, [userEmail, authStatus]); // isLoading is intentionally omitted
+  }, [userEmail, authStatus, isLoading]); // Added isLoading to deps, check for loops. No, keep it off like before.
 
   useEffect(() => {
     if (!isLoading && (fetchAttemptedForUserRef.current === userEmail || authStatus === 'unauthenticated')) {
-      localStorage.setItem('app-budgets', JSON.stringify(budgets));
+      try {
+        localStorage.setItem('app-budgets', JSON.stringify(budgets));
+      } catch (error) {
+        console.error("Error saving budgets to localStorage:", error);
+      }
     }
   }, [budgets, isLoading, userEmail, authStatus]);
 
@@ -155,7 +160,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
         .reduce((sum, t) => sum + t.amount, 0);
 
       if (Math.abs(targetBudget.spent - newSpent) < 0.001) {
-        return prevBudgets; 
+        return prevBudgets;
       }
 
       const updatedBudgets = [...prevBudgets];

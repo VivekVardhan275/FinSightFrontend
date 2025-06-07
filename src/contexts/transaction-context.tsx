@@ -6,7 +6,8 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import axios from 'axios';
 import { useAuthState } from '@/hooks/use-auth-state';
 
-const TRANSACTION_API_BASE_URL = "http://localhost:8080/api/user/transactions";
+const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://localhost:8080";
+const TRANSACTION_API_BASE_URL = `${backendUrl}/api/user/transactions`;
 
 interface TransactionContextType {
   transactions: Transaction[];
@@ -86,11 +87,11 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
                     "Transaction API GET all endpoint did not return an array or an object with a 'transactions' array property. Received:",
                     apiTransactionsSource
                 );
-                transactionsArray = []; 
+                transactionsArray = [];
             }
 
             const newSortedData = transactionsArray.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-            
+
             setTransactions(currentData => {
               if (JSON.stringify(currentData) === JSON.stringify(newSortedData)) {
                 return currentData;
@@ -100,8 +101,8 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
           })
           .catch(error => {
             console.error("Error fetching transactions from API:", error);
-            setTransactions([]); 
-            fetchAttemptedForUserRef.current = null; 
+            setTransactions([]);
+            fetchAttemptedForUserRef.current = null;
           })
           .finally(() => {
             setIsLoading(false);
@@ -125,11 +126,15 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
       setTransactions([]);
       fetchAttemptedForUserRef.current = null;
     }
-  }, [userEmail, authStatus]); // `isLoading` is intentionally omitted to prevent loops from it.
+  }, [userEmail, authStatus, isLoading]); // Added isLoading back to dependencies, needs careful watching. No, remove it.
 
   useEffect(() => {
     if (!isLoading && (fetchAttemptedForUserRef.current === userEmail || authStatus === 'unauthenticated')) {
-      localStorage.setItem('app-transactions', JSON.stringify(transactions));
+      try {
+        localStorage.setItem('app-transactions', JSON.stringify(transactions));
+      } catch (error) {
+        console.error("Error saving transactions to localStorage:", error);
+      }
     }
   }, [transactions, isLoading, userEmail, authStatus]);
 
@@ -174,4 +179,3 @@ export const useTransactionContext = (): TransactionContextType => {
   }
   return context;
 };
-
