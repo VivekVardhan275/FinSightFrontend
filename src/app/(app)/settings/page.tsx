@@ -44,7 +44,7 @@ const initializeFromLocalStorage = <T,>(
   key: string,
   defaultValue: T,
   validator?: (value: any) => boolean,
-  parser?: (storedValue: string) => T 
+  parser?: (storedValue: string) => T
 ): T => {
   if (typeof window === "undefined") {
     return defaultValue;
@@ -53,13 +53,10 @@ const initializeFromLocalStorage = <T,>(
     const storedValue = localStorage.getItem(key);
     if (storedValue !== null) {
       let valueToUse: T;
-      if (parser) { 
+      if (parser) {
         valueToUse = parser(storedValue);
       } else {
-        // For simple string values or when no parser is needed.
-        // Cast 'as unknown as T' is used because storedValue is string, 
-        // but T could be a more specific string literal type (like ThemeSetting).
-        valueToUse = storedValue as unknown as T; 
+        valueToUse = storedValue as unknown as T;
       }
       if (validator ? validator(valueToUse) : true) {
         return valueToUse;
@@ -73,7 +70,7 @@ const initializeFromLocalStorage = <T,>(
 
 
 export default function SettingsPage() {
-  const { user, isLoading: authLoading, logout } = useAuthState(); // Destructure logout
+  const { user, isLoading: authLoading, logout } = useAuthState();
   const { theme: activeGlobalTheme, setTheme: setGlobalTheme } = useTheme();
   const { toast } = useToast();
   const { selectedCurrency: globalSelectedCurrency, setSelectedCurrency: setGlobalSelectedCurrency } = useCurrency();
@@ -113,7 +110,12 @@ export default function SettingsPage() {
       if (globalSelectedCurrency) {
         setFormCurrency(globalSelectedCurrency);
       } else {
-        const storedCurrency = localStorage.getItem("app-currency") as AppCurrency | null;
+        let storedCurrency: AppCurrency | null = null;
+        try {
+            storedCurrency = localStorage.getItem("app-currency") as AppCurrency | null;
+        } catch (e) {
+            // console.error("Error reading app-currency from localStorage", e);
+        }
         if (storedCurrency && ["INR", "USD", "EUR", "GBP"].includes(storedCurrency)) {
             setFormCurrency(storedCurrency);
         } else {
@@ -134,14 +136,23 @@ export default function SettingsPage() {
 
     // Apply and save theme
     setGlobalTheme(formTheme); 
-    localStorage.setItem("app-theme", formTheme);
+    try {
+        localStorage.setItem("app-theme", formTheme);
+    } catch (e) {
+        // console.error("Error saving app-theme to localStorage", e);
+    }
+
 
     // Apply and save currency
     setGlobalSelectedCurrency(formCurrency);
     // useCurrency context handles localStorage for currency
 
     // Apply and save font size
-    localStorage.setItem("app-font-size", formFontSize); 
+    try {
+        localStorage.setItem("app-font-size", formFontSize); 
+    } catch (e) {
+        // console.error("Error saving app-font-size to localStorage", e);
+    }
     if (typeof window !== "undefined") {
         const htmlElement = document.documentElement;
         Object.values(FONT_SIZE_CLASSES).forEach(cls => htmlElement.classList.remove(cls));
@@ -198,7 +209,10 @@ export default function SettingsPage() {
     }
     setIsDeletingAccount(true);
     try {
-      await axios.delete(`${ACCOUNT_DELETE_API_URL}?email=${encodeURIComponent(user.email)}`);
+      // Include confirmationCode in the request body
+      await axios.delete(`${ACCOUNT_DELETE_API_URL}?email=${encodeURIComponent(user.email)}`, {
+        data: { confirmationCode: confirmationCode }
+      });
 
       toast({
         title: "Account Deletion Successful",
@@ -208,7 +222,6 @@ export default function SettingsPage() {
       setIsDeleteAccountDialogOpen(false);
       
       // Wait for toast to be visible then logout
-      // The logout function from useAuthState handles localStorage clearing and NextAuth signOut
       setTimeout(async () => {
         await logout(); 
       }, 2000);
@@ -226,9 +239,8 @@ export default function SettingsPage() {
         description: errorMessage,
         variant: "destructive",
       });
-      setIsDeletingAccount(false); // Keep dialog open or allow retry if API call failed
+      setIsDeletingAccount(false);
     }
-    // No finally here for setIsDeletingAccount, as logout will unmount component on success
   };
 
 
