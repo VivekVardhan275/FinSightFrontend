@@ -71,8 +71,9 @@ const emptyStateMotionVariants = {
 
 export default function BudgetsPage() {
   const { user } = useAuthState();
-  const { budgets, isLoading: isLoadingBudgets, addBudget, updateBudget, deleteBudget: deleteBudgetFromContext, updateBudgetSpentAmount } = useBudgetContext();
-  const { transactions } = useTransactionContext(); // For calculating spent amounts
+  const { budgets, isLoading: isLoadingBudgets, addBudget, updateBudget, deleteBudget: deleteBudgetFromContext } = useBudgetContext();
+  // transactions are used by BudgetContext internally now.
+  // const { transactions } = useTransactionContext(); 
   const { selectedCurrency, convertAmount, conversionRates } = useCurrency();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
@@ -83,16 +84,7 @@ export default function BudgetsPage() {
 
   const { addNotification } = useNotification();
 
-  // Effect to recalculate all budget spent amounts when transactions change
-  // This ensures that budget cards are up-to-date if transactions are modified elsewhere
-  useEffect(() => {
-    if (budgets.length > 0 && transactions.length > 0) {
-      budgets.forEach(budget => {
-        updateBudgetSpentAmount(budget.id, transactions);
-      });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transactions, budgets.length]); // Only re-run if transactions or number of budgets change
+  // Removed useEffect that called updateBudgetSpentAmount, as BudgetContext now handles this reactively.
 
   const handleAddBudget = () => {
     setEditingBudget(null);
@@ -189,7 +181,6 @@ export default function BudgetsPage() {
       return;
     }
 
-    // Data for API: category, allocated (in INR), month. 'spent' and 'id' (for new) are handled by backend/context.
     const dataForApi = {
       category: formData.category,
       allocated: allocatedInINR,
@@ -199,26 +190,23 @@ export default function BudgetsPage() {
     let notificationAction = isActualEditOperation ? "Updated" : "Added";
 
     try {
-      let savedBudgetFromApi: BudgetFromApi; // Backend returns budget without 'spent'
-      let finalBudgetInContext: Budget;
+      let savedBudgetFromApi: BudgetFromApi;
 
       if (isActualEditOperation && editingBudget) {
         const response = await axios.put<BudgetFromApi>(`${BUDGET_API_BASE_URL}/${editingBudget.id}?email=${encodeURIComponent(user.email)}`, dataForApi);
         savedBudgetFromApi = response.data;
-        updateBudget(savedBudgetFromApi); // Context updates details, preserves old spent temporarily
-        finalBudgetInContext = budgets.find(b => b.id === savedBudgetFromApi.id)!; // Get the updated budget from context
+        updateBudget(savedBudgetFromApi); // Context updates details, preserves old spent temporarily. Reactive effect in context will recalc spent.
       } else {
         const response = await axios.post<BudgetFromApi>(`${BUDGET_API_BASE_URL}?email=${encodeURIComponent(user.email)}`, dataForApi);
         savedBudgetFromApi = response.data; // Backend adds ID
-        finalBudgetInContext = addBudget(savedBudgetFromApi); // Context adds, initializes spent to 0
+        addBudget(savedBudgetFromApi); // Context adds, initializes spent to 0. Reactive effect in context will recalc spent.
       }
 
-      // Recalculate spent amount for this specific budget
-      updateBudgetSpentAmount(finalBudgetInContext.id, transactions);
-
+      // Success notification relies on savedBudgetFromApi which has correct category/month from API.
+      // The 'spent' amount will be updated reactively by the context.
       addNotification({
           title: `Budget ${notificationAction}`,
-          description: `Budget for ${finalBudgetInContext.category} successfully ${notificationAction.toLowerCase()}.`,
+          description: `Budget for ${savedBudgetFromApi.category} successfully ${notificationAction.toLowerCase()}.`,
           type: 'success',
           href: '/budgets'
         });
@@ -313,8 +301,8 @@ export default function BudgetsPage() {
       <BudgetFormDialog
         open={isFormOpen}
         onOpenChange={setIsFormOpen}
-        budget={editingBudget} // Pass full budget with frontend-calculated 'spent' for editing context
-        onSave={handleSaveBudget} // This receives BudgetFormData (no id, no spent)
+        budget={editingBudget} 
+        onSave={handleSaveBudget}
         isSaving={isSaving}
       />
 

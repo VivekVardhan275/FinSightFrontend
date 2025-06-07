@@ -5,6 +5,7 @@ import type { Budget, Transaction, BudgetFromApi as BudgetFromApiType } from '@/
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
 import axios from 'axios';
 import { useAuthState } from '@/hooks/use-auth-state';
+import { useTransactionContext } from './transaction-context'; // Import TransactionContext
 
 const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://localhost:8080";
 const BUDGET_API_BASE_URL = `${backendUrl}/api/user/budgets`;
@@ -18,7 +19,8 @@ interface BudgetContextType {
   updateBudget: (budgetDataFromApi: BudgetFromApi) => void;
   deleteBudget: (budgetId: string) => void;
   getBudgetById: (budgetId: string) => Budget | undefined;
-  updateBudgetSpentAmount: (budgetId: string, transactions: Transaction[]) => void;
+  // updateBudgetSpentAmount is kept for potential direct use, though primary updates are reactive
+  updateBudgetSpentAmount: (budgetId: string, allTransactions: Transaction[]) => void;
   getBudgetsByMonth: (year: number, month: number) => Budget[];
 }
 
@@ -27,6 +29,7 @@ const BudgetContext = createContext<BudgetContextType | undefined>(undefined);
 export const BudgetProvider = ({ children }: { children: ReactNode }) => {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const { user, status: authStatus } = useAuthState();
+  const { transactions, isLoading: isLoadingTransactions } = useTransactionContext(); // Consume transactions
   const [contextIsLoading, setContextIsLoading] = useState(true);
   const fetchAttemptedForUserRef = useRef<string | null>(null);
 
@@ -65,10 +68,10 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
     if (userEmail) {
       if (fetchAttemptedForUserRef.current !== userEmail) {
         if (!contextIsLoading) setContextIsLoading(true);
-        fetchAttemptedForUserRef.current = userEmail; // Mark as attempted for this user
-
+        
         axios.get<{ budgets: Array<Omit<BudgetFromApiType, 'spent'>> }>(`${BUDGET_API_BASE_URL}?email=${encodeURIComponent(userEmail)}`)
           .then(response => {
+            fetchAttemptedForUserRef.current = userEmail; // Mark as attempted for this user ONLY on successful fetch start
             const apiBudgetsRaw = response.data.budgets || response.data;
             let apiBudgets: Array<Omit<BudgetFromApiType, 'spent'>> = [];
             if (Array.isArray(apiBudgetsRaw)) {
@@ -77,7 +80,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
               console.warn("BudgetContext (auth): API response did not contain a 'budgets' array.");
             }
             const initializedBudgets = apiBudgets
-              .map(b => ({ ...b, id: b.id.toString(), spent: 0 }))
+              .map(b => ({ ...b, id: b.id.toString(), spent: 0 })) // Initialize spent to 0
               .sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category));
             setBudgets(currentData => JSON.stringify(currentData) === JSON.stringify(initializedBudgets) ? currentData : initializedBudgets);
           })
@@ -86,24 +89,23 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
             if (axios.isAxiosError(error) && error.response) {
               console.error("Backend error message:", error.response.data?.message || error.response.data?.error || "No specific message from backend.");
               console.error("Status code:", error.response.status);
-              // If it's a 404, we assume no data and don't reset the ref to prevent retries for this user.
-              // For other errors, reset to allow a retry.
-              if (error.response.status !== 404) {
+              if (error.response.status !== 404) { // If not 404, allow retry
                 fetchAttemptedForUserRef.current = null;
+              } else { // For 404, mark as attempted so we don't retry for this user
+                fetchAttemptedForUserRef.current = userEmail;
               }
             } else if (error instanceof Error) {
               console.error("Error details:", error.message);
-              fetchAttemptedForUserRef.current = null; // Reset for non-Axios errors too
+              fetchAttemptedForUserRef.current = null;
             } else {
-              fetchAttemptedForUserRef.current = null; // Reset for unknown errors
+              fetchAttemptedForUserRef.current = null;
             }
-            setBudgets([]); // Set to empty on error
+            setBudgets([]);
           })
           .finally(() => {
             setContextIsLoading(false);
           });
       } else {
-        // Data already fetched (or fetch attempt completed) for this user.
         if (contextIsLoading) setContextIsLoading(false);
       }
     } else {
@@ -112,6 +114,41 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
       if (contextIsLoading) setContextIsLoading(false);
     }
   }, [userEmail, authStatus, contextIsLoading]);
+
+  // Effect to recalculate all budget spent amounts when budgets or transactions change
+  useEffect(() => {
+    if (!contextIsLoading && !isLoadingTransactions && budgets.length > 0) {
+      // transactions might be empty if they are loading or if there are none.
+      // isLoadingTransactions tells us if they are still loading.
+      // If transactions are loaded (even if empty), we can proceed.
+      let anySpentAmountChanged = false;
+      const recalculatedBudgets = budgets.map(budget => {
+        const budgetMonthYear = budget.month.split('-');
+        const budgetYear = parseInt(budgetMonthYear[0]);
+        const budgetMonth = parseInt(budgetMonthYear[1]);
+
+        const newSpent = transactions
+          .filter(t => {
+            const tDate = new Date(t.date);
+            return t.category.toLowerCase() === budget.category.toLowerCase() &&
+                   tDate.getFullYear() === budgetYear &&
+                   (tDate.getMonth() + 1) === budgetMonth &&
+                   t.type === 'expense';
+          })
+          .reduce((sum, t) => sum + t.amount, 0);
+
+        if (Math.abs(budget.spent - newSpent) >= 0.001) {
+          anySpentAmountChanged = true;
+          return { ...budget, spent: newSpent };
+        }
+        return budget;
+      });
+
+      if (anySpentAmountChanged) {
+        setBudgets(recalculatedBudgets.sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category)));
+      }
+    }
+  }, [budgets, transactions, contextIsLoading, isLoadingTransactions]);
 
 
   useEffect(() => {
@@ -125,6 +162,8 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
   }, [budgets, contextIsLoading, authStatus]);
 
   const addBudget = useCallback((budgetFromApi: BudgetFromApi): Budget => {
+    // API returns budget without 'spent'. Initialize 'spent' to 0.
+    // The useEffect above will recalculate it if necessary based on existing transactions.
     const budgetWithSpent: Budget = { ...budgetFromApi, spent: 0 };
     setBudgets(prev => [budgetWithSpent, ...prev].sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category)));
     return budgetWithSpent;
@@ -133,7 +172,8 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
   const updateBudget = useCallback((budgetDataFromApi: BudgetFromApi) => {
     setBudgets(prev => prev.map(b => {
         if (b.id === budgetDataFromApi.id) {
-            return { ...b, ...budgetDataFromApi, spent: b.spent }; // Preserve existing spent amount
+            // Preserve existing spent amount; the reactive useEffect will update it.
+            return { ...b, ...budgetDataFromApi, spent: b.spent }; 
         }
         return b;
     }).sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category)));
@@ -152,7 +192,8 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
     return budgets.filter(b => b.month === targetMonthStr);
   }, [budgets]);
 
-  const updateBudgetSpentAmount = useCallback((budgetId: string, relatedTransactions: Transaction[]) => {
+  // This function can be used for imperative updates if needed, but reactive updates are preferred.
+  const updateBudgetSpentAmount = useCallback((budgetId: string, allTransactions: Transaction[]) => {
     setBudgets(prevBudgets => {
       const targetBudgetIndex = prevBudgets.findIndex(b => b.id === budgetId);
       if (targetBudgetIndex === -1) return prevBudgets;
@@ -162,7 +203,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
       const budgetYear = parseInt(budgetMonthYear[0]);
       const budgetMonth = parseInt(budgetMonthYear[1]);
 
-      const newSpent = relatedTransactions
+      const newSpent = allTransactions
         .filter(t => {
           const tDate = new Date(t.date);
           return t.category.toLowerCase() === targetBudget.category.toLowerCase() &&
@@ -173,18 +214,18 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
         .reduce((sum, t) => sum + t.amount, 0);
 
       if (Math.abs(targetBudget.spent - newSpent) < 0.001) {
-        return prevBudgets; // No change needed
+        return prevBudgets; 
       }
 
       const updatedBudgets = [...prevBudgets];
       updatedBudgets[targetBudgetIndex] = { ...targetBudget, spent: newSpent };
-      return updatedBudgets;
+      return updatedBudgets.sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category));
     });
   }, []);
 
 
   return (
-    <BudgetContext.Provider value={{ budgets, isLoading: contextIsLoading, addBudget, updateBudget, deleteBudget, getBudgetById, updateBudgetSpentAmount, getBudgetsByMonth }}>
+    <BudgetContext.Provider value={{ budgets, isLoading: contextIsLoading || isLoadingTransactions, addBudget, updateBudget, deleteBudget, getBudgetById, updateBudgetSpentAmount, getBudgetsByMonth }}>
       {children}
     </BudgetContext.Provider>
   );
