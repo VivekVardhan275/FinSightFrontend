@@ -16,8 +16,8 @@ import {
 } from "@/components/ui/sidebar";
 import { useAuthState } from "@/hooks/use-auth-state";
 import Link from "next/link";
-import { usePathname } from "next/navigation"; // Removed useRouter
-import React, { useEffect, useCallback } from "react";
+import { usePathname } from "next/navigation";
+import React, { useEffect, useCallback, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCurrency } from "@/contexts/currency-context";
 import { useNotification } from "@/contexts/notification-context";
@@ -26,98 +26,132 @@ import { TransactionProvider } from "@/contexts/transaction-context";
 import { BudgetProvider, useBudgetContext } from "@/contexts/budget-context";
 import { formatCurrency } from "@/lib/utils";
 import { UserSettingsLoader } from "@/components/layout/user-settings-loader";
+import type { AppNotification, Budget } from "@/types"; // Assuming Transaction might be needed if passed to calculate
 
 function BudgetNotificationEffect() {
   const { budgets, getBudgetsByMonth } = useBudgetContext();
   const { addNotification } = useNotification();
   const { selectedCurrency, convertAmount } = useCurrency();
-  const [notifiedLayoutBudgets, setNotifiedLayoutBudgets] = React.useState<Set<string>>(new Set());
+  const [notifiedLayoutBudgets, setNotifiedLayoutBudgets] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    const storedNotified = localStorage.getItem('app-layout-notified-budgets');
-    if (storedNotified) {
-      try {
+    try {
+      const storedNotified = localStorage.getItem('app-layout-notified-budgets');
+      if (storedNotified) {
         setNotifiedLayoutBudgets(new Set(JSON.parse(storedNotified)));
-      } catch (e) {
-        // console.error("Error parsing layout notified budgets from localStorage", e);
       }
+    } catch (e) {
+      console.error("Error parsing layout notified budgets from localStorage", e);
+      setNotifiedLayoutBudgets(new Set());
     }
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('app-layout-notified-budgets', JSON.stringify(Array.from(notifiedLayoutBudgets)));
+    try {
+      localStorage.setItem('app-layout-notified-budgets', JSON.stringify(Array.from(notifiedLayoutBudgets)));
+    } catch (e) {
+      console.error("Error setting layout notified budgets to localStorage", e);
+    }
   }, [notifiedLayoutBudgets]);
 
-  const checkAndNotifyGlobalBudgets = useCallback(() => {
-    if (!budgets || budgets.length === 0) return;
+  const memoizedCalculateBudgetNotifications = useCallback(() => {
+    const notificationsToDispatch: Array<Omit<AppNotification, 'id' | 'timestamp' | 'read'>> = [];
+    const newPotentialNotifiedSet = new Set(notifiedLayoutBudgets);
+    let setContentHasChanged = false;
+
+    if (!budgets || budgets.length === 0) {
+      if (notifiedLayoutBudgets.size > 0) {
+        newPotentialNotifiedSet.clear();
+        setContentHasChanged = true;
+      }
+      return { notificationsToDispatch, nextNotifiedSet: newPotentialNotifiedSet, setContentHasChanged };
+    }
 
     const currentDate = new Date();
     const currentYear = currentDate.getFullYear();
     const currentMonth = currentDate.getMonth() + 1;
+    const relevantBudgets = getBudgetsByMonth(currentYear, currentMonth);
 
-    const currentMonthBudgets = getBudgetsByMonth(currentYear, currentMonth);
+    relevantBudgets.forEach(budget => {
+      const currentSpentINR = budget.spent;
+      const allocatedINR = budget.allocated;
+      const percentageSpent = allocatedINR > 0 ? (currentSpentINR / allocatedINR) * 100 : 0;
+      const budgetId = budget.id;
 
-    setNotifiedLayoutBudgets(prevNotifiedSet => {
-      let newSet = new Set(prevNotifiedSet);
-      let changed = false;
+      const displaySpent = convertAmount(currentSpentINR, selectedCurrency);
+      const displayAllocated = convertAmount(allocatedINR, selectedCurrency);
 
-      currentMonthBudgets.forEach(budget => {
-        const currentSpentINR = budget.spent;
-        const allocatedINR = budget.allocated;
-        const percentageSpent = allocatedINR > 0 ? (currentSpentINR / allocatedINR) * 100 : 0;
-        const budgetId = budget.id;
+      const exceededKey = `layout-${budgetId}-exceeded`;
+      const nearingKey = `layout-${budgetId}-nearing`;
 
-        const displaySpent = convertAmount(currentSpentINR, selectedCurrency);
-        const displayAllocated = convertAmount(allocatedINR, selectedCurrency);
-
-        const exceededKey = `layout-${budgetId}-exceeded`;
-        const nearingKey = `layout-${budgetId}-nearing`;
-
-        if (currentSpentINR > allocatedINR) {
-          if (!prevNotifiedSet.has(exceededKey)) {
-            addNotification({
-              title: "Budget Exceeded!",
-              description: `You've exceeded budget for ${budget.category} (${budget.month}). Spent: ${formatCurrency(displaySpent, selectedCurrency)}, Allocated: ${formatCurrency(displayAllocated, selectedCurrency)}.`,
-              type: "error",
-              href: "/budgets"
-            });
-            newSet.add(exceededKey);
-            if (newSet.has(nearingKey)) newSet.delete(nearingKey);
-            changed = true;
-          }
-        } else if (percentageSpent >= 85) {
-          if (!prevNotifiedSet.has(nearingKey) && !prevNotifiedSet.has(exceededKey)) {
-            addNotification({
-              title: "Budget Nearing Limit",
-              description: `Spent ${percentageSpent.toFixed(0)}% of budget for ${budget.category} (${budget.month}). Spent: ${formatCurrency(displaySpent, selectedCurrency)}, Allocated: ${formatCurrency(displayAllocated, selectedCurrency)}.`,
-              type: "warning",
-              href: "/budgets"
-            });
-            newSet.add(nearingKey);
-            changed = true;
-          }
-        } else {
-          if (prevNotifiedSet.has(nearingKey)) {
-            newSet.delete(nearingKey);
-            changed = true;
-          }
-          if (prevNotifiedSet.has(exceededKey)) {
-            newSet.delete(exceededKey);
-            changed = true;
-          }
+      if (currentSpentINR > allocatedINR) {
+        if (!notifiedLayoutBudgets.has(exceededKey)) {
+          notificationsToDispatch.push({
+            title: "Budget Exceeded!",
+            description: `You've exceeded budget for ${budget.category} (${budget.month}). Spent: ${formatCurrency(displaySpent, selectedCurrency)}, Allocated: ${formatCurrency(displayAllocated, selectedCurrency)}.`,
+            type: "error",
+            href: "/budgets"
+          });
+          if (!newPotentialNotifiedSet.has(exceededKey)) { newPotentialNotifiedSet.add(exceededKey); }
+          if (newPotentialNotifiedSet.has(nearingKey)) { newPotentialNotifiedSet.delete(nearingKey); }
+          // setContentHasChanged will be determined later by comparing sets
         }
-      });
-
-      if (changed) {
-        return newSet;
+      } else if (percentageSpent >= 85) {
+        if (!notifiedLayoutBudgets.has(nearingKey) && !notifiedLayoutBudgets.has(exceededKey)) {
+          notificationsToDispatch.push({
+            title: "Budget Nearing Limit",
+            description: `Spent ${percentageSpent.toFixed(0)}% of budget for ${budget.category} (${budget.month}). Spent: ${formatCurrency(displaySpent, selectedCurrency)}, Allocated: ${formatCurrency(displayAllocated, selectedCurrency)}.`,
+            type: "warning",
+            href: "/budgets"
+          });
+          if (!newPotentialNotifiedSet.has(nearingKey)) { newPotentialNotifiedSet.add(nearingKey); }
+        }
+      } else {
+        if (newPotentialNotifiedSet.has(nearingKey)) {
+          newPotentialNotifiedSet.delete(nearingKey);
+        }
+        if (newPotentialNotifiedSet.has(exceededKey)) {
+          newPotentialNotifiedSet.delete(exceededKey);
+        }
       }
-      return prevNotifiedSet;
     });
-  }, [budgets, getBudgetsByMonth, convertAmount, selectedCurrency, addNotification, formatCurrency]);
+    
+    if (notifiedLayoutBudgets.size !== newPotentialNotifiedSet.size) {
+        setContentHasChanged = true;
+    } else {
+        for (const item of newPotentialNotifiedSet) {
+            if (!notifiedLayoutBudgets.has(item)) {
+                setContentHasChanged = true;
+                break;
+            }
+        }
+        if (!setContentHasChanged) { // Check other direction if sizes are same and no new items found
+             for (const item of notifiedLayoutBudgets) {
+                if (!newPotentialNotifiedSet.has(item)) {
+                    setContentHasChanged = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    return { notificationsToDispatch, nextNotifiedSet: newPotentialNotifiedSet, setContentHasChanged };
+  }, [budgets, getBudgetsByMonth, convertAmount, selectedCurrency, notifiedLayoutBudgets]);
+
 
   useEffect(() => {
-    checkAndNotifyGlobalBudgets();
-  }, [budgets, selectedCurrency, checkAndNotifyGlobalBudgets]);
+    const { notificationsToDispatch, nextNotifiedSet, setContentHasChanged } = memoizedCalculateBudgetNotifications();
+
+    if (notificationsToDispatch.length > 0) {
+      notificationsToDispatch.forEach(notifData => {
+        addNotification(notifData);
+      });
+    }
+
+    if (setContentHasChanged) {
+      setNotifiedLayoutBudgets(nextNotifiedSet);
+    }
+  }, [memoizedCalculateBudgetNotifications, addNotification]);
   
   return null;
 }
@@ -130,37 +164,27 @@ export default function AuthenticatedAppLayout({
   const { user, isLoading: authStateIsLoading, status } = useAuthState();
   const pathname = usePathname();
 
-  // The useAuthState hook now handles the primary redirection logic.
-  // This layout component focuses on rendering based on the resolved state.
-
   if (authStateIsLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
-        <p>Loading application...</p> {/* Covers initial session load AND first-check API call duration */}
+        <p>Loading application...</p>
       </div>
     );
   }
   
-  // If not authenticated, or authenticated but setup is not complete,
-  // useAuthState will redirect. This layout should not render its main content in those cases.
-  // This implicitly means if we proceed, status === 'authenticated' && user.hasCompletedSetup === true.
   if (status !== 'authenticated' || (status === 'authenticated' && user?.hasCompletedSetup !== true)) {
-    // This state should typically lead to a redirect by useAuthState.
-    // Rendering null here prevents brief flashes of layout content on unauthorized access.
-    // Pages like /login or /welcome/setup are not wrapped by this layout.
     return (
         <div className="flex h-screen items-center justify-center bg-background">
-          <p>Redirecting...</p> {/* Generic redirect message */}
+          <p>Redirecting...</p>
         </div>
     );
   }
   
-  // At this point, user is authenticated and setup is complete.
   return (
     <TransactionProvider>
       <BudgetProvider>
-        <UserSettingsLoader /> {/* Fetches and applies settings */}
-        <BudgetNotificationEffect /> {/* Handles budget notifications */}
+        <UserSettingsLoader />
+        <BudgetNotificationEffect />
         <SidebarProvider defaultOpen>
           <Sidebar variant="sidebar" collapsible="icon" side="left" className="border-r">
             <SidebarHeader className="p-4 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-2 transition-all duration-200 ease-linear">
@@ -175,7 +199,6 @@ export default function AuthenticatedAppLayout({
               <SidebarNav />
             </SidebarContent>
             <SidebarFooter className="p-4">
-              {/* Footer items can go here */}
             </SidebarFooter>
           </Sidebar>
           <SidebarRail />
