@@ -179,10 +179,14 @@ export default function SettingsPage() {
         description: "Your preferences have been successfully saved and applied.",
       });
     } catch (error) {
-      console.error("Error saving settings to backend:", error);
+      console.error("API error saving settings.");
       let errorMessage = "Could not save your preferences to the server. Local changes have been applied.";
-      if (axios.isAxiosError(error) && error.response?.data?.message) {
-        errorMessage = error.response.data.message;
+      if (axios.isAxiosError(error) && error.response) {
+        errorMessage = error.response.data?.message || error.response.data?.error || errorMessage;
+        console.error("Backend error message:", errorMessage);
+        console.error("Status code:", error.response.status);
+      } else if (error instanceof Error) {
+        console.error("Error details:", error.message);
       }
       toast({
         title: "Error Saving Settings",
@@ -227,12 +231,14 @@ export default function SettingsPage() {
       }, 2000);
 
     } catch (error) {
-      console.error("Error deleting account:", error);
+      console.error("API error deleting account.");
       let errorMessage = "Failed to delete your account. Please try again.";
-      if (axios.isAxiosError(error) && error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (axios.isAxiosError(error) && error.response?.status) {
-        errorMessage = `Failed to delete account. Server responded with status ${error.response.status}.`;
+      if (axios.isAxiosError(error) && error.response) {
+        errorMessage = error.response.data?.message || error.response.data?.error || (error.response.status ? `Server responded with status ${error.response.status}.` : errorMessage);
+        console.error("Backend error message:", errorMessage);
+        console.error("Status code:", error.response.status);
+      } else if (error instanceof Error) {
+        console.error("Error details:", error.message);
       }
       toast({
         title: "Account Deletion Failed",

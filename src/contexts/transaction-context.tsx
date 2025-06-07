@@ -30,14 +30,13 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
   const userEmail = user?.email;
 
   useEffect(() => {
-    // Effect for fetching transactions based on auth state
     if (authStatus === 'loading') {
-      if (!isLoading) setIsLoading(true); // Ensure loading state if auth is resolving
+      if (!isLoading) setIsLoading(true);
       return;
     }
 
     if (authStatus === 'unauthenticated') {
-      if (!isLoading) setIsLoading(true); // Indicate loading for localStorage access
+      if (!isLoading) setIsLoading(true);
       try {
         const stored = localStorage.getItem('app-transactions');
         let parsed: Transaction[] = [];
@@ -50,26 +49,20 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
             }
         }
         const sortedParsed = parsed.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        // Only update state if data is different to avoid unnecessary re-renders
-        setTransactions(currentData => {
-          if (JSON.stringify(currentData) === JSON.stringify(sortedParsed)) return currentData;
-          return sortedParsed;
-        });
+        setTransactions(currentData => JSON.stringify(currentData) === JSON.stringify(sortedParsed) ? currentData : sortedParsed);
       } catch (e) {
         console.error("TransactionContext: Error processing transactions from localStorage for unauthenticated user", e);
-        setTransactions([]); // Default to empty on error
+        setTransactions([]);
       }
-      fetchAttemptedForUserRef.current = null; // Reset for next potential login
-      if (isLoading) setIsLoading(false); // Done with unauthenticated state
+      fetchAttemptedForUserRef.current = null;
+      if (isLoading) setIsLoading(false);
       return;
     }
 
-    // authStatus === 'authenticated'
     if (userEmail) {
       if (fetchAttemptedForUserRef.current !== userEmail) {
-        // New user or first fetch attempt for this user
         if (!isLoading) setIsLoading(true);
-        fetchAttemptedForUserRef.current = userEmail; // Mark that we ARE ATTEMPTING for this user
+        fetchAttemptedForUserRef.current = userEmail;
 
         axios.get(`${TRANSACTION_API_BASE_URL}?email=${encodeURIComponent(userEmail)}`)
           .then(response => {
@@ -81,42 +74,36 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
             } else if (apiTransactionsSource && typeof apiTransactionsSource === 'object' && 'transactions' in apiTransactionsSource && Array.isArray(apiTransactionsSource.transactions)) {
                 transactionsArray = apiTransactionsSource.transactions;
             } else {
-                console.warn(
-                    "TransactionContext: Transaction API GET all endpoint did not return an array or an object with a 'transactions' array property. Received:",
-                    apiTransactionsSource
-                );
+                console.warn("TransactionContext: Transaction API GET all endpoint did not return an array or an object with a 'transactions' array property.");
             }
             const newSortedData = transactionsArray.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-            // Only update state if data is different
-            setTransactions(currentData => {
-              if (JSON.stringify(currentData) === JSON.stringify(newSortedData)) return currentData;
-              return newSortedData;
-            });
+            setTransactions(currentData => JSON.stringify(currentData) === JSON.stringify(newSortedData) ? currentData : newSortedData);
           })
           .catch(error => {
-            console.error("TransactionContext: Error fetching transactions from API:", error);
-            setTransactions([]); // Default to empty on API error
-            fetchAttemptedForUserRef.current = null; // IMPORTANT: Allow retry on error
+            console.error("API error fetching transactions.");
+            if (axios.isAxiosError(error) && error.response) {
+                console.error("Backend error message:", error.response.data?.message || error.response.data?.error || "No specific message from backend.");
+                console.error("Status code:", error.response.status);
+            } else if (error instanceof Error) {
+                console.error("Error details:", error.message);
+            }
+            setTransactions([]);
+            fetchAttemptedForUserRef.current = null;
           })
           .finally(() => {
-            if (isLoading) setIsLoading(false); // Fetch attempt finished
+            if (isLoading) setIsLoading(false);
           });
       } else {
-        // Fetch was already attempted for this user (ref matches userEmail).
-        // If we're not currently loading, ensure isLoading is false.
-        // This handles cases where the effect re-runs but a fetch isn't needed.
         if (isLoading) setIsLoading(false);
       }
     } else {
-      // Authenticated, but no userEmail (should be rare)
       setTransactions([]);
       fetchAttemptedForUserRef.current = null;
       if (isLoading) setIsLoading(false);
     }
-  }, [userEmail, authStatus, isLoading]); // isLoading is included to allow effect to re-evaluate if isLoading was externally set to true.
+  }, [userEmail, authStatus, isLoading]);
 
   useEffect(() => {
-    // Effect for saving transactions to localStorage
     if (authStatus === 'unauthenticated' && !isLoading) {
       try {
         localStorage.setItem('app-transactions', JSON.stringify(transactions));
@@ -167,4 +154,3 @@ export const useTransactionContext = (): TransactionContextType => {
   }
   return context;
 };
-

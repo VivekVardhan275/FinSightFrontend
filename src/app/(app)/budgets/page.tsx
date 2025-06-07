@@ -127,7 +127,13 @@ export default function BudgetsPage() {
       });
       setBudgetToDeleteId(null);
     } catch (error) {
-      console.error("Error deleting budget:", error);
+      console.error("API error deleting budget.");
+      if (axios.isAxiosError(error) && error.response) {
+        console.error("Backend error message:", error.response.data?.message || error.response.data?.error || "No specific message from backend.");
+        console.error("Status code:", error.response.status);
+      } else if (error instanceof Error) {
+        console.error("Error details:", error.message);
+      }
       addNotification({
         title: "Error Deleting Budget",
         description: `Failed to delete budget. Please try again. ${axios.isAxiosError(error) && error.response?.data?.message ? error.response.data.message : ""}`,
@@ -220,7 +226,13 @@ export default function BudgetsPage() {
       setEditingBudget(null);
 
     } catch (error) {
-       console.error(`Error ${notificationAction.toLowerCase()} budget:`, error);
+       console.error(`API error ${notificationAction.toLowerCase()} budget.`);
+        if (axios.isAxiosError(error) && error.response) {
+            console.error("Backend error message:", error.response.data?.message || error.response.data?.error || "No specific message from backend.");
+            console.error("Status code:", error.response.status);
+        } else if (error instanceof Error) {
+            console.error("Error details:", error.message);
+        }
         addNotification({
             title: `Error ${notificationAction} Budget`,
             description: `Failed to ${notificationAction.toLowerCase()} budget. Please try again. ${axios.isAxiosError(error) && error.response?.data?.message ? error.response.data.message : ""}`,

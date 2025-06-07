@@ -126,7 +126,13 @@ export default function TransactionsPage() {
       setTransactionToDeleteId(null);
 
     } catch (error) {
-      console.error("Error deleting transaction:", error);
+      console.error("API error deleting transaction.");
+      if (axios.isAxiosError(error) && error.response) {
+        console.error("Backend error message:", error.response.data?.message || error.response.data?.error || "No specific message from backend.");
+        console.error("Status code:", error.response.status);
+      } else if (error instanceof Error) {
+        console.error("Error details:", error.message);
+      }
       addNotification({
         title: "Error Deleting Transaction",
         description: `Failed to delete transaction. Please try again. ${axios.isAxiosError(error) && error.response?.data?.message ? error.response.data.message : ""}`,
@@ -261,8 +267,14 @@ export default function TransactionsPage() {
       }
 
     } catch (error) {
-      console.error("Error saving transaction:", error);
       const action = isActualEditOperation ? "updating" : "adding";
+      console.error(`API error ${action} transaction.`);
+      if (axios.isAxiosError(error) && error.response) {
+        console.error("Backend error message:", error.response.data?.message || error.response.data?.error || "No specific message from backend.");
+        console.error("Status code:", error.response.status);
+      } else if (error instanceof Error) {
+        console.error("Error details:", error.message);
+      }
       addNotification({
         title: `Error ${action} transaction`,
         description: `Failed to save transaction. Please try again. ${axios.isAxiosError(error) && error.response?.data?.message ? error.response.data.message : ""}`,

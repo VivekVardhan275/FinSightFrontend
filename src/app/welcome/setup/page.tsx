@@ -88,8 +88,11 @@ export default function SetupPage() {
   useEffect(() => {
     if (user && !authStateIsLoading) {
       setFormDisplayName(user.name || "");
+      // Initialize currency from context once it's available from useCurrency hook
+      setFormCurrency(initialGlobalCurrency);
     }
-  }, [user, authStateIsLoading]);
+  }, [user, authStateIsLoading, initialGlobalCurrency]);
+
 
   const handleSaveSetup = useCallback(async () => {
     if (!user || !user.email) {
@@ -147,10 +150,14 @@ export default function SetupPage() {
       router.push('/dashboard');
 
     } catch (error) {
-      console.error("Failed to save setup data:", error);
+      console.error("API error saving setup data.");
       let errorMessage = "Could not save your setup information. Please try again.";
       if (axios.isAxiosError(error) && error.response) {
         errorMessage = error.response.data?.message || error.response.data?.error || errorMessage;
+        console.error("Backend error message:", errorMessage);
+        console.error("Status code:", error.response.status);
+      } else if (error instanceof Error){
+        console.error("Error details:", error.message);
       }
       toast({
         title: "Error Saving Setup",

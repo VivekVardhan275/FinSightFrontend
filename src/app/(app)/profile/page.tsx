@@ -88,7 +88,13 @@ export default function ProfilePage() {
       });
       profileFetchedForUserRef.current = emailToFetch; // Mark success for this email
     } catch (error) {
-      console.error("Error fetching profile data:", error);
+      console.error("API error fetching profile data.");
+      if (axios.isAxiosError(error) && error.response) {
+        console.error("Backend error message:", error.response.data?.message || error.response.data?.error || "No specific message from backend.");
+        console.error("Status code:", error.response.status);
+      } else if (error instanceof Error) {
+        console.error("Error details:", error.message);
+      }
       toast({
         title: "Error Loading Profile",
         description: "Could not fetch your profile information. Displaying defaults.",
@@ -134,7 +140,7 @@ export default function ProfilePage() {
       if (isProfileDataLoading) setIsProfileDataLoading(false);
       profileFetchedForUserRef.current = null;
     }
-  }, [userEmail, authLoading, fetchProfileData, currentUserNameFromSession]);
+  }, [userEmail, authLoading, fetchProfileData, currentUserNameFromSession, isProfileDataLoading]);
 
 
   if (authLoading || isProfileDataLoading) {
@@ -217,10 +223,14 @@ export default function ProfilePage() {
       }
 
     } catch (error) {
-      console.error("Error saving profile data:", error);
+      console.error("API error saving profile data.");
       let errorMessage = "Could not save your changes. Please try again.";
       if (axios.isAxiosError(error) && error.response) {
         errorMessage = error.response.data?.message || error.response.data?.error || errorMessage;
+        console.error("Backend error message:", errorMessage);
+        console.error("Status code:", error.response.status);
+      } else if (error instanceof Error){
+        console.error("Error details:", error.message);
       }
       toast({
         title: "Error Saving Profile",

@@ -48,8 +48,7 @@ export function useAuthState() {
     try {
       return await updateNextAuthSession(dataToUpdate);
     } catch (error) {
-      console.error("useAuthState: Error updating NextAuth session:", error);
-      // Potentially re-throw or handle as needed, for now just logging
+      console.error("useAuthState: Error updating NextAuth session:", error instanceof Error ? error.message : error);
       return null;
     }
   }, [updateNextAuthSession]);
@@ -69,7 +68,13 @@ export function useAuthState() {
             }
           })
           .catch(error => {
-            console.error("Error calling 'first-check' API:", error);
+            console.error("API error calling 'first-check'. Defaulting hasCompletedSetup to false.");
+            if (axios.isAxiosError(error) && error.response) {
+                console.error("Backend error message:", error.response.data?.message || error.response.data?.error || "No specific message from backend.");
+                console.error("Status code:", error.response.status);
+            } else if (error instanceof Error) {
+                console.error("Error details:", error.message);
+            }
             updateSession({ user: { ...session.user, hasCompletedSetup: false } });
             firstCheckInitiatedForUserRef.current = null;
           })
@@ -121,7 +126,7 @@ export function useAuthState() {
       if (result?.url) router.push(result.url);
       else if (result?.error) console.error("NextAuth signIn error (Google):", result.error);
     } catch (error) {
-      console.error("Catastrophic error during Google signIn:", error);
+      console.error("Catastrophic error during Google signIn:", error instanceof Error ? error.message : error);
     }
   }, [router]);
 
@@ -133,7 +138,7 @@ export function useAuthState() {
       if (result?.url) router.push(result.url);
       else if (result?.error) console.error("NextAuth signIn error (GitHub):", result.error);
     } catch (error) {
-      console.error("Catastrophic error during GitHub signIn:", error);
+      console.error("Catastrophic error during GitHub signIn:", error instanceof Error ? error.message : error);
     }
   }, [router]);
 
@@ -152,7 +157,7 @@ export function useAuthState() {
     try {
       await signOut({ callbackUrl: '/login', redirect: true });
     } catch (error) {
-      console.error("Error during signOut:", error);
+      console.error("Error during signOut:", error instanceof Error ? error.message : error);
       router.push('/login');
     }
   }, [router]);

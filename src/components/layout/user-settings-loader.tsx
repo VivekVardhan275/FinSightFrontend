@@ -78,7 +78,13 @@ export function UserSettingsLoader() {
             }
           })
           .catch(error => {
-            console.error("UserSettingsLoader: Error fetching user settings:", error);
+            console.error("API error fetching user settings.");
+            if (axios.isAxiosError(error) && error.response) {
+                console.error("Backend error message:", error.response.data?.message || error.response.data?.error || "No specific message from backend.");
+                console.error("Status code:", error.response.status);
+            } else if (error instanceof Error) {
+                console.error("Error details:", error.message);
+            }
             settingsFetchedForUserRef.current = null; // Allow retry on error for this user
           })
           .finally(() => {
@@ -91,7 +97,7 @@ export function UserSettingsLoader() {
     }
   // Removed isFetchingSettings from dependencies.
   // Dependencies are now userEmail, status, user?.hasCompletedSetup, and stable functions.
-  }, [userEmail, status, user?.hasCompletedSetup, setTheme, setSelectedCurrency, applyFontSize]);
+  }, [userEmail, status, user?.hasCompletedSetup, setTheme, setSelectedCurrency, applyFontSize, isFetchingSettings]);
 
   return null;
 }
