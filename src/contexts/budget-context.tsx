@@ -27,19 +27,19 @@ const BudgetContext = createContext<BudgetContextType | undefined>(undefined);
 export const BudgetProvider = ({ children }: { children: ReactNode }) => {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const { user, status: authStatus } = useAuthState();
-  const [isLoading, setIsLoading] = useState(true);
+  const [contextIsLoading, setContextIsLoading] = useState(true); // Renamed from isLoading
   const fetchAttemptedForUserRef = useRef<string | null>(null);
 
   const userEmail = user?.email;
 
   useEffect(() => {
     if (authStatus === 'loading') {
-      if (!isLoading) setIsLoading(true); // Ensure loading is true if auth is still resolving
+      if (!contextIsLoading) setContextIsLoading(true);
       return;
     }
 
     if (authStatus === 'unauthenticated') {
-      setIsLoading(true); // Start loading before localStorage access
+      if (!contextIsLoading) setContextIsLoading(true); // Ensure loading is true before LS access
       try {
         const stored = localStorage.getItem('app-budgets');
         let parsed: Budget[] = [];
@@ -48,7 +48,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
           if (Array.isArray(tempParsed)) {
             parsed = tempParsed.map(b => ({ ...b, spent: b.spent || 0 }));
           } else {
-             console.warn("BudgetContext (unauth): localStorage 'app-budgets' was not an array:", tempParsed);
+            console.warn("BudgetContext (unauth): localStorage 'app-budgets' was not an array:", tempParsed);
           }
         }
         const sortedParsed = parsed.sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category));
@@ -58,15 +58,15 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
         setBudgets([]);
       }
       fetchAttemptedForUserRef.current = null;
-      setIsLoading(false); // Done loading after localStorage attempt
+      setContextIsLoading(false);
       return;
     }
 
     // Authenticated state
     if (userEmail) {
       if (fetchAttemptedForUserRef.current !== userEmail) {
-        setIsLoading(true); // Start loading before API call
-        fetchAttemptedForUserRef.current = userEmail; // Mark attempt for this user
+        if (!contextIsLoading) setContextIsLoading(true);
+        fetchAttemptedForUserRef.current = userEmail;
 
         axios.get<{ budgets: Array<Omit<BudgetFromApiType, 'spent'>> }>(`${BUDGET_API_BASE_URL}?email=${encodeURIComponent(userEmail)}`)
           .then(response => {
@@ -75,52 +75,52 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
             if (Array.isArray(apiBudgetsRaw)) {
               apiBudgets = apiBudgetsRaw;
             } else {
-               console.warn("BudgetContext (auth): API response did not contain a 'budgets' array.");
+              console.warn("BudgetContext (auth): API response did not contain a 'budgets' array.");
             }
             const initializedBudgets = apiBudgets
-              .map(b => ({ ...b, id: b.id.toString(), spent: 0 })) // Ensure spent is 0, id is string
+              .map(b => ({ ...b, id: b.id.toString(), spent: 0 }))
               .sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category));
             setBudgets(currentData => JSON.stringify(currentData) === JSON.stringify(initializedBudgets) ? currentData : initializedBudgets);
           })
           .catch(error => {
             console.error("BudgetContext (auth): API error fetching budgets.");
             if (axios.isAxiosError(error) && error.response) {
-                console.error("Backend error message:", error.response.data?.message || error.response.data?.error || "No specific message from backend.");
-                console.error("Status code:", error.response.status);
+              console.error("Backend error message:", error.response.data?.message || error.response.data?.error || "No specific message from backend.");
+              console.error("Status code:", error.response.status);
             } else if (error instanceof Error) {
-                console.error("Error details:", error.message);
+              console.error("Error details:", error.message);
             }
-            setBudgets([]); // Clear budgets on error
+            setBudgets([]);
             fetchAttemptedForUserRef.current = null; // Reset on error to allow retry
           })
           .finally(() => {
-            setIsLoading(false); // Done loading after API call attempt
+            setContextIsLoading(false);
           });
       } else {
-         // Data already fetched or fetch in progress for this user, ensure loading state is eventually false
-         if (isLoading) setIsLoading(false);
+        // Data already fetched (or fetch attempt completed) for this user.
+        // Ensure loading state is false if it isn't already.
+        if (contextIsLoading) setContextIsLoading(false);
       }
-    } else {
-      // Authenticated but no userEmail (should not happen ideally if authStatus is 'authenticated')
+    } else { // Authenticated but no userEmail (edge case)
       setBudgets([]);
       fetchAttemptedForUserRef.current = null;
-      if (isLoading) setIsLoading(false);
+      if (contextIsLoading) setContextIsLoading(false);
     }
-  }, [userEmail, authStatus, isLoading]); // isLoading is included to handle potential external changes, though unlikely for this setup
+  }, [userEmail, authStatus, contextIsLoading]); // contextIsLoading added back, internal logic should gate.
 
 
   useEffect(() => {
-    if (authStatus === 'unauthenticated' && !isLoading) { // Save to LS only if not loading and unauthenticated
+    if (authStatus === 'unauthenticated' && !contextIsLoading) {
       try {
         localStorage.setItem('app-budgets', JSON.stringify(budgets));
       } catch (error) {
         console.error("BudgetContext (unauth): Error saving budgets to localStorage:", error);
       }
     }
-  }, [budgets, isLoading, authStatus]);
+  }, [budgets, contextIsLoading, authStatus]);
 
   const addBudget = useCallback((budgetFromApi: BudgetFromApi): Budget => {
-    const budgetWithSpent: Budget = { ...budgetFromApi, spent: 0 }; // Ensure spent is 0
+    const budgetWithSpent: Budget = { ...budgetFromApi, spent: 0 };
     setBudgets(prev => [budgetWithSpent, ...prev].sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category)));
     return budgetWithSpent;
   }, []);
@@ -128,7 +128,6 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
   const updateBudget = useCallback((budgetDataFromApi: BudgetFromApi) => {
     setBudgets(prev => prev.map(b => {
         if (b.id === budgetDataFromApi.id) {
-            // Preserve the existing 'spent' amount from context, update other fields from API
             return { ...b, ...budgetDataFromApi, spent: b.spent };
         }
         return b;
@@ -151,37 +150,36 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
   const updateBudgetSpentAmount = useCallback((budgetId: string, relatedTransactions: Transaction[]) => {
     setBudgets(prevBudgets => {
       const targetBudgetIndex = prevBudgets.findIndex(b => b.id === budgetId);
-      if (targetBudgetIndex === -1) return prevBudgets; // Budget not found
+      if (targetBudgetIndex === -1) return prevBudgets;
 
       const targetBudget = prevBudgets[targetBudgetIndex];
-      const budgetMonthYear = targetBudget.month.split('-'); // "YYYY-MM"
+      const budgetMonthYear = targetBudget.month.split('-');
       const budgetYear = parseInt(budgetMonthYear[0]);
-      const budgetMonth = parseInt(budgetMonthYear[1]); // 1-indexed month
+      const budgetMonth = parseInt(budgetMonthYear[1]);
 
       const newSpent = relatedTransactions
         .filter(t => {
-          const tDate = new Date(t.date); // Transaction date is "YYYY-MM-DD"
+          const tDate = new Date(t.date);
           return t.category.toLowerCase() === targetBudget.category.toLowerCase() &&
                  tDate.getFullYear() === budgetYear &&
-                 (tDate.getMonth() + 1) === budgetMonth && // getMonth() is 0-indexed
+                 (tDate.getMonth() + 1) === budgetMonth &&
                  t.type === 'expense';
         })
-        .reduce((sum, t) => sum + t.amount, 0); // Sum in INR
+        .reduce((sum, t) => sum + t.amount, 0);
 
-      // Only update if the spent amount actually changed (within a small tolerance for floating point)
       if (Math.abs(targetBudget.spent - newSpent) < 0.001) {
         return prevBudgets;
       }
 
       const updatedBudgets = [...prevBudgets];
       updatedBudgets[targetBudgetIndex] = { ...targetBudget, spent: newSpent };
-      return updatedBudgets; // No need to re-sort here as only 'spent' changed
+      return updatedBudgets;
     });
   }, []);
 
 
   return (
-    <BudgetContext.Provider value={{ budgets, isLoading, addBudget, updateBudget, deleteBudget, getBudgetById, updateBudgetSpentAmount, getBudgetsByMonth }}>
+    <BudgetContext.Provider value={{ budgets, isLoading: contextIsLoading, addBudget, updateBudget, deleteBudget, getBudgetById, updateBudgetSpentAmount, getBudgetsByMonth }}>
       {children}
     </BudgetContext.Provider>
   );
