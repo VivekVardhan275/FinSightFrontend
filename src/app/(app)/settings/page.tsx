@@ -56,6 +56,8 @@ const initializeFromLocalStorage = <T,>(
       if (parser) {
         valueToUse = parser(storedValue);
       } else {
+        // If no parser, assume the stored value is directly usable as type T (e.g., string literal types)
+        // This prevents JSON.parse errors for simple string values like "medium" or "dark"
         valueToUse = storedValue as unknown as T;
       }
       if (validator ? validator(valueToUse) : true) {
@@ -209,10 +211,8 @@ export default function SettingsPage() {
     }
     setIsDeletingAccount(true);
     try {
-      // Include confirmationCode in the request body
-      await axios.delete(`${ACCOUNT_DELETE_API_URL}?email=${encodeURIComponent(user.email)}`, {
-        data: { confirmationCode: confirmationCode }
-      });
+      const deleteUrl = `${ACCOUNT_DELETE_API_URL}?email=${encodeURIComponent(user.email)}&confirmationCode=${encodeURIComponent(confirmationCode)}`;
+      await axios.delete(deleteUrl);
 
       toast({
         title: "Account Deletion Successful",
@@ -401,3 +401,4 @@ export default function SettingsPage() {
     
 
     
+
