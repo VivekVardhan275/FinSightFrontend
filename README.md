@@ -120,19 +120,26 @@ FinSight is a modern, intuitive personal finance management application designed
 
 ## Backend Interaction
 
-The frontend application communicates with a Spring Boot backend via REST APIs. The base URL for this backend is configurable via an environment variable. These APIs handle data persistence for user profiles, settings, transactions, and budgets. All user-specific data is associated with the user's email.
+The frontend application communicates with a Spring Boot backend via REST APIs. The base URL for this backend is configurable via an environment variable `NEXT_PUBLIC_BACKEND_API_URL`. These APIs handle data persistence for user profiles, settings, transactions, and budgets. All user-specific data is associated with the user's email.
 
 ## Environment Variables
 
-To run this application, you will need to set up environment variables. Create a `.env.local` file in the root of your project and add the following:
+To run this application, you will need to set up environment variables. For local development, create a `.env.local` file in the root of your project. For production deployments (e.g., on Netlify), configure these in your hosting provider's settings.
 
 \`\`\`env
+# --- GENERAL SETTINGS ---
 # NextAuth.js Configuration
 # Generate a strong secret using: openssl rand -base64 32
 AUTH_SECRET=your_nextauth_secret_here
-# Your application's base URL (e.g., http://localhost:9002 for local Next.js dev server)
+
+# !! IMPORTANT: Set AUTH_URL to your application's actual base URL.
 # Ensure it does NOT have a trailing slash.
-AUTH_URL=http://localhost:9002
+#
+# --- Example for Local Development (Next.js dev server on port 9002) ---
+# AUTH_URL=http://localhost:9002
+#
+# --- Example for Production (Deployed to https://finsight27.netlify.app) ---
+AUTH_URL=https://finsight27.netlify.app # Replace with your actual production URL
 
 # Google OAuth Credentials (Optional - for Google Login)
 GOOGLE_CLIENT_ID=your_google_client_id
@@ -144,15 +151,24 @@ GITHUB_CLIENT_SECRET=your_github_client_secret
 
 # Backend API URL
 # The base URL of your Spring Boot backend.
+# Example: http://localhost:8080 (for local dev) or your deployed backend URL.
 # Ensure it does NOT have a trailing slash.
-# Example: http://localhost:8080 or your deployed backend URL
 NEXT_PUBLIC_BACKEND_API_URL=http://localhost:8080
 \`\`\`
 
-**Important Notes:**
-*   `NEXT_PUBLIC_BACKEND_API_URL`: This variable tells the Next.js frontend where to find your Spring Boot backend API. If not set, it will default to `http://localhost:8080` for local development convenience.
-*   `AUTH_URL`: This is crucial for NextAuth.js to correctly construct callback URLs. For local development with Next.js running on port 9002, this would be `http://localhost:9002`.
-*   Ensure the OAuth redirect URIs are correctly configured in your Google Cloud Console and GitHub OAuth App settings to match your `AUTH_URL` (e.g., `http://localhost:9002/api/auth/callback/google`).
+**Important Notes for Deployment (e.g., to `https://finsight27.netlify.app`):**
+*   `NEXT_PUBLIC_BACKEND_API_URL`: This variable tells the Next.js frontend where to find your Spring Boot backend API. Update this to your deployed backend's URL. If not set, it defaults to `http://localhost:8080`.
+*   `AUTH_URL`: This is **critical** for NextAuth.js.
+    *   For **local development** (e.g., Next.js running on port 9002), set `AUTH_URL=http://localhost:9002`.
+    *   For **production deployment** to `https://finsight27.netlify.app`, set `AUTH_URL=https://finsight27.netlify.app`.
+*   **OAuth Redirect URIs**: You **must** configure the OAuth redirect URIs in your Google Cloud Console and GitHub OAuth App settings to match your `AUTH_URL`.
+    *   For **production** (`https://finsight27.netlify.app`):
+        *   Google: Add `https://finsight27.netlify.app/api/auth/callback/google`
+        *   GitHub: Set Authorization callback URL to `https://finsight27.netlify.app/api/auth/callback/github`
+    *   For **local development** (if `AUTH_URL=http://localhost:9002`):
+        *   Google: Add `http://localhost:9002/api/auth/callback/google`
+        *   GitHub: Set Authorization callback URL to `http://localhost:9002/api/auth/callback/github`
+    *   It's common to add *both* local and production callback URLs to your OAuth provider settings to support both environments.
 
 ---
 
