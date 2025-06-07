@@ -81,15 +81,23 @@ export default function SetupPage() {
       !!FONT_SIZE_CLASSES[v as FontSizeSetting]
     )
   );
-  const [formCurrency, setFormCurrency] = useState<AppCurrency>(initialGlobalCurrency);
+  
+  // Initialize formCurrency from global context or default if global context is not ready
+  const [formCurrency, setFormCurrency] = useState<AppCurrency>(initialGlobalCurrency || "INR");
 
   const [isSaving, setIsSaving] = useState(false);
+
 
   useEffect(() => {
     if (user && !authStateIsLoading) {
       setFormDisplayName(user.name || "");
-      // Initialize currency from context once it's available from useCurrency hook
-      setFormCurrency(initialGlobalCurrency);
+      // Set formCurrency from context once it's definitely available, but only if it hasn't been changed by user yet
+      // This check is implicitly handled by initializing useState with initialGlobalCurrency
+      // If initialGlobalCurrency changes after mount (e.g. context loads later), we might want to update
+      // but for setup, it's probably better to stick with the first good value or let user choose.
+      if (initialGlobalCurrency && formCurrency !== initialGlobalCurrency) {
+         setFormCurrency(initialGlobalCurrency);
+      }
     }
   }, [user, authStateIsLoading, initialGlobalCurrency]);
 

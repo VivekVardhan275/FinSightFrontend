@@ -48,7 +48,7 @@ export function useAuthState() {
     try {
       return await updateNextAuthSession(dataToUpdate);
     } catch (error) {
-      console.error("useAuthState: Error updating NextAuth session:", error instanceof Error ? error.message : error);
+      console.error("useAuthState: Error updating NextAuth session:", error instanceof Error ? error.message : String(error));
       return null;
     }
   }, [updateNextAuthSession]);
@@ -64,19 +64,20 @@ export function useAuthState() {
             if (response.data && typeof response.data.hasCompletedSetup === 'boolean') {
               updateSession({ user: { ...session.user, hasCompletedSetup: response.data.hasCompletedSetup } });
             } else {
+              console.warn("useAuthState: API 'first-check' response did not include a boolean 'hasCompletedSetup'. Defaulting to false.");
               updateSession({ user: { ...session.user, hasCompletedSetup: false } });
             }
           })
           .catch(error => {
-            console.error("API error calling 'first-check'. Defaulting hasCompletedSetup to false.");
+            console.error("useAuthState: API error calling 'first-check'. Defaulting hasCompletedSetup to false.");
             if (axios.isAxiosError(error) && error.response) {
                 console.error("Backend error message:", error.response.data?.message || error.response.data?.error || "No specific message from backend.");
                 console.error("Status code:", error.response.status);
             } else if (error instanceof Error) {
                 console.error("Error details:", error.message);
             }
-            updateSession({ user: { ...session.user, hasCompletedSetup: false } });
-            firstCheckInitiatedForUserRef.current = null;
+            updateSession({ user: { ...session.user, hasCompletedSetup: false } }); // Ensure a default on error
+            firstCheckInitiatedForUserRef.current = null; // Allow retry if this call failed
           })
           .finally(() => {
             setIsApiCheckInProgress(false);
@@ -84,16 +85,17 @@ export function useAuthState() {
       }
     } else if (status === 'unauthenticated') {
       firstCheckInitiatedForUserRef.current = null;
-      if(isApiCheckInProgress) setIsApiCheckInProgress(false);
+      if(isApiCheckInProgress) setIsApiCheckInProgress(false); // Reset if user logs out during check
     }
-  }, [session, status, updateSession, isApiCheckInProgress]);
+  }, [session, status, updateSession, isApiCheckInProgress]); // isApiCheckInProgress added to re-evaluate if it changes
 
 
   const navigateBasedOnAuthAndSetup = useCallback(() => {
     const isWaitingForAuth = isLoadingFromAuth;
-    const isWaitingForApiCheck = status === 'authenticated' && user?.hasCompletedSetup === undefined && isApiCheckInProgress;
+    // isApiCheckInProgress is now part of combinedIsLoading, which gates this entire effect effectively.
+    // So, if API check is in progress, combinedIsLoading will be true, and this function won't cause navigation yet.
 
-    if (isWaitingForAuth || isWaitingForApiCheck) {
+    if (isWaitingForAuth || isApiCheckInProgress) { // Explicitly wait if API check is also ongoing
       return;
     }
 
@@ -102,13 +104,15 @@ export function useAuthState() {
         if (pathname === '/login' || pathname === '/welcome/setup') {
           router.replace('/dashboard');
         }
-      } else if (user?.hasCompletedSetup === false) {
+      } else if (user?.hasCompletedSetup === false) { // Explicitly check for false
         if (pathname !== '/welcome/setup') {
           router.replace('/welcome/setup');
         }
       }
+      // If hasCompletedSetup is still undefined here, it means API check hasn't finished or failed.
+      // The isLoading check at the top should handle this.
     } else if (status === 'unauthenticated') {
-      if (pathname !== '/login' && pathname !== '/welcome/setup') {
+      if (pathname !== '/login' && pathname !== '/welcome/setup') { // Allow /welcome/setup for brief moments during logout redirect
         router.replace('/login');
       }
     }
@@ -120,25 +124,25 @@ export function useAuthState() {
 
   const loginWithGoogle = useCallback(async () => {
     try {
-      firstCheckInitiatedForUserRef.current = null;
-      setIsApiCheckInProgress(false);
+      firstCheckInitiatedForUserRef.current = null; // Reset for the new login session
+      setIsApiCheckInProgress(false); // Reset
       const result = await signIn('google', { callbackUrl: '/dashboard', redirect: false });
       if (result?.url) router.push(result.url);
       else if (result?.error) console.error("NextAuth signIn error (Google):", result.error);
     } catch (error) {
-      console.error("Catastrophic error during Google signIn:", error instanceof Error ? error.message : error);
+      console.error("Catastrophic error during Google signIn:", error instanceof Error ? error.message : String(error));
     }
   }, [router]);
 
   const loginWithGitHub = useCallback(async () => {
     try {
-      firstCheckInitiatedForUserRef.current = null;
-      setIsApiCheckInProgress(false);
+      firstCheckInitiatedForUserRef.current = null; // Reset for the new login session
+      setIsApiCheckInProgress(false); // Reset
       const result = await signIn('github', { callbackUrl: '/dashboard', redirect: false });
       if (result?.url) router.push(result.url);
       else if (result?.error) console.error("NextAuth signIn error (GitHub):", result.error);
     } catch (error) {
-      console.error("Catastrophic error during GitHub signIn:", error instanceof Error ? error.message : error);
+      console.error("Catastrophic error during GitHub signIn:", error instanceof Error ? error.message : String(error));
     }
   }, [router]);
 
@@ -157,11 +161,12 @@ export function useAuthState() {
     try {
       await signOut({ callbackUrl: '/login', redirect: true });
     } catch (error) {
-      console.error("Error during signOut:", error instanceof Error ? error.message : error);
-      router.push('/login');
+      console.error("Error during signOut:", error instanceof Error ? error.message : String(error));
+      router.push('/login'); // Ensure redirect even if signOut promise rejects
     }
   }, [router]);
 
+  // This combined loading state should be true if auth is loading OR if auth is done but API check is still pending.
   const combinedIsLoading = isLoadingFromAuth || (status === 'authenticated' && user?.hasCompletedSetup === undefined && isApiCheckInProgress);
 
   return {

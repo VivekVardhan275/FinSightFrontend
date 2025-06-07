@@ -215,8 +215,9 @@ export default function SettingsPage() {
     }
     setIsDeletingAccount(true);
     try {
+      // Send confirmationCode as a query parameter
       const deleteUrl = `${ACCOUNT_DELETE_API_URL}?email=${encodeURIComponent(user.email)}&confirmationCode=${encodeURIComponent(confirmationCode)}`;
-      await axios.delete(deleteUrl);
+      await axios.delete(deleteUrl); // No request body needed
 
       toast({
         title: "Account Deletion Successful",
