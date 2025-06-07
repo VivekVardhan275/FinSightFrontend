@@ -27,7 +27,7 @@ const BudgetContext = createContext<BudgetContextType | undefined>(undefined);
 export const BudgetProvider = ({ children }: { children: ReactNode }) => {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const { user, status: authStatus } = useAuthState();
-  const [contextIsLoading, setContextIsLoading] = useState(true); // Renamed from isLoading
+  const [contextIsLoading, setContextIsLoading] = useState(true);
   const fetchAttemptedForUserRef = useRef<string | null>(null);
 
   const userEmail = user?.email;
@@ -39,7 +39,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
     }
 
     if (authStatus === 'unauthenticated') {
-      if (!contextIsLoading) setContextIsLoading(true); // Ensure loading is true before LS access
+      if (!contextIsLoading) setContextIsLoading(true);
       try {
         const stored = localStorage.getItem('app-budgets');
         let parsed: Budget[] = [];
@@ -62,11 +62,10 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    // Authenticated state
     if (userEmail) {
       if (fetchAttemptedForUserRef.current !== userEmail) {
         if (!contextIsLoading) setContextIsLoading(true);
-        fetchAttemptedForUserRef.current = userEmail;
+        fetchAttemptedForUserRef.current = userEmail; // Mark as attempted for this user
 
         axios.get<{ budgets: Array<Omit<BudgetFromApiType, 'spent'>> }>(`${BUDGET_API_BASE_URL}?email=${encodeURIComponent(userEmail)}`)
           .then(response => {
@@ -87,26 +86,32 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
             if (axios.isAxiosError(error) && error.response) {
               console.error("Backend error message:", error.response.data?.message || error.response.data?.error || "No specific message from backend.");
               console.error("Status code:", error.response.status);
+              // If it's a 404, we assume no data and don't reset the ref to prevent retries for this user.
+              // For other errors, reset to allow a retry.
+              if (error.response.status !== 404) {
+                fetchAttemptedForUserRef.current = null;
+              }
             } else if (error instanceof Error) {
               console.error("Error details:", error.message);
+              fetchAttemptedForUserRef.current = null; // Reset for non-Axios errors too
+            } else {
+              fetchAttemptedForUserRef.current = null; // Reset for unknown errors
             }
-            setBudgets([]);
-            fetchAttemptedForUserRef.current = null; // Reset on error to allow retry
+            setBudgets([]); // Set to empty on error
           })
           .finally(() => {
             setContextIsLoading(false);
           });
       } else {
         // Data already fetched (or fetch attempt completed) for this user.
-        // Ensure loading state is false if it isn't already.
         if (contextIsLoading) setContextIsLoading(false);
       }
-    } else { // Authenticated but no userEmail (edge case)
+    } else {
       setBudgets([]);
       fetchAttemptedForUserRef.current = null;
       if (contextIsLoading) setContextIsLoading(false);
     }
-  }, [userEmail, authStatus, contextIsLoading]); // contextIsLoading added back, internal logic should gate.
+  }, [userEmail, authStatus, contextIsLoading]);
 
 
   useEffect(() => {
@@ -128,7 +133,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
   const updateBudget = useCallback((budgetDataFromApi: BudgetFromApi) => {
     setBudgets(prev => prev.map(b => {
         if (b.id === budgetDataFromApi.id) {
-            return { ...b, ...budgetDataFromApi, spent: b.spent };
+            return { ...b, ...budgetDataFromApi, spent: b.spent }; // Preserve existing spent amount
         }
         return b;
     }).sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category)));
@@ -168,7 +173,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
         .reduce((sum, t) => sum + t.amount, 0);
 
       if (Math.abs(targetBudget.spent - newSpent) < 0.001) {
-        return prevBudgets;
+        return prevBudgets; // No change needed
       }
 
       const updatedBudgets = [...prevBudgets];
