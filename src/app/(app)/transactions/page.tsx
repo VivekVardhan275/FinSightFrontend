@@ -3,7 +3,7 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
-import { PlusCircle, RotateCw, ListChecks as NoTransactionsIcon } from "lucide-react"; // Added NoTransactionsIcon
+import { PlusCircle, RotateCw, ListChecks as NoTransactionsIcon } from "lucide-react"; 
 import { DataTable } from "@/components/transactions/data-table";
 import { getColumns } from "@/components/transactions/transaction-table-columns";
 import type { Transaction, TransactionFormData } from "@/types";
@@ -30,6 +30,12 @@ import axios from 'axios';
 
 const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://localhost:8080";
 const TRANSACTION_API_BASE_URL = `${backendUrl}/api/user/transactions`;
+
+const addRandomQueryParam = (url: string, paramName: string = '_cb'): string => {
+  const randomString = Math.random().toString(36).substring(2, 10);
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}${paramName}=${randomString}`;
+};
 
 
 const buttonMotionVariants = {
@@ -110,7 +116,8 @@ export default function TransactionsPage() {
     setIsDeleting(true);
 
     try {
-      await axios.delete(`${TRANSACTION_API_BASE_URL}/${transactionToDeleteId}?email=${encodeURIComponent(user.email)}`);
+      const apiUrl = `${TRANSACTION_API_BASE_URL}/${transactionToDeleteId}?email=${encodeURIComponent(user.email)}`;
+      await axios.delete(addRandomQueryParam(apiUrl));
 
       const transactionToDelete = transactions.find(t => t.id === transactionToDeleteId);
       deleteTransactionFromContext(transactionToDeleteId);
@@ -225,7 +232,8 @@ export default function TransactionsPage() {
             amount: editingTransaction.amount
         };
         const transactionToUpdate: Transaction = { ...dataForApi, id: editingTransaction.id };
-        const response = await axios.put<Transaction>(`${TRANSACTION_API_BASE_URL}/${editingTransaction.id}?email=${encodeURIComponent(user.email)}`, transactionToUpdate);
+        const apiUrl = `${TRANSACTION_API_BASE_URL}/${editingTransaction.id}?email=${encodeURIComponent(user.email)}`;
+        const response = await axios.put<Transaction>(addRandomQueryParam(apiUrl), transactionToUpdate);
         savedTransaction = response.data;
         updateTransaction(savedTransaction);
         addNotification({
@@ -236,7 +244,8 @@ export default function TransactionsPage() {
         });
 
       } else {
-        const response = await axios.post<Transaction>(`${TRANSACTION_API_BASE_URL}?email=${encodeURIComponent(user.email)}`, dataForApi);
+        const apiUrl = `${TRANSACTION_API_BASE_URL}?email=${encodeURIComponent(user.email)}`;
+        const response = await axios.post<Transaction>(addRandomQueryParam(apiUrl), dataForApi);
         savedTransaction = response.data;
         addTransaction(savedTransaction);
         addNotification({

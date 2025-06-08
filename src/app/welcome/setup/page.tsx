@@ -19,6 +19,14 @@ import { motion } from "framer-motion";
 import axios from "axios";
 import { useRouter } from "next/navigation";
 
+const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://localhost:8080";
+const USER_SETUP_API_URL_BASE = `${backendUrl}/api/user/setup`;
+
+const addRandomQueryParam = (url: string, paramName: string = '_cb'): string => {
+  const randomString = Math.random().toString(36).substring(2, 10);
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}${paramName}=${randomString}`;
+};
 
 type ThemeSetting = "light" | "dark" | "system";
 type FontSizeSetting = "small" | "medium" | "large";
@@ -52,9 +60,6 @@ const initializeFromLocalStorage = <T,>(
   return defaultValue;
 };
 
-const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://localhost:8080";
-const USER_SETUP_API_URL = `${backendUrl}/api/user/setup`;
-
 
 export default function SetupPage() {
   const { user, isLoading: authStateIsLoading, status, updateSession } = useAuthState();
@@ -64,13 +69,11 @@ export default function SetupPage() {
   const { selectedCurrency: initialGlobalCurrency, setSelectedCurrency: setGlobalCurrencyContext } = useCurrency();
   const { toast } = useToast();
 
-  // Personal Information States
   const [formDisplayName, setFormDisplayName] = useState("");
   const [formPhoneNumber, setFormPhoneNumber] = useState("");
   const [formDateOfBirth, setFormDateOfBirth] = useState("");
   const [formGender, setFormGender] = useState("");
 
-  // Appearance & Regional Form States
   const [formTheme, setFormTheme] = useState<ThemeSetting>(() =>
     initializeFromLocalStorage<ThemeSetting>("app-theme", "system", (v) =>
       ["light", "dark", "system"].includes(v)
@@ -82,7 +85,6 @@ export default function SetupPage() {
     )
   );
   
-  // Initialize formCurrency from global context or default if global context is not ready
   const [formCurrency, setFormCurrency] = useState<AppCurrency>(initialGlobalCurrency || "INR");
 
   const [isSaving, setIsSaving] = useState(false);
@@ -91,15 +93,11 @@ export default function SetupPage() {
   useEffect(() => {
     if (user && !authStateIsLoading) {
       setFormDisplayName(user.name || "");
-      // Set formCurrency from context once it's definitely available, but only if it hasn't been changed by user yet
-      // This check is implicitly handled by initializing useState with initialGlobalCurrency
-      // If initialGlobalCurrency changes after mount (e.g. context loads later), we might want to update
-      // but for setup, it's probably better to stick with the first good value or let user choose.
       if (initialGlobalCurrency && formCurrency !== initialGlobalCurrency) {
          setFormCurrency(initialGlobalCurrency);
       }
     }
-  }, [user, authStateIsLoading, initialGlobalCurrency]);
+  }, [user, authStateIsLoading, initialGlobalCurrency, formCurrency]);
 
 
   const handleSaveSetup = useCallback(async () => {
@@ -117,7 +115,7 @@ export default function SetupPage() {
     setIsSaving(true);
 
     const setupPayload = {
-      email: user.email,
+      email: user.email, // Email is in body for backend
       displayName: formDisplayName || user.name,
       phoneNumber: formPhoneNumber || null,
       dateOfBirth: formDateOfBirth,
@@ -128,9 +126,10 @@ export default function SetupPage() {
     };
 
     try {
-      await axios.post(USER_SETUP_API_URL, setupPayload);
+      // Email also as query param as requested
+      const apiUrlWithEmailQuery = `${USER_SETUP_API_URL_BASE}?email=${encodeURIComponent(user.email)}`;
+      await axios.post(addRandomQueryParam(apiUrlWithEmailQuery), setupPayload);
 
-      // Apply settings globally AFTER successful save
       setGlobalTheme(formTheme);
       localStorage.setItem("app-theme", formTheme);
 
@@ -140,11 +139,10 @@ export default function SetupPage() {
       if (FONT_SIZE_CLASSES[formFontSize]) {
         htmlElement.classList.add(FONT_SIZE_CLASSES[formFontSize]);
       } else {
-         htmlElement.classList.add(FONT_SIZE_CLASSES.medium); // Default if invalid
+         htmlElement.classList.add(FONT_SIZE_CLASSES.medium); 
       }
 
       setGlobalCurrencyContext(formCurrency);
-      // Note: useCurrency context already saves to localStorage
 
       await updateSession({ user: { ...user, name: formDisplayName, hasCompletedSetup: true } });
 
@@ -182,7 +180,6 @@ export default function SetupPage() {
       setGlobalCurrencyContext, setGlobalTheme, router, toast, updateSession
     ]);
 
-  // Memoized event handlers
   const handleDisplayNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setFormDisplayName(e.target.value);
   }, []);

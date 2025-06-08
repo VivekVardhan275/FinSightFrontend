@@ -22,6 +22,12 @@ const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://localhost:
 const SETTINGS_API_URL = `${backendUrl}/api/user/settings`;
 const ACCOUNT_DELETE_API_URL = `${backendUrl}/api/user/account/delete`;
 
+const addRandomQueryParam = (url: string, paramName: string = '_cb'): string => {
+  const randomString = Math.random().toString(36).substring(2, 10);
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}${paramName}=${randomString}`;
+};
+
 const pageHeaderBlockMotionVariants = {
   initial: { opacity: 0, x: -20 },
   animate: { opacity: 1, x: 0, transition: { duration: 0.3, ease: "easeOut" } },
@@ -57,7 +63,6 @@ const initializeFromLocalStorage = <T,>(
       if (parser) {
         valueToUse = parser(storedValue);
       } else {
-        // If no parser, assume the stored value is directly usable as type T (e.g., string literal types)
         valueToUse = storedValue as unknown as T;
       }
       if (validator ? validator(valueToUse) : true) {
@@ -77,7 +82,6 @@ export default function SettingsPage() {
   const { toast } = useToast();
   const { selectedCurrency: globalSelectedCurrency, setSelectedCurrency: setGlobalSelectedCurrency } = useCurrency();
 
-  // Local form states for appearance and regional
   const [formTheme, setFormTheme] = useState<ThemeSetting>("system");
   const [formFontSize, setFormFontSize] = useState<FontSizeSetting>("medium");
   const [formCurrency, setFormCurrency] = useState<AppCurrency>("INR");
@@ -85,15 +89,12 @@ export default function SettingsPage() {
   const [isSettingsReflectingGlobal, setIsSettingsReflectingGlobal] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
-  // Account Deletion State
   const [isDeleteAccountDialogOpen, setIsDeleteAccountDialogOpen] = useState(false);
   const [confirmationCode, setConfirmationCode] = useState("");
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
-  // Effect to initialize form states from global/localStorage once auth is resolved
   useEffect(() => {
     if (!authLoading && !isSettingsReflectingGlobal) {
-      // Initialize theme
       const initialTheme = initializeFromLocalStorage<ThemeSetting>(
         "app-theme",
         "system",
@@ -101,14 +102,12 @@ export default function SettingsPage() {
       );
       setFormTheme(activeGlobalTheme && ["light", "dark", "system"].includes(activeGlobalTheme) ? activeGlobalTheme as ThemeSetting : initialTheme);
 
-      // Initialize font size
       setFormFontSize(initializeFromLocalStorage<FontSizeSetting>(
         "app-font-size",
         "medium",
         (v) => !!FONT_SIZE_CLASSES[v as FontSizeSetting]
       ));
 
-      // Initialize currency
       if (globalSelectedCurrency) {
         setFormCurrency(globalSelectedCurrency);
       } else {
@@ -121,7 +120,7 @@ export default function SettingsPage() {
         if (storedCurrency && ["INR", "USD", "EUR", "GBP"].includes(storedCurrency)) {
             setFormCurrency(storedCurrency);
         } else {
-            setFormCurrency("INR"); // Default if global is not set and local is invalid/missing
+            setFormCurrency("INR"); 
         }
       }
       setIsSettingsReflectingGlobal(true);
@@ -136,7 +135,6 @@ export default function SettingsPage() {
     }
     setIsSavingSettings(true);
 
-    // Apply and save theme
     setGlobalTheme(formTheme);
     try {
         localStorage.setItem("app-theme", formTheme);
@@ -144,12 +142,8 @@ export default function SettingsPage() {
         // console.error("Error saving app-theme to localStorage", e);
     }
 
-
-    // Apply and save currency
     setGlobalSelectedCurrency(formCurrency);
-    // useCurrency context handles localStorage for currency
 
-    // Apply and save font size
     try {
         localStorage.setItem("app-font-size", formFontSize);
     } catch (e) {
@@ -161,7 +155,7 @@ export default function SettingsPage() {
         if (FONT_SIZE_CLASSES[formFontSize]) {
           htmlElement.classList.add(FONT_SIZE_CLASSES[formFontSize]);
         } else {
-          htmlElement.classList.add(FONT_SIZE_CLASSES.medium); // Default if somehow invalid
+          htmlElement.classList.add(FONT_SIZE_CLASSES.medium); 
         }
     }
 
@@ -172,7 +166,8 @@ export default function SettingsPage() {
     };
 
     try {
-      await axios.put(`${SETTINGS_API_URL}?email=${encodeURIComponent(user.email)}`, settingsToSaveToBackend);
+      const apiUrl = `${SETTINGS_API_URL}?email=${encodeURIComponent(user.email)}`;
+      await axios.put(addRandomQueryParam(apiUrl), settingsToSaveToBackend);
 
       toast({
         title: "Settings Saved",
@@ -215,9 +210,8 @@ export default function SettingsPage() {
     }
     setIsDeletingAccount(true);
     try {
-      // Send confirmationCode as a query parameter
       const deleteUrl = `${ACCOUNT_DELETE_API_URL}?email=${encodeURIComponent(user.email)}&confirmationCode=${encodeURIComponent(confirmationCode)}`;
-      await axios.delete(deleteUrl); // No request body needed
+      await axios.delete(addRandomQueryParam(deleteUrl)); 
 
       toast({
         title: "Account Deletion Successful",
@@ -226,7 +220,6 @@ export default function SettingsPage() {
       });
       setIsDeleteAccountDialogOpen(false);
 
-      // Wait for toast to be visible then logout
       setTimeout(async () => {
         await logout();
       }, 2000);

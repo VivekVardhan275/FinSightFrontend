@@ -29,6 +29,12 @@ import axios from 'axios';
 const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://localhost:8080";
 const BUDGET_API_BASE_URL = `${backendUrl}/api/user/budgets`;
 
+const addRandomQueryParam = (url: string, paramName: string = '_cb'): string => {
+  const randomString = Math.random().toString(36).substring(2, 10);
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}${paramName}=${randomString}`;
+};
+
 // Type for budget data received from API (without 'spent')
 type BudgetFromApi = Omit<Budget, 'spent'>;
 
@@ -108,7 +114,8 @@ export default function BudgetsPage() {
     setIsDeleting(true);
 
     try {
-      await axios.delete(`${BUDGET_API_BASE_URL}/${budgetToDeleteId}?email=${encodeURIComponent(user.email)}`);
+      const apiUrl = `${BUDGET_API_BASE_URL}/${budgetToDeleteId}?email=${encodeURIComponent(user.email)}`;
+      await axios.delete(addRandomQueryParam(apiUrl));
       deleteBudgetFromContext(budgetToDeleteId);
       addNotification({
         title: "Budget Deleted",
@@ -191,14 +198,15 @@ export default function BudgetsPage() {
       let savedBudgetFromApi: BudgetFromApi;
 
       if (isActualEditOperation && editingBudget) {
-        const response = await axios.put<BudgetFromApi>(`${BUDGET_API_BASE_URL}/${editingBudget.id}?email=${encodeURIComponent(user.email)}`, dataForApi);
+        const apiUrl = `${BUDGET_API_BASE_URL}/${editingBudget.id}?email=${encodeURIComponent(user.email)}`;
+        const response = await axios.put<BudgetFromApi>(addRandomQueryParam(apiUrl), dataForApi);
         savedBudgetFromApi = response.data;
-        // Pass the current transactions from this page's context to ensure freshness
         updateBudget(savedBudgetFromApi, pageTransactions);
       } else {
-        const response = await axios.post<BudgetFromApi>(`${BUDGET_API_BASE_URL}?email=${encodeURIComponent(user.email)}`, dataForApi);
+        const apiUrl = `${BUDGET_API_BASE_URL}?email=${encodeURIComponent(user.email)}`;
+        const response = await axios.post<BudgetFromApi>(addRandomQueryParam(apiUrl), dataForApi);
         savedBudgetFromApi = response.data;
-        addBudget(savedBudgetFromApi); // For new budgets, spent will be 0 initially, global effect will calculate
+        addBudget(savedBudgetFromApi); 
       }
 
       addNotification({

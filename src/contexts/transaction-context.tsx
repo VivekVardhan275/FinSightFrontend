@@ -9,6 +9,12 @@ import { useAuthState } from '@/hooks/use-auth-state';
 const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://localhost:8080";
 const TRANSACTION_API_BASE_URL = `${backendUrl}/api/user/transactions`;
 
+const addRandomQueryParam = (url: string, paramName: string = '_cb'): string => {
+  const randomString = Math.random().toString(36).substring(2, 10);
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}${paramName}=${randomString}`;
+};
+
 interface TransactionContextType {
   transactions: Transaction[];
   isLoading: boolean;
@@ -55,16 +61,17 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
         setTransactions([]);
       }
       fetchAttemptedForUserRef.current = null;
-      setContextIsLoading(false);
+      if (contextIsLoading) setContextIsLoading(false);
       return;
     }
 
     if (userEmail) {
       if (fetchAttemptedForUserRef.current !== userEmail) {
         if (!contextIsLoading) setContextIsLoading(true);
-        fetchAttemptedForUserRef.current = userEmail; // Mark as attempted for this user
+        fetchAttemptedForUserRef.current = userEmail; 
 
-        axios.get(`${TRANSACTION_API_BASE_URL}?email=${encodeURIComponent(userEmail)}`)
+        const apiUrl = `${TRANSACTION_API_BASE_URL}?email=${encodeURIComponent(userEmail)}`;
+        axios.get(addRandomQueryParam(apiUrl))
           .then(response => {
             let apiTransactionsSource = response.data;
             let transactionsArray: Transaction[] = [];
@@ -84,24 +91,21 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
             if (axios.isAxiosError(error) && error.response) {
               console.error("Backend error message:", error.response.data?.message || error.response.data?.error || "No specific message from backend.");
               console.error("Status code:", error.response.status);
-              // If it's a 404, we assume no data and don't reset the ref to prevent retries for this user.
-              // For other errors, reset to allow a retry.
               if (error.response.status !== 404) {
                 fetchAttemptedForUserRef.current = null;
               }
             } else if (error instanceof Error) {
               console.error("Error details:", error.message);
-               fetchAttemptedForUserRef.current = null; // Reset for non-Axios errors too
+               fetchAttemptedForUserRef.current = null; 
             } else {
-               fetchAttemptedForUserRef.current = null; // Reset for unknown errors
+               fetchAttemptedForUserRef.current = null; 
             }
-            setTransactions([]); // Set to empty on error
+            setTransactions([]); 
           })
           .finally(() => {
-            setContextIsLoading(false);
+            if (contextIsLoading) setContextIsLoading(false);
           });
       } else {
-        // Data already fetched (or fetch attempt completed) for this user.
         if (contextIsLoading) setContextIsLoading(false);
       }
     } else {

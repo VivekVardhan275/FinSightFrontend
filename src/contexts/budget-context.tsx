@@ -10,6 +10,12 @@ import { useTransactionContext } from './transaction-context';
 const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://localhost:8080";
 const BUDGET_API_BASE_URL = `${backendUrl}/api/user/budgets`;
 
+const addRandomQueryParam = (url: string, paramName: string = '_cb'): string => {
+  const randomString = Math.random().toString(36).substring(2, 10);
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}${paramName}=${randomString}`;
+};
+
 type BudgetFromApi = Omit<BudgetFromApiType, 'spent'>;
 
 interface BudgetContextType {
@@ -28,7 +34,7 @@ const BudgetContext = createContext<BudgetContextType | undefined>(undefined);
 export const BudgetProvider = ({ children }: { children: ReactNode }) => {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const { user, status: authStatus } = useAuthState();
-  const { transactions: contextTransactions, isLoading: isLoadingTransactions } = useTransactionContext(); // Renamed to avoid conflict in updateBudget
+  const { transactions: contextTransactions, isLoading: isLoadingTransactions } = useTransactionContext(); 
   const [contextIsLoading, setContextIsLoading] = useState(true);
   const fetchAttemptedForUserRef = useRef<string | null>(null);
 
@@ -60,17 +66,18 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
         setBudgets([]);
       }
       fetchAttemptedForUserRef.current = null;
-      setContextIsLoading(false);
+      if (contextIsLoading) setContextIsLoading(false);
       return;
     }
 
     if (userEmail) {
       if (fetchAttemptedForUserRef.current !== userEmail) {
         if (!contextIsLoading) setContextIsLoading(true);
+        fetchAttemptedForUserRef.current = userEmail; 
 
-        axios.get<{ budgets: Array<Omit<BudgetFromApiType, 'spent'>> }>(`${BUDGET_API_BASE_URL}?email=${encodeURIComponent(userEmail)}`)
+        const apiUrl = `${BUDGET_API_BASE_URL}?email=${encodeURIComponent(userEmail)}`;
+        axios.get<{ budgets: Array<Omit<BudgetFromApiType, 'spent'>> }>(addRandomQueryParam(apiUrl))
           .then(response => {
-            fetchAttemptedForUserRef.current = userEmail;
             const apiBudgetsRaw = response.data.budgets || response.data;
             let apiBudgets: Array<Omit<BudgetFromApiType, 'spent'>> = [];
             if (Array.isArray(apiBudgetsRaw)) {
@@ -90,8 +97,6 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
               console.error("Status code:", error.response.status);
               if (error.response.status !== 404) {
                 fetchAttemptedForUserRef.current = null;
-              } else {
-                 fetchAttemptedForUserRef.current = userEmail;
               }
             } else if (error instanceof Error) {
               console.error("Error details:", error.message);
@@ -126,7 +131,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
       const budgetYear = parseInt(budgetMonthYear[0]);
       const budgetMonth = parseInt(budgetMonthYear[1]);
 
-      const newSpent = contextTransactions // Use transactions from this context's scope
+      const newSpent = contextTransactions 
         .filter(t => {
           const tDate = new Date(t.date);
           return t.category.toLowerCase() === budget.category.toLowerCase() &&
@@ -167,39 +172,39 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 
   const updateBudget = useCallback((budgetDataFromApi: BudgetFromApi, currentTransactions: Transaction[]) => {
     setBudgets(prevBudgets => {
-      const updatedBudgets = prevBudgets.map(b => {
-        if (b.id === budgetDataFromApi.id.toString()) {
-          const newCategory = budgetDataFromApi.category;
-          const newMonth = budgetDataFromApi.month;
-          const newAllocated = budgetDataFromApi.allocated;
+        const updatedBudgets = prevBudgets.map(b => {
+            if (b.id === budgetDataFromApi.id.toString()) {
+                const newCategory = budgetDataFromApi.category;
+                const newMonth = budgetDataFromApi.month;
+                const newAllocated = budgetDataFromApi.allocated;
 
-          // Calculate spent using the provided currentTransactions
-          const budgetMonthYear = newMonth.split('-');
-          const budgetYear = parseInt(budgetMonthYear[0]);
-          const budgetMonthNum = parseInt(budgetMonthYear[1]);
-          const calculatedSpent = currentTransactions
-            .filter(t => {
-              const tDate = new Date(t.date);
-              return t.category.toLowerCase() === newCategory.toLowerCase() &&
-                     tDate.getFullYear() === budgetYear &&
-                     (tDate.getMonth() + 1) === budgetMonthNum &&
-                     t.type === 'expense';
-            })
-            .reduce((sum, t) => sum + t.amount, 0);
+                // Calculate spent using the provided currentTransactions
+                const budgetMonthYear = newMonth.split('-');
+                const budgetYear = parseInt(budgetMonthYear[0]);
+                const budgetMonthNum = parseInt(budgetMonthYear[1]);
+                const calculatedSpent = currentTransactions
+                    .filter(t => {
+                        const tDate = new Date(t.date);
+                        return t.category.toLowerCase() === newCategory.toLowerCase() &&
+                            tDate.getFullYear() === budgetYear &&
+                            (tDate.getMonth() + 1) === budgetMonthNum &&
+                            t.type === 'expense';
+                    })
+                    .reduce((sum, t) => sum + t.amount, 0);
 
-          return {
-            id: budgetDataFromApi.id.toString(),
-            category: newCategory,
-            allocated: newAllocated,
-            month: newMonth,
-            spent: calculatedSpent,
-          };
-        }
-        return b;
-      });
-      return updatedBudgets.sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category));
+                return {
+                    id: budgetDataFromApi.id.toString(),
+                    category: newCategory,
+                    allocated: newAllocated,
+                    month: newMonth,
+                    spent: calculatedSpent,
+                };
+            }
+            return b;
+        });
+        return updatedBudgets.sort((a,b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category));
     });
-  }, []); // No direct dependencies on contextTransactions or isLoadingTransactions needed here, as they are passed in.
+  }, []);
 
   const deleteBudget = useCallback((budgetId: string) => {
     setBudgets(prev => prev.filter(b => b.id !== budgetId));

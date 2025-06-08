@@ -10,6 +10,12 @@ import axios from 'axios';
 const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://localhost:8080";
 const SETTINGS_API_URL = `${backendUrl}/api/user/settings`;
 
+const addRandomQueryParam = (url: string, paramName: string = '_cb'): string => {
+  const randomString = Math.random().toString(36).substring(2, 10);
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}${paramName}=${randomString}`;
+};
+
 type ThemeSetting = "light" | "dark" | "system";
 type FontSizeSetting = "small" | "medium" | "large";
 
@@ -40,7 +46,6 @@ export function UserSettingsLoader() {
         }
       } catch (error) {
         console.error("UserSettingsLoader: Error applying font size or saving to localStorage", error);
-        // Fallback to medium if error occurs
         const htmlElement = document.documentElement;
         Object.values(FONT_SIZE_CLASSES).forEach(cls => htmlElement.classList.remove(cls));
         htmlElement.classList.add(FONT_SIZE_CLASSES.medium);
@@ -48,16 +53,16 @@ export function UserSettingsLoader() {
     }
   }, []);
 
-  const userEmail = user?.email; // Stable variable for user's email
+  const userEmail = user?.email; 
 
   useEffect(() => {
     if (status === 'authenticated' && userEmail && user?.hasCompletedSetup === true) {
-      // Only fetch if not already fetched for this user AND not currently fetching
       if (settingsFetchedForUserRef.current !== userEmail && !isFetchingSettings) {
         setIsFetchingSettings(true);
         settingsFetchedForUserRef.current = userEmail;
 
-        axios.get(`${SETTINGS_API_URL}?email=${encodeURIComponent(userEmail)}`)
+        const apiUrl = `${SETTINGS_API_URL}?email=${encodeURIComponent(userEmail)}`;
+        axios.get(addRandomQueryParam(apiUrl))
           .then(response => {
             const fetchedSettings = response.data;
 
@@ -74,7 +79,6 @@ export function UserSettingsLoader() {
             }
             if (fetchedSettings.currency) {
               setSelectedCurrency(fetchedSettings.currency as AppCurrency);
-              // Currency context handles its own localStorage
             }
           })
           .catch(error => {
@@ -85,7 +89,7 @@ export function UserSettingsLoader() {
             } else if (error instanceof Error) {
                 console.error("Error details:", error.message);
             }
-            settingsFetchedForUserRef.current = null; // Allow retry on error for this user
+            settingsFetchedForUserRef.current = null; 
           })
           .finally(() => {
             setIsFetchingSettings(false);
@@ -93,10 +97,8 @@ export function UserSettingsLoader() {
       }
     } else if (status === 'unauthenticated') {
         settingsFetchedForUserRef.current = null;
-        if (isFetchingSettings) setIsFetchingSettings(false); // Reset if user logs out during fetch
+        if (isFetchingSettings) setIsFetchingSettings(false); 
     }
-  // Removed isFetchingSettings from dependencies.
-  // Dependencies are now userEmail, status, user?.hasCompletedSetup, and stable functions.
   }, [userEmail, status, user?.hasCompletedSetup, setTheme, setSelectedCurrency, applyFontSize, isFetchingSettings]);
 
   return null;

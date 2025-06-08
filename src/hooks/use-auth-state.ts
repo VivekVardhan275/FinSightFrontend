@@ -11,7 +11,7 @@ export interface AppUser {
   name?: string | null;
   email?: string | null;
   image?: string | null;
-  hasCompletedSetup?: boolean | undefined; // Can be undefined until fetched
+  hasCompletedSetup?: boolean | undefined; 
 }
 
 const APP_LOCAL_STORAGE_KEYS = [
@@ -26,7 +26,13 @@ const APP_LOCAL_STORAGE_KEYS = [
 ];
 
 const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://localhost:8080";
-const EXTERNAL_API_FIRST_CHECK_URL = `${backendUrl}/api/user/first-check`;
+const EXTERNAL_API_FIRST_CHECK_URL_BASE = `${backendUrl}/api/user/first-check`;
+
+const addRandomQueryParam = (url: string, paramName: string = '_cb'): string => {
+  const randomString = Math.random().toString(36).substring(2, 10);
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}${paramName}=${randomString}`;
+};
 
 export function useAuthState() {
   const { data: session, status, update: updateNextAuthSession } = useSession();
@@ -59,7 +65,8 @@ export function useAuthState() {
       if (firstCheckInitiatedForUserRef.current !== userEmailForCheck && !isApiCheckInProgress) {
         firstCheckInitiatedForUserRef.current = userEmailForCheck;
         setIsApiCheckInProgress(true);
-        axios.get(`${EXTERNAL_API_FIRST_CHECK_URL}?email=${encodeURIComponent(userEmailForCheck)}`)
+        const apiUrl = `${EXTERNAL_API_FIRST_CHECK_URL_BASE}?email=${encodeURIComponent(userEmailForCheck)}`;
+        axios.get(addRandomQueryParam(apiUrl))
           .then(response => {
             if (response.data && typeof response.data.hasCompletedSetup === 'boolean') {
               updateSession({ user: { ...session.user, hasCompletedSetup: response.data.hasCompletedSetup } });
@@ -76,8 +83,8 @@ export function useAuthState() {
             } else if (error instanceof Error) {
                 console.error("Error details:", error.message);
             }
-            updateSession({ user: { ...session.user, hasCompletedSetup: false } }); // Ensure a default on error
-            firstCheckInitiatedForUserRef.current = null; // Allow retry if this call failed
+            updateSession({ user: { ...session.user, hasCompletedSetup: false } }); 
+            firstCheckInitiatedForUserRef.current = null; 
           })
           .finally(() => {
             setIsApiCheckInProgress(false);
@@ -85,17 +92,15 @@ export function useAuthState() {
       }
     } else if (status === 'unauthenticated') {
       firstCheckInitiatedForUserRef.current = null;
-      if(isApiCheckInProgress) setIsApiCheckInProgress(false); // Reset if user logs out during check
+      if(isApiCheckInProgress) setIsApiCheckInProgress(false); 
     }
-  }, [session, status, updateSession, isApiCheckInProgress]); // isApiCheckInProgress added to re-evaluate if it changes
+  }, [session, status, updateSession, isApiCheckInProgress]); 
 
 
   const navigateBasedOnAuthAndSetup = useCallback(() => {
     const isWaitingForAuth = isLoadingFromAuth;
-    // isApiCheckInProgress is now part of combinedIsLoading, which gates this entire effect effectively.
-    // So, if API check is in progress, combinedIsLoading will be true, and this function won't cause navigation yet.
-
-    if (isWaitingForAuth || isApiCheckInProgress) { // Explicitly wait if API check is also ongoing
+    
+    if (isWaitingForAuth || isApiCheckInProgress) { 
       return;
     }
 
@@ -104,15 +109,13 @@ export function useAuthState() {
         if (pathname === '/login' || pathname === '/welcome/setup') {
           router.replace('/dashboard');
         }
-      } else if (user?.hasCompletedSetup === false) { // Explicitly check for false
+      } else if (user?.hasCompletedSetup === false) { 
         if (pathname !== '/welcome/setup') {
           router.replace('/welcome/setup');
         }
       }
-      // If hasCompletedSetup is still undefined here, it means API check hasn't finished or failed.
-      // The isLoading check at the top should handle this.
     } else if (status === 'unauthenticated') {
-      if (pathname !== '/login' && pathname !== '/welcome/setup') { // Allow /welcome/setup for brief moments during logout redirect
+      if (pathname !== '/login' && pathname !== '/welcome/setup') { 
         router.replace('/login');
       }
     }
@@ -124,8 +127,8 @@ export function useAuthState() {
 
   const loginWithGoogle = useCallback(async () => {
     try {
-      firstCheckInitiatedForUserRef.current = null; // Reset for the new login session
-      setIsApiCheckInProgress(false); // Reset
+      firstCheckInitiatedForUserRef.current = null; 
+      setIsApiCheckInProgress(false); 
       const result = await signIn('google', { callbackUrl: '/dashboard', redirect: false });
       if (result?.url) router.push(result.url);
       else if (result?.error) console.error("NextAuth signIn error (Google):", result.error);
@@ -136,8 +139,8 @@ export function useAuthState() {
 
   const loginWithGitHub = useCallback(async () => {
     try {
-      firstCheckInitiatedForUserRef.current = null; // Reset for the new login session
-      setIsApiCheckInProgress(false); // Reset
+      firstCheckInitiatedForUserRef.current = null; 
+      setIsApiCheckInProgress(false); 
       const result = await signIn('github', { callbackUrl: '/dashboard', redirect: false });
       if (result?.url) router.push(result.url);
       else if (result?.error) console.error("NextAuth signIn error (GitHub):", result.error);
@@ -162,11 +165,10 @@ export function useAuthState() {
       await signOut({ callbackUrl: '/login', redirect: true });
     } catch (error) {
       console.error("Error during signOut:", error instanceof Error ? error.message : String(error));
-      router.push('/login'); // Ensure redirect even if signOut promise rejects
+      router.push('/login'); 
     }
   }, [router]);
 
-  // This combined loading state should be true if auth is loading OR if auth is done but API check is still pending.
   const combinedIsLoading = isLoadingFromAuth || (status === 'authenticated' && user?.hasCompletedSetup === undefined && isApiCheckInProgress);
 
   return {

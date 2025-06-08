@@ -14,10 +14,16 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-import axios from "axios"; // Import axios
+import axios from "axios"; 
 
 const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://localhost:8080";
 const PROFILE_API_URL = `${backendUrl}/api/user/profile`;
+
+const addRandomQueryParam = (url: string, paramName: string = '_cb'): string => {
+  const randomString = Math.random().toString(36).substring(2, 10);
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}${paramName}=${randomString}`;
+};
 
 const pageHeaderBlockMotionVariants = {
   initial: { opacity: 0, x: -20 },
@@ -61,9 +67,9 @@ export default function ProfilePage() {
   const currentUserNameFromSession = user?.name; // For fallback if profile is new
 
   const fetchProfileData = useCallback(async (emailToFetch: string) => {
-    // setIsProfileDataLoading(true) is managed by the calling useEffect based on authLoading or fetch initiation
     try {
-      const response = await axios.get(`${PROFILE_API_URL}?email=${encodeURIComponent(emailToFetch)}`);
+      const apiUrl = `${PROFILE_API_URL}?email=${encodeURIComponent(emailToFetch)}`;
+      const response = await axios.get(addRandomQueryParam(apiUrl));
       const profileData = response.data;
 
       const apiDisplayName = profileData.displayName || currentUserNameFromSession || "";
@@ -86,7 +92,7 @@ export default function ProfilePage() {
         description: "Your profile information has been successfully loaded.",
         variant: "default",
       });
-      profileFetchedForUserRef.current = emailToFetch; // Mark success for this email
+      profileFetchedForUserRef.current = emailToFetch; 
     } catch (error) {
       console.error("API error fetching profile data.");
       if (axios.isAxiosError(error) && error.response) {
@@ -106,11 +112,11 @@ export default function ProfilePage() {
       setPhoneNumber(""); setInitialPhoneNumberForEdit("");
       setDateOfBirth(""); setInitialDateOfBirthForEdit("");
       setGender(""); setInitialGenderForEdit("");
-      profileFetchedForUserRef.current = null; // Reset on error to allow retry
+      profileFetchedForUserRef.current = null; 
     } finally {
-      setIsProfileDataLoading(false); // Always set to false after attempt
+      setIsProfileDataLoading(false); 
     }
-  }, [toast, currentUserNameFromSession]); // Dependencies: toast, currentUserNameFromSession (for fallback)
+  }, [toast, currentUserNameFromSession]); 
 
   useEffect(() => {
     if (authLoading) {
@@ -118,18 +124,14 @@ export default function ProfilePage() {
       return;
     }
 
-    // Auth is settled
     if (userEmail) {
       if (profileFetchedForUserRef.current !== userEmail) {
-        // Need to fetch for this user OR previous fetch failed
-        setIsProfileDataLoading(true); // Set loading before fetch
+        setIsProfileDataLoading(true); 
         fetchProfileData(userEmail);
       } else {
-        // Data already fetched for this user, or fetch attempt completed.
         if (isProfileDataLoading) setIsProfileDataLoading(false);
       }
     } else {
-      // Not authLoading, and no userEmail (e.g., unauthenticated)
       const fallbackName = currentUserNameFromSession || "";
       setDisplayName(fallbackName);
       setInitialDisplayNameForEdit(fallbackName);
@@ -152,7 +154,7 @@ export default function ProfilePage() {
     );
   }
 
-  if (!user) { // Should be covered by authLoading/isProfileDataLoading, but as a fallback
+  if (!user) { 
     return (
       <div className="flex h-full items-center justify-center">
         <p>Please log in to view your profile.</p>
@@ -171,7 +173,6 @@ export default function ProfilePage() {
   };
 
   const handleEditPersonalInfo = () => {
-    // Ensure initial edit states are set from current display values before editing
     setInitialDisplayNameForEdit(displayName);
     setInitialPhoneNumberForEdit(phoneNumber);
     setInitialDateOfBirthForEdit(dateOfBirth);
@@ -202,23 +203,20 @@ export default function ProfilePage() {
     };
 
     try {
-      await axios.put(`${PROFILE_API_URL}?email=${encodeURIComponent(user.email)}`, profileDataToSave);
+      const apiUrl = `${PROFILE_API_URL}?email=${encodeURIComponent(user.email)}`;
+      await axios.put(addRandomQueryParam(apiUrl), profileDataToSave);
       toast({
         title: "Profile Updated",
         description: "Your personal information has been successfully saved.",
         variant: "default",
       });
       setIsEditingPersonalInfo(false);
-      // Update initial states to reflect saved changes
       setInitialDisplayNameForEdit(displayName);
       setInitialPhoneNumberForEdit(phoneNumber);
       setInitialDateOfBirthForEdit(dateOfBirth);
       setInitialGenderForEdit(gender);
 
-      // If displayName changed, update the NextAuth session
       if (user.name !== displayName) {
-        // updateSession might trigger a re-render of this page.
-        // The useEffect for data fetching should not re-fetch due to profileFetchedForUserRef.
         await updateSession({ user: { ...user, name: displayName } });
       }
 
@@ -250,12 +248,12 @@ export default function ProfilePage() {
   };
 
   const getFormattedGender = (genderValue: string) => {
-    if (!genderValue) return ""; // Placeholder if not set
+    if (!genderValue) return ""; 
     const formatted = genderValue.charAt(0).toUpperCase() + genderValue.slice(1).replace(/_/g, " ");
     if (["Male", "Female", "Other", "Prefer not to say"].includes(formatted)) {
         return formatted;
     }
-    return "Not set"; // Fallback for unexpected values
+    return "Not set"; 
   };
 
   return (
@@ -284,7 +282,6 @@ export default function ProfilePage() {
         <Card className="md:col-span-1 shadow-lg">
           <CardHeader className="items-center text-center">
             <Avatar className="h-24 w-24 mb-4 border-2 border-primary">
-              {/* Removed AvatarImage, relying on AvatarFallback */}
               <AvatarFallback className="text-3xl">{getInitials(displayName || user.name || "")}</AvatarFallback>
             </Avatar>
             <CardTitle className="text-2xl font-headline">{displayName || user.name}</CardTitle>
@@ -294,7 +291,6 @@ export default function ProfilePage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center pt-0">
-            {/* Edit Profile Picture button can be added here if needed */}
           </CardContent>
         </Card>
 
@@ -331,7 +327,7 @@ export default function ProfilePage() {
                 onClick={handleEmailClick}
                 className={cn(
                   "flex h-10 w-full items-center rounded-md border border-transparent bg-transparent px-3 py-2 text-sm",
-                  "cursor-not-allowed opacity-70" // Visually indicate it's not editable
+                  "cursor-not-allowed opacity-70" 
                 )}
                 title="Your email address cannot be changed."
               >
@@ -363,7 +359,7 @@ export default function ProfilePage() {
                   type="date"
                   value={dateOfBirth}
                   onChange={(e) => setDateOfBirth(e.target.value)}
-                  max={new Date().toISOString().split("T")[0]} // Prevent future dates
+                  max={new Date().toISOString().split("T")[0]} 
                   disabled={isSaving}
                 />
               ) : (
