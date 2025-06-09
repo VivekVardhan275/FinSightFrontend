@@ -30,7 +30,7 @@ FinSight is a modern, intuitive personal finance management application designed
 
 ### 1. Authentication & User Management
 *   **Secure Sign-in/Sign-up**: Users can authenticate using Google or GitHub through NextAuth.js.
-*   **Onboarding Setup**: A guided setup process for new users to personalize their profile (name, phone, DOB, gender) and initial preferences (theme, font size, default currency).
+*   **Onboarding Setup**: A guided setup process for new users to personalize their profile (name, phone, DOB, gender) and initial preferences (theme, font size, default currency), followed by an instructions page.
 *   **Profile Management**: Users can view and update their personal information on a dedicated profile page.
 *   **Account Deletion**: Secure account deletion with a confirmation code step to prevent accidental data loss.
 
@@ -73,7 +73,10 @@ FinSight is a modern, intuitive personal finance management application designed
 *   **Multi-Currency Support**: Although data is stored in INR (Indian Rupee) on the backend (as implied by context logic), users can view all financial figures in their selected currency (USD, EUR, GBP, INR).
 *   **Fixed Conversion Rates**: Uses pre-defined fixed conversion rates for display purposes.
 
-### 8. (Future) Financial Forecasting
+### 8. Application Guide
+*   **FinSight Guide**: A detailed guide accessible from the user profile dropdown, explaining how to use all key features of the application.
+
+### 9. (Future) Financial Forecasting
 *   **Dedicated Forecast Page**: A placeholder page for future AI-powered financial forecasting.
 *   **Genkit Integration**: The application is set up with Genkit, preparing for AI/ML model integration to predict future income, expenses, and net balance.
 
@@ -108,13 +111,14 @@ FinSight is a modern, intuitive personal finance management application designed
 ## Project Structure (Simplified Frontend)
 
 *   `src/app/`: Contains all Next.js App Router pages, layouts, and API route handlers (like NextAuth).
-    *   `(app)/`: Authenticated routes (Dashboard, Transactions, Budgets, etc.).
+    *   `(app)/`: Authenticated routes (Dashboard, Transactions, Budgets, Profile, Settings, Guide, etc.).
     *   `login/`: Public login page.
     *   `welcome/setup/`: User onboarding/setup page.
+    *   `welcome/instructions/`: New user instructions page shown after setup.
 *   `src/components/`: Reusable UI components, categorized by feature (e.g., `dashboard`, `budgets`, `transactions`) and general UI elements (`ui`).
 *   `src/contexts/`: React Context providers for global state management (e.g., `CurrencyContext`, `TransactionContext`, `BudgetContext`, `NotificationContext`).
 *   `src/hooks/`: Custom React hooks (e.g., `useAuthState`, `useToast`, `useIsMobile`).
-*   `src/lib/`: Utility functions and placeholder data.
+*   `src/lib/`: Utility functions.
 *   `src/ai/`: Genkit related code, including flows and prompts (currently minimal, for future expansion).
 *   `src/types/`: TypeScript type definitions.
 
