@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"; // Removed AvatarImage
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -14,18 +14,18 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggleButton } from "@/components/ui/theme-toggle-button";
 import { useAuthState } from "@/hooks/use-auth-state";
-import { LogOut, Settings, User as UserIcon } from "lucide-react";
+import { BookOpenText, LogOut, Settings, User as UserIcon } from "lucide-react";
 import Link from "next/link";
 
 export function UserNav() {
   const { user, logout } = useAuthState();
 
   if (!user) {
-    return null; 
+    return null;
   }
 
-  const getInitials = (name: string) => {
-    if (!name) return "?"; // Fallback for empty name
+  const getInitials = (name: string | null | undefined) => {
+    if (!name) return "?";
     const names = name.split(' ');
     let initials = names[0].substring(0, 1).toUpperCase();
     if (names.length > 1) {
@@ -33,7 +33,7 @@ export function UserNav() {
     }
     return initials;
   };
-  
+
   return (
     <div className="flex items-center gap-2">
       <ThemeToggleButton />
@@ -41,7 +41,6 @@ export function UserNav() {
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="relative h-8 w-8 rounded-full">
             <Avatar className="h-8 w-8">
-              {/* AvatarImage removed */}
               <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
             </Avatar>
           </Button>
@@ -67,6 +66,12 @@ export function UserNav() {
               <Link href="/settings">
                 <Settings className="mr-2 h-4 w-4" />
                 <span>Settings</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/guide">
+                <BookOpenText className="mr-2 h-4 w-4" />
+                <span>FinSight Guide</span>
               </Link>
             </DropdownMenuItem>
           </DropdownMenuGroup>
