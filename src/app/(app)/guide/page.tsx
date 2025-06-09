@@ -59,82 +59,107 @@ export default function FinSightGuidePage() {
       icon: <LayoutDashboard className="h-6 w-6" />,
       title: "Dashboard Overview",
       description: `Your financial command center! The Dashboard provides an at-a-glance summary of your current financial health:
-        - **Summary Cards**: Quickly view your Total Income, Total Expenses, Net Savings, and overall Budget Left for the current month. These cards also show percentage change trends compared to the previous month.
-        - **Income & Expense Overview Charts**: Line charts visualize your total income and expenses over the last 6 months, helping you identify trends.
-        - **Expense Breakdown Chart**: A pie chart illustrates how your expenses are distributed across different categories for the current month.
-        - **Net Savings Overview Chart**: This line chart shows your net savings (income minus expenses) over the past 6 months, with a reference line at zero to easily see if you're saving or overspending.
-      All financial figures are displayed in the currency you've selected in Settings.`,
+        - Summary Cards: Quickly view your Total Income, Total Expenses, Net Savings, and overall Budget Left for the current month. These cards also show percentage change trends compared to the previous month, giving you insight into your financial momentum.
+        - Income & Expense Overview Charts: Line charts visualize your total income and expenses over the last 6 months. This helps you identify spending patterns, periods of high income, or months where expenses spiked.
+        - Expense Breakdown Chart: A pie chart illustrates how your expenses are distributed across different categories for the current month. This is key to understanding where your money is going.
+        - Net Savings Overview Chart: This line chart shows your net savings (income minus expenses) over the past 6 months, with a reference line at zero to easily see if you're saving or overspending consistently.
+      All financial figures are displayed in the currency you've selected in Settings, making it relevant to your preferred view.`,
     },
     {
       icon: <ListChecks className="h-6 w-6" />,
       title: "Managing Transactions",
-      description: `The 'Transactions' page is where you log and manage all your financial activities.
-        - **Adding a Transaction**: Click the 'Add Transaction' button. A form will appear where you can enter:
-          - Date: When the transaction occurred.
-          - Description: A brief note about the transaction (e.g., "Lunch with client", "Electricity Bill").
-          - Category: Assign a category (e.g., "Food", "Utilities", "Salary"). This helps in tracking and budgeting.
-          - Amount: The value of the transaction.
-          - Type: Specify if it's 'Income' or 'Expense'.
-        - **Viewing Transactions**: All your transactions are listed in a data table.
-        - **Sorting & Filtering**:
-          - Click on column headers (like 'Date' or 'Amount') to sort the table.
-          - Use the search bar at the top to filter transactions by description, category, etc.
-          - Click the 'Columns' button to show or hide specific columns in the table for a cleaner view.
-        - **Editing & Deleting**: For each transaction in the table, click the three-dot menu icon ('MoreHorizontal') on the right to find options to 'Edit' or 'Delete' that transaction.
-        - **Duplicate Prevention**: The system provides warnings if you try to add a transaction that looks very similar to an existing one (same date, description, category, type but different amount) or prevents an exact duplicate.`,
+      description: `The 'Transactions' page is where you log and manage all your financial activities. Accurate transaction logging is crucial for all other features.
+        - Adding a Transaction:
+          1. Click the 'Add Transaction' button (usually with a PlusCircle icon).
+          2. A form will appear. Fill in these details:
+             - Date: The date the transaction occurred.
+             - Description: A clear note about the transaction (e.g., "Lunch with client", "Electricity Bill - July", "Monthly Salary").
+             - Category: Assign a relevant category (e.g., "Food", "Utilities", "Salary", "Transport"). Consistent categorization helps in tracking and budgeting.
+             - Amount: The monetary value of the transaction.
+             - Type: Specify if it's 'Income' (money coming in) or 'Expense' (money going out).
+          3. Click 'Save Transaction'.
+        - Viewing Transactions: All your entered transactions are listed in a data table.
+        - Sorting & Filtering:
+          - Sorting: Click on column headers (like 'Date' or 'Amount') to sort the table by that column in ascending or descending order. An arrow will indicate the sort direction.
+          - Filtering: Use the search bar at the top of the table (often labeled "Filter transactions...") to find specific transactions. You can type keywords from the description, category, etc.
+          - Column Visibility: Look for a 'Columns' button. This allows you to show or hide specific columns in the table, customizing your view for clarity.
+        - Editing & Deleting:
+          - For each transaction in the table, there's usually a three-dot menu icon (MoreHorizontal) on the right side of the row.
+          - Click this icon to reveal options like 'Edit' or 'Delete'.
+          - 'Edit' will open the transaction form pre-filled with the transaction's data for you to modify.
+          - 'Delete' will prompt for confirmation before permanently removing the transaction.
+        - Duplicate Prevention: The system has basic checks. It might warn you if you try to add a transaction that looks very similar to an existing one (e.g., same date, description, category, type but a slightly different amount). It generally prevents exact duplicates.
+      Regularly updating your transactions ensures your dashboard and budget tracking are accurate.`,
     },
     {
       icon: <Target className="h-6 w-6" />,
       title: "Setting & Tracking Budgets",
-      description: `Effectively manage your spending by setting monthly budgets on the 'Budgets' page.
-        - **Adding a Budget**: Click the 'Add Budget' button. You'll need to provide:
-          - Category: The expense category you want to budget for (e.g., "Groceries", "Entertainment"). This should match categories you use for expense transactions.
-          - Allocated Amount: The maximum amount you plan to spend for this category in the selected month (in your chosen currency).
-          - Month: Select the year and month for which this budget applies.
-        - **Understanding Budget Cards**: Each budget you create is displayed as a card:
-          - Shows the category, allocated amount, how much you've spent so far, and the remaining balance.
-          - A progress bar visually represents your spending against the budget.
-        - **Automatic Spending Calculation**: The 'Spent' amount on each budget card is automatically calculated by summing up all expense transactions that match the budget's category and month.
-        - **Visual Alerts**:
-          - The progress bar changes color (e.g., to yellow or red) as you get closer to or exceed your budget.
-          - An alert icon may appear if you're over budget.
-        - **Editing & Deleting Budgets**: Each budget card has 'Edit' and 'Delete' icons, allowing you to modify or remove budget entries as needed.`,
+      description: `Effectively manage your spending by setting monthly budgets on the 'Budgets' page. Budgets help you control your expenses in specific categories.
+        - Adding a Budget:
+          1. Click the 'Add Budget' button.
+          2. You'll need to provide:
+             - Category: The expense category you want to budget for (e.g., "Groceries", "Entertainment", "Shopping"). This should match the categories you use for your expense transactions.
+             - Allocated Amount: The maximum amount you plan to spend for this category in the selected month (in your chosen display currency).
+             - Month: Select the specific year and month for which this budget applies (e.g., July 2024).
+          3. Click 'Save Budget'.
+        - Understanding Budget Cards: Each budget you create is displayed as a card, showing:
+          - Category name and the month it applies to.
+          - Allocated Amount: The total you planned to spend.
+          - Spent Amount: How much you've actually spent in that category for that month (calculated automatically from your expense transactions).
+          - Remaining Balance: Allocated minus Spent.
+          - Progress Bar: A visual representation of your spending against the budget.
+        - Automatic Spending Calculation: The 'Spent' amount on each budget card is automatically updated whenever you add, edit, or delete an expense transaction that matches the budget's category and month.
+        - Visual Alerts & Progress:
+          - The progress bar changes color (e.g., to yellow or red) as you get closer to or exceed your budget, providing an immediate visual cue.
+          - An alert icon (like AlertTriangle) may appear if you're over budget, drawing your attention.
+        - Editing & Deleting Budgets: Each budget card typically has 'Edit' and 'Delete' icons (often Edit2 and Trash2).
+          - 'Edit' allows you to change the category, allocated amount, or month for that budget.
+          - 'Delete' will remove the budget entry after confirmation.
+      Budgets are most effective when reviewed regularly against your actual spending (transactions).`,
     },
     {
       icon: <UserCircle className="h-6 w-6" />,
       title: "Profile Management",
-      description: `Access your 'Profile' from the user menu (click your avatar in the top-right corner). Here you can:
+      description: `Access your 'Profile' from the user menu (usually by clicking your avatar or name in the top-right corner of the application). On the Profile page, you can:
         - View your display name and email address.
-        - Update your display name, phone number (optional), date of birth, and gender (optional).
-      Your email address is linked to your login provider (Google/GitHub) and cannot be changed through the profile page.`,
+        - Update your display name (this is how your name appears within the app).
+        - Update your phone number (this is typically optional).
+        - Set or update your date of birth.
+        - Set or update your gender (options usually include Male, Female, Other, Prefer not to say).
+      Your email address is generally tied to your login provider (Google/GitHub) and cannot be changed through the profile page. Changes are saved when you click an 'Update' or 'Save Changes' button.`,
     },
     {
       icon: <Settings className="h-6 w-6" />,
       title: "Personalizing Settings",
-      description: `Customize FinSight to your liking via the 'Settings' page (also in the user menu):
-        - **Appearance**:
-          - Theme: Choose between Light, Dark, or System default.
-          - Font Size: Select Small, Medium, or Large for better readability.
-        - **Regional**:
-          - Default Currency: Set your preferred currency (INR, USD, EUR, GBP) for displaying all financial figures. Note: Data is stored in a base currency (INR) and converted for display based on fixed rates.
-        - **Account Management**:
-          - Delete Account: Securely delete your account and all associated data. This action is permanent and requires a confirmation code.
-      Remember to click 'Save All Settings' after making changes.`,
+      description: `Customize FinSight to your liking via the 'Settings' page, also accessible from the user menu.
+        - Appearance Settings:
+          - Theme: Choose between 'Light', 'Dark', or 'System' default themes to change the overall look of the app.
+          - Font Size: Select 'Small', 'Medium', or 'Large' font sizes for better readability across the application.
+        - Regional Settings:
+          - Default Currency: Set your preferred currency for displaying all financial figures (e.g., INR, USD, EUR, GBP). Note: The application might store data in a base currency (like INR) and convert it for display based on pre-defined fixed rates.
+        - Account Management:
+          - Delete Account: This section allows you to securely delete your account and all associated data. This action is permanent and usually requires a confirmation step (like entering a code) to prevent accidental deletion.
+      Remember to click a 'Save All Settings' or similar button to apply your changes. Some changes like theme might apply instantly, while others are saved to your profile.`,
     },
     {
       icon: <Bell className="h-6 w-6" />,
       title: "Notifications",
-      description: `The bell icon in the top navigation bar is your notification center.
-        - It provides updates on important events like:
-          - Budgets nearing their limit or being exceeded.
-          - Success, error, or warning messages for actions you perform within the app (e.g., saving data, API errors).
-        - An indicator (a small dot) will appear on the bell icon if you have unread notifications.
-        - Click the bell to view, manage, and clear your notifications.`,
+      description: `The bell icon in the top navigation bar is your notification center. It keeps you informed about important events and application feedback.
+        - Types of Notifications:
+          - Budget status: Alerts when you are nearing your budget limit for a category or when you have exceeded it.
+          - Action Confirmations: Success, error, or warning messages for actions you perform, like saving a transaction, updating settings, or if an API call fails.
+        - Unread Indicator: A small dot or badge will typically appear on the bell icon if you have unread notifications.
+        - Viewing & Managing: Click the bell icon to open the notifications panel. Here you can:
+          - See a list of your recent notifications.
+          - Mark individual notifications as read.
+          - Mark all notifications as read.
+          - Clear individual or all notifications.
+        Notifications help you stay on top of your financial activities and application status.`,
     },
     {
       icon: <ForecastIcon className="h-6 w-6" />,
       title: "Financial Forecast (Future Feature)",
-      description: "The 'Forecast' page is designed for future AI-powered financial projections. Soon, you'll be able to see predictions for your future income, expenses, and net balance, helping you plan ahead. This feature is currently under development and will be integrated with Genkit.",
+      description: "The 'Forecast' page is a placeholder for an upcoming feature designed for AI-powered financial projections. In the future, this section will allow you to see predictions for your future income, expenses, and net balance, helping you make informed financial plans. This feature is currently under development and will be integrated with Genkit technology for AI/ML capabilities.",
     },
   ];
 
