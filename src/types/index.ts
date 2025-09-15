@@ -54,3 +54,19 @@ export interface AppNotification {
   href?: string; // Optional link for the notification
 }
 
+// Types for Group Expense Management
+export interface GroupMember {
+  id: string;
+  name: string;
+}
+
+export interface GroupExpenseFormData {
+  description: string;
+  amount: number;
+  paidById: string;
+  date: Date;
+  splitType: 'equally' | 'unequally';
+  splits?: {
+    [memberId: string]: number;
+  };
+}
