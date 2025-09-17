@@ -95,6 +95,15 @@ export default function GroupsPage() {
   };
 
   const handleSaveGroup = async (formData: GroupExpenseFormData) => {
+    if (!user || !user.email) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to save a group.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsSaving(true);
     // MOCK API CALL
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -104,6 +113,7 @@ export default function GroupsPage() {
       const updatedGroup: Group = {
         ...editingGroup,
         groupName: formData.groupName,
+        email: user.email, // Ensure email is correctly maintained
         members: formData.members.map(m => m.name),
         expenses: formData.members.map(m => m.expense),
         balance: formData.members.map(m => m.balance),
@@ -119,7 +129,7 @@ export default function GroupsPage() {
       const newGroup: Group = {
         id: (Math.random() * 1000).toString(), // Mock ID
         groupName: formData.groupName,
-        email: user?.email || "",
+        email: user.email,
         members: formData.members.map(m => m.name),
         expenses: formData.members.map(m => m.expense),
         balance: formData.members.map(m => m.balance),
