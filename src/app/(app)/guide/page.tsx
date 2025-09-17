@@ -156,11 +156,6 @@ export default function FinSightGuidePage() {
           - Clear individual or all notifications.
         Notifications help you stay on top of your financial activities and application status.`,
     },
-    {
-      icon: <ForecastIcon className="h-6 w-6" />,
-      title: "Financial Forecast (Future Feature)",
-      description: "The 'Forecast' page is a placeholder for an upcoming feature designed for AI-powered financial projections. In the future, this section will allow you to see predictions for your future income, expenses, and net balance, helping you make informed financial plans. This feature is currently under development and will be integrated with Genkit technology for AI/ML capabilities.",
-    },
   ];
 
   return (

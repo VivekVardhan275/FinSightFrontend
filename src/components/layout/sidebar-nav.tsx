@@ -25,7 +25,6 @@ const navItems: NavItem[] = [
   { href: "/transactions", label: "Transactions", icon: <ListChecks /> },
   { href: "/budgets", label: "Budgets", icon: <Target /> },
   { href: "/groups", label: "Groups", icon: <Users /> },
-  { href: "/forecast", label: "Forecast", icon: <LineChart /> }, 
 ];
 
 export function SidebarNav() {
