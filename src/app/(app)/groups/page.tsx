@@ -92,7 +92,7 @@ export default function GroupsPage() {
     setIsDeleting(true);
 
     try {
-      const apiUrl = `${GROUP_API_BASE_URL}/group-expense/${groupToDeleteId}?email=${encodeURIComponent(user.email)}`;
+      const apiUrl = `${GROUP_API_BASE_URL}/group-expense?id=${groupToDeleteId}&email=${encodeURIComponent(user.email)}`;
       await axios.delete(addRandomQueryParam(apiUrl));
       deleteGroupFromContext(groupToDeleteId);
       addNotification({
