@@ -1,4 +1,3 @@
-
 export type Transaction = {
   id: string;
   date: string; // ISO string date for simplicity
@@ -62,28 +61,28 @@ export interface AppNotification {
   href?: string; // Optional link for the notification
 }
 
+// ===================================
 // Types for Group Expense Management
+// ===================================
+
+// Main data structure for a group expense record
 export interface Group {
   id: string;
   groupName: string;
-  groupMembers: string[];
-  expenses: number[];
-  balance: number[];
+  email: string;
+  members: string[]; // List of member names
+  expenses: number[]; // List of expenses corresponding to members
+  balance: number[]; // List of balances corresponding to members
   totalExpense: number;
 }
 
-export interface GroupMember {
-  id: string;
-  name: string;
-}
-
+// Data structure for the "Create/Edit Group" form
 export interface GroupExpenseFormData {
-  description: string;
-  amount: number;
-  paidById: string; // The ID of the member who paid
-  date: Date;
-  splitType: 'equally' | 'unequally';
-  splits?: {
-    [memberId: string]: number;
-  };
+  groupName: string;
+  members: Array<{
+    name: string;
+    expense: number;
+    balance: number;
+  }>;
+  totalExpense: number;
 }
