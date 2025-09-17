@@ -11,7 +11,7 @@ import { Trash2, PlusCircle, RotateCw } from "lucide-react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { Group } from '@/types';
+import type { Group, GroupExpenseFormData } from '@/types';
 import { useAuthState } from "@/hooks/use-auth-state";
 import { Separator } from "../ui/separator";
 import { formatCurrency } from "@/lib/utils";
@@ -19,17 +19,6 @@ import { useCurrency } from "@/contexts/currency-context";
 import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 
 export type SplitMethod = "equal" | "unequal";
-
-export interface GroupExpenseFormData {
-  groupName: string;
-  totalExpense: number;
-  splitMethod: SplitMethod;
-  members: Array<{
-    name: string;
-    expense: number;
-    balance: number;
-  }>;
-}
 
 const memberSchema = z.object({
   name: z.string().min(1, "Name is required."),
@@ -124,12 +113,12 @@ export function GroupExpenseFormDialog({
         // For simplicity, we assume "unequal" split when editing, as equal split is a calculated state.
         reset({
           groupName: group.groupName,
-          totalExpense: group.totalExpense,
+          totalExpense: group.totalExpenses,
           splitMethod: "unequal", 
           members: group.members.map((name, index) => ({
             name,
             expense: group.expenses[index] || 0,
-            balance: group.balance[index] || 0,
+            balance: group.balances[index] || 0,
           })),
         });
       } else {
@@ -149,18 +138,12 @@ export function GroupExpenseFormDialog({
     if (data.splitMethod === 'equal') {
         const memberCount = data.members.length;
         const amountPerMember = memberCount > 0 ? data.totalExpense / memberCount : 0;
-        data.members.forEach((_, index) => {
-            data.members[index].expense = parseFloat(amountPerMember.toFixed(2));
+        data.members.forEach((member, index) => {
+            member.expense = parseFloat(amountPerMember.toFixed(2));
         });
     }
 
-    const finalDataForApi = {
-        ...data,
-        email: user?.email, // Ensure email is added before saving
-        // The form data already contains the correct structure, just need to add email
-    };
-
-    onSave(finalDataForApi as any); // Pass it on to the parent handler
+    onSave(data);
   };
 
   return (

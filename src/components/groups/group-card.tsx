@@ -15,7 +15,7 @@ import { ScrollArea } from '../ui/scroll-area';
 interface GroupCardProps {
   group: Group;
   onEdit: (group: Group) => void;
-  onDelete: (groupId: string) => void;
+  onDelete: (groupId: number) => void;
 }
 
 const cardMotionVariants = {
@@ -52,7 +52,7 @@ export function GroupCard({ group, onEdit, onDelete }: GroupCardProps) {
                     </Badge>
                 </div>
                 <CardDescription>
-                    Total Expense: {formatCurrency(group.totalExpense, selectedCurrency)}
+                    Total Expense: {formatCurrency(group.totalExpenses, selectedCurrency)}
                 </CardDescription>
             </CardHeader>
             <CardContent className="flex-grow space-y-3">
@@ -64,8 +64,8 @@ export function GroupCard({ group, onEdit, onDelete }: GroupCardProps) {
                                 <span className="text-muted-foreground truncate" title={member}>{member}</span>
                                 <div className="text-right">
                                     <p className="font-medium">{formatCurrency(group.expenses[index], selectedCurrency)}</p>
-                                    <p className={`text-xs ${group.balance[index] >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                        Bal: {formatCurrency(group.balance[index], selectedCurrency)}
+                                    <p className={`text-xs ${group.balances[index] >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        Bal: {formatCurrency(group.balances[index], selectedCurrency)}
                                     </p>
                                 </div>
                             </div>
@@ -77,7 +77,7 @@ export function GroupCard({ group, onEdit, onDelete }: GroupCardProps) {
                 <Button variant="ghost" size="icon" onClick={() => onEdit(group)} aria-label="Edit group">
                     <Edit2 className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="icon" onClick={() => onDelete(group.id)} aria-label="Delete group" className="text-destructive hover:bg-destructive/10">
+                <Button variant="ghost" size="icon" onClick={() => onDelete(group.groupId)} aria-label="Delete group" className="text-destructive hover:bg-destructive/10">
                     <Trash2 className="h-4 w-4" />
                 </Button>
             </CardFooter>
