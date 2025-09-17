@@ -65,26 +65,16 @@ export interface AppNotification {
 // Types for Group Expense Management
 export interface Group {
   id: string;
-  name: string;
+  groupName: string;
+  groupMembers: string[];
+  expenses: number[];
+  balance: number[];
+  totalExpense: number;
 }
 
 export interface GroupMember {
   id: string;
   name: string;
-}
-
-export interface GroupExpense {
-  id: string;
-  description: string;
-  amount: number;
-  paidBy: string; // Name of the member who paid
-  date: string; // ISO string date
-}
-
-export interface GroupBalance {
-  from: string; // Name of the member who owes
-  to: string;   // Name of the member to be paid
-  amount: number;
 }
 
 export interface GroupExpenseFormData {
