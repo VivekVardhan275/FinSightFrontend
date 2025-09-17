@@ -79,10 +79,11 @@ export interface Group {
 // Data structure for the "Create/Edit Group" form
 export interface GroupExpenseFormData {
   groupName: string;
+  totalExpense: number;
+  splitMethod: 'equal' | 'unequal';
   members: Array<{
     name: string;
     expense: number;
     balance: number;
   }>;
-  totalExpense: number;
 }
