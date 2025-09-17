@@ -1,3 +1,4 @@
+
 // src/app/(app)/groups/page.tsx
 "use client";
 
@@ -91,6 +92,7 @@ export default function GroupsPage() {
     setIsDeleting(true);
 
     try {
+      // Corrected API endpoint as per final requirement
       const apiUrl = `${GROUP_API_BASE_URL}/group-expense/${groupToDeleteId}?email=${encodeURIComponent(user.email)}`;
       await axios.delete(addRandomQueryParam(apiUrl));
       deleteGroupFromContext(groupToDeleteId);
