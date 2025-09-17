@@ -2,7 +2,7 @@
 // src/app/(app)/groups/page.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Users, RotateCw } from "lucide-react";
 import { motion } from "framer-motion";
@@ -20,7 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useToast } from '@/hooks/use-toast';
+import { useNotification } from '@/contexts/notification-context';
 import { useGroupContext } from '@/contexts/group-context';
 import axios from 'axios';
 
@@ -33,9 +33,9 @@ const addRandomQueryParam = (url: string, paramName: string = '_cb'): string => 
   return `${url}${separator}${paramName}=${randomString}`;
 };
 
-const pageHeaderBlockMotionVariants = {
-  initial: { opacity: 0, x: -20 },
-  animate: { opacity: 1, x: 0, transition: { duration: 0.3, ease: "easeOut" } },
+const buttonMotionVariants = {
+  initial: { opacity: 0, scale: 0.9 },
+  animate: { opacity: 1, scale: 1, transition: { duration: 0.4, delay: 0.2 } },
 };
 
 const gridContainerMotionVariants = {
@@ -57,7 +57,7 @@ const emptyStateMotionVariants = {
 
 export default function GroupsPage() {
   const { user } = useAuthState();
-  const { toast } = useToast();
+  const { addNotification } = useNotification();
   const { groups, isLoading: isLoadingGroups, addGroup, updateGroup, deleteGroup: deleteGroupFromContext } = useGroupContext();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -85,20 +85,20 @@ export default function GroupsPage() {
 
   const handleDeleteGroup = async () => {
     if (!groupToDeleteId || !user || !user.email) {
-       toast({ title: "Error", description: "Cannot delete group. User or group ID missing.", variant: "destructive" });
+       addNotification({ title: "Error", description: "Cannot delete group. User or group ID missing.", type: "error" });
        setIsConfirmDeleteDialogOpen(false);
        return;
     }
     setIsDeleting(true);
 
     try {
-      // Corrected API endpoint as per final requirement
       const apiUrl = `${GROUP_API_BASE_URL}/group-expense/${groupToDeleteId}?email=${encodeURIComponent(user.email)}`;
       await axios.delete(addRandomQueryParam(apiUrl));
       deleteGroupFromContext(groupToDeleteId);
-      toast({
+      addNotification({
         title: "Group Deleted",
         description: `The group has been successfully deleted.`,
+        type: "info",
       });
       setGroupToDeleteId(null);
     } catch (error) {
@@ -111,10 +111,10 @@ export default function GroupsPage() {
       } else if (error instanceof Error) {
         console.error("Error details:", error.message);
       }
-      toast({
+      addNotification({
         title: "Error Deleting Group",
         description: errorMessage,
-        variant: "destructive",
+        type: "error",
       });
     } finally {
       setIsDeleting(false);
@@ -124,10 +124,10 @@ export default function GroupsPage() {
 
   const handleSaveGroup = async (formData: GroupExpenseFormData) => {
     if (!user || !user.email) {
-      toast({
+      addNotification({
         title: "Error",
         description: "You must be logged in to save a group.",
-        variant: "destructive",
+        type: "error",
       });
       return;
     }
@@ -160,9 +160,11 @@ export default function GroupsPage() {
             addGroup(savedGroupFromApi);
         }
 
-        toast({
+        addNotification({
             title: `Group ${notificationAction}`,
             description: `Group "${savedGroupFromApi.groupName}" successfully ${notificationAction.toLowerCase()}.`,
+            type: 'success',
+            href: '/groups'
         });
         setIsFormOpen(false);
         setEditingGroup(null);
@@ -176,10 +178,10 @@ export default function GroupsPage() {
         } else if (error instanceof Error) {
             console.error("Error details:", error.message);
         }
-        toast({
+        addNotification({
             title: `Error ${notificationAction} Group`,
             description: errorMessage,
-            variant: 'destructive',
+            type: 'error',
         });
     } finally {
         setIsSaving(false);
@@ -189,27 +191,22 @@ export default function GroupsPage() {
 
   return (
     <div className="space-y-8">
-      <motion.div
-        variants={pageHeaderBlockMotionVariants}
-        initial="initial"
-        animate="animate"
-        viewport={{ once: true }}
-      >
-        <div className="flex items-center justify-between">
-          <div>
+      <div className="flex items-center justify-between">
+        <div>
             <h1 className="font-headline text-3xl font-bold tracking-tight">
-              Group Expenses
+                Group Expenses
             </h1>
             <p className="text-muted-foreground">
-              Manage your shared expenses with groups.
+                Manage your shared expenses with groups.
             </p>
-          </div>
-          <Button onClick={handleAddGroup}>
-            <PlusCircle className="mr-2 h-5 w-5" />
-            Create Group
-          </Button>
         </div>
-      </motion.div>
+        <motion.div initial="initial" animate="animate" variants={buttonMotionVariants} viewport={{ once: true }}>
+            <Button onClick={handleAddGroup} disabled={isLoadingGroups}>
+                <PlusCircle className="mr-2 h-5 w-5" />
+                Create Group
+            </Button>
+        </motion.div>
+      </div>
 
       {isLoadingGroups ? (
         <div className="flex items-center justify-center p-10">
@@ -222,6 +219,7 @@ export default function GroupsPage() {
             initial="hidden"
             animate="visible"
             className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
+            viewport={{ once: true }}
         >
             {groups.map((group) => (
                 <GroupCard
@@ -238,6 +236,7 @@ export default function GroupsPage() {
           initial="initial"
           animate="animate"
           variants={emptyStateMotionVariants}
+          viewport={{ once: true }}
         >
             <Users className="mx-auto h-12 w-12 text-muted-foreground" />
             <h3 className="mt-4 text-xl font-semibold">No groups yet</h3>
