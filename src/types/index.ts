@@ -44,6 +44,14 @@ export type BudgetFormData = {
   month: string; // YYYY-MM format
 };
 
+// Type for budgets returned from API (before 'spent' is calculated)
+export interface BudgetFromApi {
+  id: string;
+  category: string;
+  allocated: number;
+  month: string;
+}
+
 export interface AppNotification {
   id: string;
   title: string;
@@ -55,15 +63,34 @@ export interface AppNotification {
 }
 
 // Types for Group Expense Management
+export interface Group {
+  id: string;
+  name: string;
+}
+
 export interface GroupMember {
   id: string;
   name: string;
 }
 
+export interface GroupExpense {
+  id: string;
+  description: string;
+  amount: number;
+  paidBy: string; // Name of the member who paid
+  date: string; // ISO string date
+}
+
+export interface GroupBalance {
+  from: string; // Name of the member who owes
+  to: string;   // Name of the member to be paid
+  amount: number;
+}
+
 export interface GroupExpenseFormData {
   description: string;
   amount: number;
-  paidById: string;
+  paidById: string; // The ID of the member who paid
   date: Date;
   splitType: 'equally' | 'unequally';
   splits?: {
