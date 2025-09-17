@@ -29,7 +29,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import type { GroupExpenseFormData, GroupMember } from "@/types";
+import type { GroupExpenseFormData, GroupMember } from '@/types';
 import { Separator } from "../ui/separator";
 
 interface GroupExpenseFormDialogProps {
