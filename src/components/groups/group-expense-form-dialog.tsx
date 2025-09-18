@@ -1,7 +1,7 @@
 // src/components/groups/group-expense-form-dialog.tsx
 "use client";
 
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -58,7 +58,8 @@ const calculateAndSetEqualSplit = (
   setValue: UseFormSetValue<GroupExpenseFormData>
 ) => {
   const memberCount = members.length;
-  const amountPerMember = memberCount > 0 ? totalExpense / memberCount : 0;
+  if (memberCount === 0) return;
+  const amountPerMember = totalExpense / memberCount;
   members.forEach((_, index) => {
     setValue(`members.${index}.expense`, parseFloat(amountPerMember.toFixed(2)), { shouldValidate: true });
   });
@@ -107,20 +108,20 @@ export function GroupExpenseFormDialog({
 
   const expenseMismatch = Math.abs(sumOfIndividualExpenses - totalExpense) > 0.01;
 
-  const handleSplitMethodChange = (value: SplitMethod) => {
+  const handleSplitMethodChange = useCallback((value: SplitMethod) => {
     setValue('splitMethod', value);
     if (value === 'equal') {
       calculateAndSetEqualSplit(getValues('totalExpense'), getValues('members'), setValue);
     }
-  };
+  }, [setValue, getValues]);
   
-  const handleTotalExpenseChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTotalExpenseChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const newTotalExpense = parseFloat(e.target.value) || 0;
     setValue('totalExpense', newTotalExpense, { shouldValidate: true });
     if (getValues('splitMethod') === 'equal') {
       calculateAndSetEqualSplit(newTotalExpense, getValues('members'), setValue);
     }
-  };
+  }, [setValue, getValues]);
 
 
   useEffect(() => {
