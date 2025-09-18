@@ -9,9 +9,29 @@ import type { GroupExpense } from '@/types';
 import { GroupCard } from '@/components/groups/group-card';
 import { GroupExpenseFormDialog } from '@/components/groups/group-expense-form-dialog';
 import { useNotification } from '@/contexts/notification-context';
+import { v4 as uuidv4 } from 'uuid';
 
-// MOCK DATA for initial UI display. This will be replaced by context.
-const MOCK_GROUPS: GroupExpense[] = [];
+// MOCK DATA for initial UI display. This will be replaced by context/API calls.
+const MOCK_GROUPS: GroupExpense[] = [
+    {
+        id: 'group-1',
+        groupName: 'Trip to Goa',
+        email: 'user@example.com',
+        members: ['Alice', 'Bob', 'Charlie'],
+        expenses: [2000.0, 1000.0, 0.0],
+        balance: [1000.0, 0.0, -1000.0],
+        totalExpense: 3000.0,
+    },
+    {
+        id: 'group-2',
+        groupName: 'Dinner Party',
+        email: 'user@example.com',
+        members: ['David', 'Eve'],
+        expenses: [500.0, 1500.0],
+        balance: [-500.0, 500.0],
+        totalExpense: 2000.0,
+    },
+];
 
 const buttonMotionVariants = {
   initial: { opacity: 0, scale: 0.9 },
@@ -66,22 +86,37 @@ export default function GroupsPage() {
   };
   
   const handleDeleteGroup = (groupId: string) => {
-    // API logic will go here
+    // MOCK: Filter out the group to delete
+    setGroups(prev => prev.filter(g => g.id !== groupId));
     addNotification({
-        title: "Info",
-        description: `Delete functionality for group ${groupId} will be implemented next.`,
+        title: "Group Deleted (Mock)",
+        description: `Group with ID ${groupId} has been removed from the list.`,
         type: 'info'
     });
   };
 
   const handleSaveGroup = (data: Omit<GroupExpense, 'id'>) => {
-    // This function will handle the API call
-    addNotification({
-        title: "Group Data Prepared",
-        description: `Data for "${data.groupName}" is ready to be sent to the API.`,
-        type: 'success'
-    });
-    console.log("Data to be sent:", data);
+    if (editingGroup) {
+        // MOCK: Update existing group
+        const updatedGroup = { ...data, id: editingGroup.id };
+        setGroups(prev => prev.map(g => g.id === editingGroup.id ? updatedGroup : g));
+        addNotification({
+            title: "Group Updated (Mock)",
+            description: `Data for "${data.groupName}" has been updated.`,
+            type: 'success'
+        });
+    } else {
+        // MOCK: Add new group with a unique ID
+        const newGroup = { ...data, id: uuidv4() };
+        setGroups(prev => [...prev, newGroup]);
+        addNotification({
+            title: "Group Created (Mock)",
+            description: `Data for "${data.groupName}" has been created.`,
+            type: 'success'
+        });
+    }
+    
+    console.log("Data to be sent to API:", data);
     setIsFormOpen(false);
   };
 
