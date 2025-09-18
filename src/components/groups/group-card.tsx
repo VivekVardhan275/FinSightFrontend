@@ -13,7 +13,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 // Icons
-import { Edit2, Trash2, Users, AlertTriangle } from 'lucide-react';
+import { Edit2, Trash2, Users } from 'lucide-react';
 
 // Contexts & Utilities
 import { useCurrency } from '@/contexts/currency-context';
@@ -40,12 +40,11 @@ interface GroupCardProps {
  * It provides details on total expenses, member breakdown, and actions to edit or delete the group.
  */
 export function GroupCard({ group, onEdit, onDelete, variants, custom }: GroupCardProps) {
-  const { selectedCurrency, convertAmount } = useCurrency();
-
-  // FIX: Validate that the lengths of member-related arrays are consistent.
-  const isDataConsistent =
-    group.members.length === group.expenses.length &&
-    group.members.length === group.balance.length;
+  // FIX: Add a fallback for the currency context to prevent crashes if it's not ready.
+  const { selectedCurrency, convertAmount } = useCurrency() ?? {
+    selectedCurrency: 'INR',
+    convertAmount: (v: number) => v,
+  };
 
   return (
     <motion.div
@@ -64,10 +63,10 @@ export function GroupCard({ group, onEdit, onDelete, variants, custom }: GroupCa
               <Users className="h-5 w-5 text-primary" />
               <span className="truncate" title={group.groupName}>{group.groupName}</span>
             </CardTitle>
-            <Badge variant="secondary" className="shrink-0">{group.members.length} Members</Badge>
+            <Badge variant="secondary" className="shrink-0">{group.members?.length || 0} Members</Badge>
           </div>
           <CardDescription>
-            Total Expense: {formatCurrency(convertAmount(group.totalExpense, selectedCurrency), selectedCurrency)}
+            Total Expense: {formatCurrency(convertAmount(group.totalExpense ?? 0, selectedCurrency), selectedCurrency)}
           </CardDescription>
         </CardHeader>
 
@@ -81,25 +80,25 @@ export function GroupCard({ group, onEdit, onDelete, variants, custom }: GroupCa
             </div>
             <Separator />
             <ScrollArea className="h-28 pr-4">
-              {!isDataConsistent ? (
-                <div className="flex items-center justify-center h-24 text-sm text-destructive gap-2">
-                  <AlertTriangle className="h-4 w-4" />
-                  <p>Inconsistent group data.</p>
-                </div>
-              ) : group.members.length > 0 ? (
-                group.members.map((member, index) => (
-                  // Improvement: Using index as a key is acceptable here since the list is static per render.
-                  // However, if members could be reordered, a unique ID from the data would be better.
-                  <div key={`${group.id}-member-${index}`} className="grid grid-cols-3 gap-2 items-center text-sm py-1.5">
-                    <span className="truncate col-span-1" title={member}>{member}</span>
-                    <span className="text-right col-span-1 text-muted-foreground">
-                      {formatCurrency(convertAmount(group.expenses[index], selectedCurrency), selectedCurrency)}
-                    </span>
-                    <span className={`text-right col-span-1 font-medium ${group.balance[index] >= 0 ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'}`}>
-                      {formatCurrency(convertAmount(group.balance[index], selectedCurrency), selectedCurrency)}
-                    </span>
-                  </div>
-                ))
+              {group.members?.length > 0 ? (
+                group.members.map((member, index) => {
+                  // FIX: Safely access array elements with optional chaining and nullish coalescing.
+                  // This prevents crashes if the arrays have mismatched lengths.
+                  const expense = group.expenses?.[index] ?? 0;
+                  const balance = group.balance?.[index] ?? 0;
+
+                  return (
+                    <div key={`${group.id}-member-${index}`} className="grid grid-cols-3 gap-2 items-center text-sm py-1.5">
+                      <span className="truncate col-span-1" title={member}>{member}</span>
+                      <span className="text-right col-span-1 text-muted-foreground">
+                        {formatCurrency(convertAmount(expense, selectedCurrency), selectedCurrency)}
+                      </span>
+                      <span className={`text-right col-span-1 font-medium ${balance >= 0 ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'}`}>
+                        {formatCurrency(convertAmount(balance, selectedCurrency), selectedCurrency)}
+                      </span>
+                    </div>
+                  );
+                })
               ) : (
                 <div className="flex items-center justify-center h-24 text-sm text-muted-foreground">
                   <p>No members in this group yet.</p>
@@ -123,7 +122,8 @@ export function GroupCard({ group, onEdit, onDelete, variants, custom }: GroupCa
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => onDelete(group.id)} aria-label="Delete group" className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                {/* FIX: Add a guard to ensure group.id is a string before calling onDelete. */}
+                <Button variant="ghost" size="icon" onClick={() => onDelete(group.id ?? '')} aria-label="Delete group" className="text-destructive hover:text-destructive hover:bg-destructive/10">
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
