@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,93 +19,118 @@ import { useCurrency } from '@/contexts/currency-context';
 import type { GroupExpense, GroupExpenseSubmitData } from '@/types';
 import { ScrollArea } from '../ui/scroll-area';
 import { Separator } from '../ui/separator';
+import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+
+// --- Form Validation Schema ---
+
+const memberSchema = z.object({
+  name: z.string().min(1, "Member name is required."),
+  expense: z.number().min(0, "Expense cannot be negative."),
+});
+
+const groupExpenseSchema = z.object({
+  groupName: z.string().min(1, "Group name is required."),
+  members: z.array(memberSchema).min(1, "At least one member is required."),
+});
+
+type GroupExpenseFormData = z.infer<typeof groupExpenseSchema>;
+
+
+// --- Component Interface ---
 
 interface GroupExpenseFormDialogProps {
   group?: GroupExpense | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (data: Partial<GroupExpenseSubmitData>) => void;
+  onSave: (data: GroupExpenseSubmitData) => void;
+  isSubmitting?: boolean;
 }
 
-interface MemberFormState {
-  name: string;
-  expense: number | string;
-}
+
+// --- Component ---
 
 export function GroupExpenseFormDialog({
   group,
   open,
   onOpenChange,
   onSave,
+  isSubmitting = false,
 }: GroupExpenseFormDialogProps) {
   const { user } = useAuthState();
   const { selectedCurrency } = useCurrency();
-  const [isSaving, setIsSaving] = useState(false);
 
-  // Form State
-  const [groupName, setGroupName] = useState('');
-  const [members, setMembers] = useState<MemberFormState[]>([]);
+  const {
+    control,
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<GroupExpenseFormData>({
+    resolver: zodResolver(groupExpenseSchema),
+    defaultValues: {
+      groupName: '',
+      members: [],
+    },
+  });
 
-  // This effect now ONLY runs when the dialog opens or the group being edited changes.
-  // It is the single source of truth for initializing the form state.
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "members",
+  });
+
+  // Effect to reset the form when the dialog opens or the editing target changes.
   useEffect(() => {
     if (open) {
-      if (group) { // Edit mode
-        setGroupName(group.groupName);
-        setMembers(group.members.map((name, index) => ({
-          name,
-          expense: group.expenses[index]
-        })));
-      } else { // Create mode
-        setGroupName('');
-        setMembers([
-          { name: user?.name || 'Me', expense: 0 },
-          { name: '', expense: 0 },
-        ]);
+      if (group) { // Edit Mode
+        reset({
+          groupName: group.groupName,
+          members: group.members.map((name, index) => ({
+            name: name,
+            expense: group.expenses[index] || 0,
+          })),
+        });
+      } else { // Create Mode
+        reset({
+          groupName: '',
+          members: [
+            { name: user?.name || 'Me', expense: 0 },
+            { name: '', expense: 0 },
+          ],
+        });
       }
     }
-  }, [open, group, user]);
+  }, [group, open, reset, user]);
 
-  const handleMemberChange = (index: number, field: 'name' | 'expense', value: string) => {
-    const updatedMembers = [...members];
-    updatedMembers[index] = { ...updatedMembers[index], [field]: value };
-    setMembers(updatedMembers);
-  };
 
-  const addMember = () => {
-    setMembers([...members, { name: '', expense: 0 }]);
-  };
+  /**
+   * Processes the form data, calculates balances, and calls the onSave prop.
+   */
+  const processSubmit = (data: GroupExpenseFormData) => {
+    if (!user?.email) return;
 
-  const removeMember = (index: number) => {
-    if (members.length > 1) {
-      setMembers(members.filter((_, i) => i !== index));
-    }
-  };
+    // Calculate totals and balances safely here, only on submit.
+    const expenses = data.members.map(m => m.expense);
+    const totalExpense = expenses.reduce((sum, expense) => sum + expense, 0);
+    const averageExpense = data.members.length > 0 ? totalExpense / data.members.length : 0;
+    const balances = expenses.map(expense => expense - averageExpense);
+    const memberNames = data.members.map(m => m.name);
 
-  const processSubmit = () => {
-    if (!user?.email || !groupName) {
-      return;
-    }
-    setIsSaving(true);
-
-    // Prepare payload without balance/total calculations.
-    // This will be handled safely in the parent component.
-    const payload: Partial<GroupExpenseSubmitData> = {
-      groupName,
+    const finalData: GroupExpenseSubmitData = {
+      groupName: data.groupName,
       email: user.email,
-      members: members.map(m => m.name),
-      expenses: members.map(m => parseFloat(String(m.expense)) || 0),
+      members: memberNames,
+      expenses,
+      totalExpense,
+      balance: balances,
     };
     
-    // Simulate API call delay for mock
-    setTimeout(() => {
-        onSave(payload);
-        setIsSaving(false);
-    }, 500);
+    onSave(finalData);
   };
 
   return (
-    <Dialog open={open} onOpenChange={!isSaving ? onOpenChange : undefined}>
+    <Dialog open={open} onOpenChange={!isSubmitting ? onOpenChange : undefined}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="font-headline flex items-center gap-2">
@@ -117,52 +142,51 @@ export function GroupExpenseFormDialog({
           </DialogDescription>
         </DialogHeader>
         
-        <div className="grid gap-4 py-4">
-          <div className="space-y-2">
+        <form onSubmit={handleSubmit(processSubmit)} className="grid gap-4 py-4">
+          <div className="space-y-1">
             <Label htmlFor="groupName">Group Name</Label>
             <Input 
               id="groupName" 
-              value={groupName}
-              onChange={(e) => setGroupName(e.target.value)}
-              disabled={isSaving} 
+              {...register("groupName")}
+              disabled={isSubmitting} 
               placeholder="e.g., Trip to Goa" 
             />
+            {errors.groupName && <p className="text-sm text-destructive">{errors.groupName.message}</p>}
           </div>
           
-          <div className="space-y-2">
-            <Label>Your Email (from session)</Label>
-            <Input value={user?.email || 'No email found'} readOnly className="cursor-not-allowed bg-muted/50" />
-          </div>
-            
           <Separator className="my-2" />
 
           <div className="space-y-2">
             <Label className="font-medium">Members and Amounts Paid ({selectedCurrency})</Label>
             <ScrollArea className="h-[200px] pr-4">
               <div className="space-y-3">
-                {members.map((member, index) => (
-                  <div key={index} className="grid grid-cols-[1fr_auto_auto] gap-2 items-center">
-                    <Input
-                      placeholder={`Member ${index + 1} Name`}
-                      value={member.name}
-                      onChange={(e) => handleMemberChange(index, 'name', e.target.value)}
-                      disabled={isSaving}
-                    />
-                    <Input
-                      type="number"
-                      placeholder="Amount Paid"
-                      value={member.expense}
-                      onChange={(e) => handleMemberChange(index, 'expense', e.target.value)}
-                      className="w-32"
-                      disabled={isSaving}
-                    />
+                {fields.map((field, index) => (
+                  <div key={field.id} className="grid grid-cols-[1fr_auto_auto] gap-2 items-start">
+                    <div className="flex-grow">
+                      <Input
+                        placeholder={`Member ${index + 1} Name`}
+                        {...register(`members.${index}.name`)}
+                        disabled={isSubmitting}
+                      />
+                      {errors.members?.[index]?.name && <p className="text-xs text-destructive mt-1">{errors.members[index].name.message}</p>}
+                    </div>
+                    <div className="w-32">
+                       <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="Amount Paid"
+                        {...register(`members.${index}.expense`, { valueAsNumber: true })}
+                        disabled={isSubmitting}
+                      />
+                      {errors.members?.[index]?.expense && <p className="text-xs text-destructive mt-1">{errors.members[index].expense.message}</p>}
+                    </div>
                     <Button 
                         type="button" 
                         variant="ghost" 
                         size="icon" 
-                        onClick={() => removeMember(index)} 
-                        disabled={isSaving || members.length <= 1}
-                        className="text-destructive hover:bg-destructive/10"
+                        onClick={() => remove(index)} 
+                        disabled={isSubmitting || fields.length <= 1}
+                        className="text-destructive hover:bg-destructive/10 mt-1"
                         aria-label="Remove member"
                     >
                         <Trash2 className="h-4 w-4"/>
@@ -174,21 +198,22 @@ export function GroupExpenseFormDialog({
             <Button 
               type="button" 
               variant="outline" 
-              onClick={addMember}
-              disabled={isSaving}
+              size="sm"
+              onClick={() => append({ name: '', expense: 0 })}
+              disabled={isSubmitting}
             >
               Add Member
             </Button>
           </div>
-        </div>
           
-        <DialogFooter className="pt-6 border-t">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>Cancel</Button>
-          <Button onClick={processSubmit} disabled={isSaving || !groupName}>
-            {isSaving && <RotateCw className="mr-2 h-4 w-4 animate-spin" />}
-            {isSaving ? "Saving..." : "Save Group"}
-          </Button>
-        </DialogFooter>
+          <DialogFooter className="pt-6 border-t">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancel</Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting && <RotateCw className="mr-2 h-4 w-4 animate-spin" />}
+              {isSubmitting ? "Saving..." : (group ? "Update Group" : "Save Group")}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
