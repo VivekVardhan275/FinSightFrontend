@@ -1,7 +1,7 @@
 // src/components/groups/group-expense-form-dialog.tsx
 "use client";
 
-import React, { useEffect, useMemo, useCallback } from "react";
+import React, { useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,6 @@ import { z } from "zod";
 import type { Group, GroupExpenseFormData } from '@/types';
 import { useAuthState } from "@/hooks/use-auth-state";
 import { Separator } from "../ui/separator";
-import { formatCurrency } from "@/lib/utils";
 import { useCurrency } from "@/contexts/currency-context";
 import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 
@@ -34,7 +33,6 @@ const groupExpenseSchema = z.object({
 }).refine(data => {
     if (data.splitMethod === 'unequal') {
         const sumOfMemberExpenses = data.members.reduce((sum, member) => sum + member.expense, 0);
-        // Use a small epsilon for floating point comparison
         return Math.abs(sumOfMemberExpenses - data.totalExpense) < 0.01;
     }
     return true;
@@ -121,11 +119,10 @@ export function GroupExpenseFormDialog({
   useEffect(() => {
     if (open) {
       if (group) {
-        // Editing existing group
         reset({
           groupName: group.groupName,
           totalExpense: group.totalExpenses,
-          splitMethod: "unequal", // Default to unequal for edits to prevent accidental overwrites
+          splitMethod: "unequal",
           members: group.members.map((name, index) => ({
             name,
             expense: group.expenses[index] || 0,
@@ -133,7 +130,6 @@ export function GroupExpenseFormDialog({
           })),
         });
       } else {
-        // Creating new group
         reset({
           groupName: "",
           totalExpense: 0,
@@ -145,7 +141,6 @@ export function GroupExpenseFormDialog({
   }, [open, group, reset, user]);
 
   const processSubmit = (data: GroupExpenseFormData) => {
-    // Re-calculate equal split on submit to ensure data is fresh, especially if members were added/removed
     if (data.splitMethod === 'equal') {
         const memberCount = data.members.length;
         const amountPerMember = memberCount > 0 ? data.totalExpense / memberCount : 0;
