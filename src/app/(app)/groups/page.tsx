@@ -1,4 +1,3 @@
-
 // src/app/(app)/groups/page.tsx
 "use client";
 
@@ -133,22 +132,32 @@ export default function GroupsPage() {
     }
 
     setIsSaving(true);
+    
+    // Calculate balances before sending to API
+    const totalMembers = formData.members.length;
+    const sharePerMember = totalMembers > 0 ? formData.totalExpense / totalMembers : 0;
+    
+    const membersWithBalances = formData.members.map(member => ({
+      ...member,
+      balance: member.expense - sharePerMember,
+    }));
 
     const dataForApi = {
       groupName: formData.groupName,
       email: user.email,
-      members: formData.members.map(m => m.name),
-      expenses: formData.members.map(m => m.expense),
-      balances: formData.members.map(m => m.balance),
+      members: membersWithBalances.map(m => m.name),
+      expenses: membersWithBalances.map(m => m.expense),
+      balances: membersWithBalances.map(m => m.balance),
       totalExpenses: formData.totalExpense,
     };
 
-    const notificationAction = editingGroup ? "Updated" : "Created";
+    const isEditing = editingGroup !== null;
+    const notificationAction = isEditing ? "Updated" : "Created";
 
     try {
         let savedGroupFromApi: Group;
 
-        if (editingGroup) {
+        if (isEditing) {
             const apiUrl = `${GROUP_API_BASE_URL}/set-group-expense?id=${editingGroup.groupId}&email=${encodeURIComponent(user.email)}`;
             const response = await axios.put<Group>(addRandomQueryParam(apiUrl), dataForApi);
             savedGroupFromApi = response.data;
