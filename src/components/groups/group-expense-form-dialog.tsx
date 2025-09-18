@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Trash2, PlusCircle, RotateCw } from "lucide-react";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, type UseFormSetValue } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Group, GroupExpenseFormData } from '@/types';
@@ -51,6 +51,19 @@ interface GroupExpenseFormDialogProps {
   group?: Group | null;
   isSaving?: boolean;
 }
+
+const calculateAndSetEqualSplit = (
+  totalExpense: number,
+  members: { name: string; expense: number; balance: number }[],
+  setValue: UseFormSetValue<GroupExpenseFormData>
+) => {
+  const memberCount = members.length;
+  const amountPerMember = memberCount > 0 ? totalExpense / memberCount : 0;
+  members.forEach((_, index) => {
+    setValue(`members.${index}.expense`, parseFloat(amountPerMember.toFixed(2)), { shouldValidate: true });
+  });
+};
+
 
 export function GroupExpenseFormDialog({
   open,
@@ -97,15 +110,18 @@ export function GroupExpenseFormDialog({
   const handleSplitMethodChange = (value: SplitMethod) => {
     setValue('splitMethod', value);
     if (value === 'equal') {
-      const currentTotalExpense = getValues('totalExpense');
-      const currentMembers = getValues('members');
-      const memberCount = currentMembers.length;
-      const amountPerMember = memberCount > 0 ? currentTotalExpense / memberCount : 0;
-      currentMembers.forEach((_, index) => {
-        setValue(`members.${index}.expense`, parseFloat(amountPerMember.toFixed(2)));
-      });
+      calculateAndSetEqualSplit(getValues('totalExpense'), getValues('members'), setValue);
     }
   };
+  
+  const handleTotalExpenseChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newTotalExpense = parseFloat(e.target.value) || 0;
+    setValue('totalExpense', newTotalExpense, { shouldValidate: true });
+    if (getValues('splitMethod') === 'equal') {
+      calculateAndSetEqualSplit(newTotalExpense, getValues('members'), setValue);
+    }
+  };
+
 
   useEffect(() => {
     if (open) {
@@ -114,7 +130,7 @@ export function GroupExpenseFormDialog({
         reset({
           groupName: group.groupName,
           totalExpense: group.totalExpenses,
-          splitMethod: "unequal",
+          splitMethod: "unequal", // Default to unequal for edits to prevent accidental overwrites
           members: group.members.map((name, index) => ({
             name,
             expense: group.expenses[index] || 0,
@@ -134,7 +150,7 @@ export function GroupExpenseFormDialog({
   }, [open, group, reset, user]);
 
   const processSubmit = (data: GroupExpenseFormData) => {
-    // Re-calculate equal split on submit to ensure data is fresh
+    // Re-calculate equal split on submit to ensure data is fresh, especially if members were added/removed
     if (data.splitMethod === 'equal') {
         const memberCount = data.members.length;
         const amountPerMember = memberCount > 0 ? data.totalExpense / memberCount : 0;
@@ -142,7 +158,6 @@ export function GroupExpenseFormDialog({
             member.expense = parseFloat(amountPerMember.toFixed(2));
         });
     }
-
     onSave(data);
   };
 
@@ -164,7 +179,14 @@ export function GroupExpenseFormDialog({
             </div>
              <div className="space-y-2">
               <Label htmlFor="totalExpense">Total Expense ({selectedCurrency})</Label>
-              <Input id="totalExpense" type="number" step="0.01" {...register("totalExpense", { valueAsNumber: true })} disabled={isSaving} />
+              <Input
+                id="totalExpense"
+                type="number"
+                step="0.01"
+                {...register("totalExpense", { valueAsNumber: true })}
+                onChange={handleTotalExpenseChange}
+                disabled={isSaving}
+              />
               {errors.totalExpense && <p className="text-sm text-destructive">{errors.totalExpense.message}</p>}
             </div>
           </div>
@@ -245,7 +267,16 @@ export function GroupExpenseFormDialog({
               </p>
            )}
 
-          <Button type="button" variant="outline" size="sm" onClick={() => append({ name: "", expense: 0, balance: 0 })} disabled={isSaving}>
+          <Button type="button" variant="outline" size="sm" onClick={() => {
+              append({ name: "", expense: 0, balance: 0 });
+              if (getValues('splitMethod') === 'equal') {
+                // When adding a new member under equal split, we need to recalculate for all.
+                // We use a timeout to allow react-hook-form to process the append action first.
+                setTimeout(() => {
+                  calculateAndSetEqualSplit(getValues('totalExpense'), getValues('members'), setValue);
+                }, 0);
+              }
+            }} disabled={isSaving}>
             <PlusCircle className="mr-2 h-4 w-4" /> Add Member
           </Button>
 
