@@ -9,7 +9,6 @@ import {
   ListChecks, 
   Target, 
   LineChart,
-  Users
 } from "lucide-react";
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
 
@@ -24,7 +23,6 @@ const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: <LayoutDashboard /> },
   { href: "/transactions", label: "Transactions", icon: <ListChecks /> },
   { href: "/budgets", label: "Budgets", icon: <Target /> },
-  { href: "/groups", label: "Groups", icon: <Users /> },
 ];
 
 export function SidebarNav() {

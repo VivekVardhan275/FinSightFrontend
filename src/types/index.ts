@@ -60,29 +60,3 @@ export interface AppNotification {
   read: boolean;
   href?: string; // Optional link for the notification
 }
-
-// ===================================
-// Types for Group Expense Management
-// ===================================
-
-// Main data structure for a group expense record, matching API
-export interface Group {
-  groupId: number;
-  groupName: string;
-  email: string;
-  members: string[];
-  expenses: number[];
-  balances: number[];
-  totalExpenses: number;
-}
-
-// Data structure for the "Create/Edit Group" form
-export interface GroupExpenseFormData {
-  groupName: string;
-  totalExpense: number;
-  members: Array<{
-    name: string;
-    expense: number;
-    balance: number;
-  }>;
-}
