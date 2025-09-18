@@ -86,14 +86,4 @@ export interface GroupExpenseSubmitData {
   totalExpense: number;
 }
 
-// Represents the structure of a single member within the form
-export interface MemberDetails {
-    name: string;
-    expense: number;
-}
-
-// The shape of the data used by react-hook-form
-export type GroupExpenseFormData = {
-  groupName: string;
-  members: MemberDetails[];
-};
+    

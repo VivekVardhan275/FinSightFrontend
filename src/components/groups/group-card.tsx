@@ -9,8 +9,8 @@ import { motion, type Variants } from 'framer-motion';
 import { useCurrency } from '@/contexts/currency-context';
 import { formatCurrency } from '@/lib/utils';
 import { Badge } from '../ui/badge';
-import { ScrollArea } from '../ui/scroll-area';
 import { Separator } from '../ui/separator';
+import { ScrollArea } from '../ui/scroll-area';
 
 interface GroupCardProps {
   group: GroupExpense;
@@ -48,7 +48,6 @@ export function GroupCard({ group, onEdit, onDelete, variants, custom }: GroupCa
         </CardHeader>
         <CardContent className="space-y-3 flex-grow">
           <h4 className="text-sm font-medium text-muted-foreground">Member Breakdown</h4>
-          <ScrollArea className="h-32 pr-4">
             <div className="space-y-2">
                 <div className="grid grid-cols-3 gap-2 text-xs font-semibold text-muted-foreground">
                     <div className="col-span-1">Member</div>
@@ -56,19 +55,20 @@ export function GroupCard({ group, onEdit, onDelete, variants, custom }: GroupCa
                     <div className="col-span-1 text-right">Balance</div>
                 </div>
                 <Separator />
-                {group.members.map((member, index) => (
-                    <div key={`${member}-${index}`} className="grid grid-cols-3 gap-2 items-center text-sm">
-                        <span className="truncate col-span-1" title={member}>{member}</span>
-                        <span className="text-right col-span-1">
-                            {formatCurrency(convertAmount(group.expenses[index], selectedCurrency), selectedCurrency)}
-                        </span>
-                        <span className={`text-right col-span-1 font-medium ${group.balance[index] >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {formatCurrency(convertAmount(group.balance[index], selectedCurrency), selectedCurrency)}
-                        </span>
-                    </div>
-                ))}
+                <ScrollArea className="h-24 pr-4">
+                  {group.members.map((member, index) => (
+                      <div key={`${member}-${index}`} className="grid grid-cols-3 gap-2 items-center text-sm py-1">
+                          <span className="truncate col-span-1" title={member}>{member}</span>
+                          <span className="text-right col-span-1">
+                              {formatCurrency(convertAmount(group.expenses[index], selectedCurrency), selectedCurrency)}
+                          </span>
+                          <span className={`text-right col-span-1 font-medium ${group.balance[index] >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {formatCurrency(convertAmount(group.balance[index], selectedCurrency), selectedCurrency)}
+                          </span>
+                      </div>
+                  ))}
+                </ScrollArea>
             </div>
-          </ScrollArea>
         </CardContent>
         <CardFooter className="flex justify-end space-x-2">
           <Button variant="ghost" size="icon" onClick={() => onEdit(group)} aria-label="Edit group">
@@ -82,3 +82,5 @@ export function GroupCard({ group, onEdit, onDelete, variants, custom }: GroupCa
     </motion.div>
   );
 }
+
+    

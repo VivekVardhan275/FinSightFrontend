@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Users, RotateCw } from "lucide-react";
 import { motion } from "framer-motion";
@@ -9,7 +9,6 @@ import type { GroupExpense, GroupExpenseSubmitData } from '@/types';
 import { GroupCard } from '@/components/groups/group-card';
 import { GroupExpenseFormDialog } from '@/components/groups/group-expense-form-dialog';
 import { useNotification } from '@/contexts/notification-context';
-import { v4 as uuidv4 } from 'uuid';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,26 +21,26 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useAuthState } from '@/hooks/use-auth-state';
 
-// MOCK DATA for initial UI display.
+// MOCK DATA based on the user's provided example.
 const MOCK_GROUPS: GroupExpense[] = [
     {
-        id: 'group-1',
-        groupName: 'Trip to Goa',
-        email: 'user@example.com',
-        members: ['Alice', 'Bob', 'Charlie'],
-        expenses: [3000.0, 1500.0, 0.0], 
-        balance: [1500.0, 0.0, -1500.0], 
-        totalExpense: 4500.0,
+        id: "3456wfghj3dh",
+        groupName: "Trip to Goa",
+        email: "review-user@example.com",
+        members: ["Alice", "Bob", "Charlie"],
+        expenses: [2000.0, 1000.0, 0.0],
+        balance: [1000.0, 0.0, -1000.0],
+        totalExpense: 3000.0
     },
     {
-        id: 'group-2',
-        groupName: 'Dinner Party',
-        email: 'user@example.com',
-        members: ['David', 'Eve'],
-        expenses: [500.0, 1500.0],
-        balance: [-500.0, 500.0], 
-        totalExpense: 2000.0,
-    },
+        id: "9876xyzab5ef",
+        groupName: "Office Lunch",
+        email: "review-user@example.com",
+        members: ["David", "Eve"],
+        expenses: [500.0, 500.0],
+        balance: [0.0, 0.0],
+        totalExpense: 1000.0
+    }
 ];
 
 const buttonMotionVariants = {
@@ -81,13 +80,19 @@ const emptyStateMotionVariants = {
 
 export default function GroupsPage() {
   const { user } = useAuthState();
-  const [groups, setGroups] = useState<GroupExpense[]>(MOCK_GROUPS);
-  const [isLoading, setIsLoading] = useState(false);
+  const [groups, setGroups] = useState<GroupExpense[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<GroupExpense | null>(null);
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
   const [groupToDeleteId, setGroupToDeleteId] = useState<string | null>(null);
   const { addNotification } = useNotification();
+
+  useEffect(() => {
+    // Simulate fetching data
+    setGroups(MOCK_GROUPS);
+    setIsLoading(false);
+  }, []);
 
   const handleCreateGroup = () => {
     setEditingGroup(null);
@@ -98,12 +103,12 @@ export default function GroupsPage() {
     setEditingGroup(group);
     setIsFormOpen(true);
   };
-  
+
   const confirmDeleteGroup = (groupId: string) => {
     setGroupToDeleteId(groupId);
     setIsConfirmDeleteDialogOpen(true);
   };
-  
+
   const handleDeleteGroup = () => {
     if (!groupToDeleteId) return;
 
@@ -120,31 +125,31 @@ export default function GroupsPage() {
 
   const handleSaveGroup = (data: GroupExpenseSubmitData) => {
     if (editingGroup) {
-        // MOCK: Update existing group
-        const updatedGroup: GroupExpense = { 
-            ...data, 
-            id: editingGroup.id,
-        };
-        setGroups(prev => prev.map(g => g.id === editingGroup.id ? updatedGroup : g));
-        addNotification({
-            title: "Group Updated",
-            description: `Data for "${data.groupName}" has been updated.`,
-            type: 'success'
-        });
+      // MOCK: Update existing group
+      const updatedGroup: GroupExpense = {
+          ...data,
+          id: editingGroup.id,
+      };
+      setGroups(prev => prev.map(g => g.id === editingGroup.id ? updatedGroup : g));
+      addNotification({
+          title: "Group Updated",
+          description: `Data for "${data.groupName}" has been updated.`,
+          type: 'success'
+      });
     } else {
-        // MOCK: Add new group with a unique ID
-        const newGroup: GroupExpense = { 
-            ...data, 
-            id: uuidv4(),
-        };
-        setGroups(prev => [...prev, newGroup]);
-        addNotification({
-            title: "Group Created",
-            description: `A new group "${data.groupName}" has been created.`,
-            type: 'success'
-        });
+      // MOCK: Add new group with a unique ID
+      const newGroup: GroupExpense = {
+          ...data,
+          id: `new_${Date.now()}`,
+      };
+      setGroups(prev => [...prev, newGroup]);
+      addNotification({
+          title: "Group Created",
+          description: `A new group "${data.groupName}" has been created.`,
+          type: 'success'
+      });
     }
-    
+
     setIsFormOpen(false);
     setEditingGroup(null);
   };
@@ -211,15 +216,12 @@ export default function GroupsPage() {
         </motion.div>
       )}
 
-      {isFormOpen && (
-        <GroupExpenseFormDialog
-            open={isFormOpen}
-            onOpenChange={setIsFormOpen}
-            group={editingGroup}
-            onSave={handleSaveGroup}
-        />
-      )}
-
+      <GroupExpenseFormDialog
+          open={isFormOpen}
+          onOpenChange={setIsFormOpen}
+          group={editingGroup}
+          onSave={handleSaveGroup}
+      />
 
       <AlertDialog open={isConfirmDeleteDialogOpen} onOpenChange={setIsConfirmDeleteDialogOpen}>
         <AlertDialogContent>
@@ -243,3 +245,5 @@ export default function GroupsPage() {
     </div>
   );
 }
+
+    
