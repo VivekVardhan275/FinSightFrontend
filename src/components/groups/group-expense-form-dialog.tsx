@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -17,7 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RotateCw, Users, Trash2 } from "lucide-react";
+import { RotateCw, Users } from "lucide-react";
 import { useAuthState } from '@/hooks/use-auth-state';
 import { useCurrency } from '@/contexts/currency-context';
 import { formatCurrency } from '@/lib/utils';
@@ -76,12 +76,10 @@ export function GroupExpenseFormDialog({
     },
   });
 
-  const { fields, append, remove, replace } = useFieldArray({
+  const { fields, append, replace } = useFieldArray({
     control,
     name: "members",
   });
-
-  const members = watch('members');
 
   useEffect(() => {
     if (open) {
@@ -114,14 +112,14 @@ export function GroupExpenseFormDialog({
   const handleNumberOfPersonsChange = (value: string) => {
     const newCount = parseInt(value, 10);
     const currentCount = fields.length;
-    const currentMembers = watch('members');
-
+    
     if (newCount > currentCount) {
       const toAdd = newCount - currentCount;
       const newMemberEntries = Array.from({ length: toAdd }, () => ({ name: '', expense: 0 }));
       append(newMemberEntries);
     } else if (newCount < currentCount) {
       const toRemoveCount = currentCount - newCount;
+      const currentMembers = watch('members');
       const updatedMembers = currentMembers.slice(0, newCount);
       replace(updatedMembers);
     }
@@ -215,7 +213,7 @@ export function GroupExpenseFormDialog({
               </div>
 
               <div className="space-y-4 pt-2">
-                <Label>Members and Their Share ({selectedCurrency})</Label>
+                <Label>Members and Amount Paid ({selectedCurrency})</Label>
                 {fields.map((field, index) => (
                   <div key={field.id} className="grid grid-cols-2 gap-2 items-start">
                     <div className="space-y-1">
@@ -230,7 +228,7 @@ export function GroupExpenseFormDialog({
                         <Input
                             type="number"
                             step="0.01"
-                            placeholder={`Share for ${watch(`members.${index}.name`) || `Member ${index + 1}`}`}
+                            placeholder={`Amount paid by ${watch(`members.${index}.name`) || `Member ${index + 1}`}`}
                             {...register(`members.${index}.expense` as const, { valueAsNumber: true })}
                             disabled={isSaving}
                         />

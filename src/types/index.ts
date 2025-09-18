@@ -82,6 +82,6 @@ export interface MemberDetails {
 export type GroupExpenseFormData = {
   groupName: string;
   email: string;
-  numberOfPersons: number;
+  totalExpense: number;
   members: MemberDetails[];
 };
