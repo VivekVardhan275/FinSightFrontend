@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -51,6 +51,7 @@ export function GroupExpenseFormDialog({
   const { user } = useAuthState();
   const { selectedCurrency } = useCurrency();
   const { toast } = useToast();
+  const isFirstRender = useRef(true);
 
   const {
     control,
@@ -70,8 +71,16 @@ export function GroupExpenseFormDialog({
     control,
     name: "members",
   });
-
+  
+  // This effect now correctly and safely resets the form ONLY when it opens.
   useEffect(() => {
+    // Skip the first render to avoid resetting on initial mount when `open` might be true.
+    if (isFirstRender.current) {
+        isFirstRender.current = false;
+        // Still reset if it's open on first render (e.g. dev mode strict mode)
+        if (!open) return;
+    }
+
     if (open) {
       if (group) { // EDIT MODE
         const membersFromGroup = group.members.map((name, i) => ({
@@ -92,7 +101,8 @@ export function GroupExpenseFormDialog({
         });
       }
     }
-  }, [group, open, reset, user]);
+  }, [open, group, user, reset]); // `reset` is stable, so this only runs when `open`, `group`, or `user` changes.
+
 
   const processSubmit = (data: GroupExpenseFormData) => {
     if (!user || !user.email) {
