@@ -40,7 +40,7 @@ const groupExpenseSchema = z.object({
     return true;
 }, {
     message: "The sum of individual expenses must equal the total expense.",
-    path: ["members"], 
+    path: ["members"],
 });
 
 
@@ -61,7 +61,7 @@ export function GroupExpenseFormDialog({
 }: GroupExpenseFormDialogProps) {
   const { user } = useAuthState();
   const { selectedCurrency } = useCurrency();
-  
+
   const {
     control,
     register,
@@ -69,6 +69,7 @@ export function GroupExpenseFormDialog({
     reset,
     watch,
     setValue,
+    getValues,
     formState: { errors },
   } = useForm<GroupExpenseFormData>({
     resolver: zodResolver(groupExpenseSchema),
@@ -90,31 +91,30 @@ export function GroupExpenseFormDialog({
   const sumOfIndividualExpenses = useMemo(() => {
     return members.reduce((sum, member) => sum + (member.expense || 0), 0);
   }, [members]);
-  
+
   const expenseMismatch = Math.abs(sumOfIndividualExpenses - totalExpense) > 0.01;
 
-
-  // Effect to handle automatic expense splitting
-  useEffect(() => {
-    if (splitMethod === "equal") {
-      const memberCount = members.length;
-      const amountPerMember = memberCount > 0 ? totalExpense / memberCount : 0;
-      members.forEach((_, index) => {
+  const handleSplitMethodChange = (value: SplitMethod) => {
+    setValue('splitMethod', value);
+    if (value === 'equal') {
+      const currentTotalExpense = getValues('totalExpense');
+      const currentMembers = getValues('members');
+      const memberCount = currentMembers.length;
+      const amountPerMember = memberCount > 0 ? currentTotalExpense / memberCount : 0;
+      currentMembers.forEach((_, index) => {
         setValue(`members.${index}.expense`, parseFloat(amountPerMember.toFixed(2)));
       });
     }
-  }, [totalExpense, members.length, splitMethod, setValue]);
-
+  };
 
   useEffect(() => {
     if (open) {
       if (group) {
         // Editing existing group
-        // For simplicity, we assume "unequal" split when editing, as equal split is a calculated state.
         reset({
           groupName: group.groupName,
           totalExpense: group.totalExpenses,
-          splitMethod: "unequal", 
+          splitMethod: "unequal",
           members: group.members.map((name, index) => ({
             name,
             expense: group.expenses[index] || 0,
@@ -138,7 +138,7 @@ export function GroupExpenseFormDialog({
     if (data.splitMethod === 'equal') {
         const memberCount = data.members.length;
         const amountPerMember = memberCount > 0 ? data.totalExpense / memberCount : 0;
-        data.members.forEach((member) => { // No index needed here
+        data.members.forEach((member) => {
             member.expense = parseFloat(amountPerMember.toFixed(2));
         });
     }
@@ -172,7 +172,7 @@ export function GroupExpenseFormDialog({
           <div className="space-y-2">
             <Label>Split Method</Label>
              <RadioGroup
-                onValueChange={(value) => setValue('splitMethod', value as SplitMethod)}
+                onValueChange={(value) => handleSplitMethodChange(value as SplitMethod)}
                 value={splitMethod}
                 className="flex space-x-4 pt-1"
                 disabled={isSaving}
@@ -189,12 +189,12 @@ export function GroupExpenseFormDialog({
           </div>
 
           <Separator />
-          
+
           <div>
              <Label>Group Members</Label>
              <p className="text-xs text-muted-foreground mb-2">Add members and their respective expenses and balances.</p>
           </div>
-          
+
           <ScrollArea className="h-[200px] pr-4">
             <div className="space-y-3">
               {fields.map((field, index) => (
