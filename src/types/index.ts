@@ -1,4 +1,5 @@
 
+
 export type Transaction = {
   id: string;
   date: string; // ISO string date for simplicity
@@ -64,6 +65,7 @@ export interface AppNotification {
 
 // --- Group Expense Types ---
 
+// The full GroupExpense object, including the ID from the backend
 export interface GroupExpense {
   id: string;
   groupName: string;
@@ -74,14 +76,24 @@ export interface GroupExpense {
   totalExpense: number;
 }
 
+// The data structure that the form will produce and send to the API
+export interface GroupExpenseSubmitData {
+  groupName: string;
+  email: string;
+  members: string[];
+  expenses: number[];
+  balance: number[];
+  totalExpense: number;
+}
+
+// Represents the structure of a single member within the form
 export interface MemberDetails {
     name: string;
     expense: number;
 }
 
+// The shape of the data used by react-hook-form
 export type GroupExpenseFormData = {
   groupName: string;
-  email: string;
-  totalExpense: number;
   members: MemberDetails[];
 };

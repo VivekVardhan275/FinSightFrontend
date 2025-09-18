@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Users, RotateCw } from "lucide-react";
 import { motion } from "framer-motion";
-import type { GroupExpense } from '@/types';
+import type { GroupExpense, GroupExpenseSubmitData } from '@/types';
 import { GroupCard } from '@/components/groups/group-card';
 import { GroupExpenseFormDialog } from '@/components/groups/group-expense-form-dialog';
 import { useNotification } from '@/contexts/notification-context';
@@ -118,18 +118,13 @@ export default function GroupsPage() {
     setGroupToDeleteId(null);
   };
 
-  const handleSaveGroup = (data: Omit<GroupExpense, 'id' | 'balance'>) => {
-    // This is the safe place to calculate the balance
-    const memberCount = data.members.length;
-    const averageExpense = memberCount > 0 ? data.totalExpense / memberCount : 0;
-    const balances = data.expenses.map(expense => expense - averageExpense);
-    
+  // The onSave function now receives the fully calculated data structure from the form
+  const handleSaveGroup = (data: GroupExpenseSubmitData) => {
     if (editingGroup) {
         // MOCK: Update existing group
         const updatedGroup: GroupExpense = { 
             ...data, 
             id: editingGroup.id,
-            balance: balances 
         };
         setGroups(prev => prev.map(g => g.id === editingGroup.id ? updatedGroup : g));
         addNotification({
@@ -142,7 +137,6 @@ export default function GroupsPage() {
         const newGroup: GroupExpense = { 
             ...data, 
             id: uuidv4(),
-            balance: balances
         };
         setGroups(prev => [...prev, newGroup]);
         addNotification({

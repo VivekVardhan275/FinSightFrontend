@@ -1,8 +1,8 @@
 
 "use client";
 
-import React, { useEffect, useCallback } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import React, { useEffect } from 'react';
+import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from "@/components/ui/button";
@@ -16,34 +16,32 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RotateCw, Users, Trash2 } from "lucide-react";
+import { RotateCw, Users, Trash2, PlusCircle } from "lucide-react";
 import { useAuthState } from '@/hooks/use-auth-state';
 import { useCurrency } from '@/contexts/currency-context';
-import { formatCurrency } from '@/lib/utils';
-import type { GroupExpense, GroupExpenseFormData } from '@/types';
+import type { GroupExpense, GroupExpenseSubmitData, MemberDetails } from '@/types';
 import { ScrollArea } from '../ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
+import { Separator } from '../ui/separator';
+
+// Zod schema for the form's data structure
+const groupExpenseFormSchema = z.object({
+  groupName: z.string().min(1, "Group name is required."),
+  members: z.array(z.object({
+    name: z.string().min(1, "Member name is required."),
+    expense: z.number().min(0, "Expense must be a positive number."),
+  })).min(1, "At least one member is required."),
+});
+
+type GroupExpenseFormData = z.infer<typeof groupExpenseFormSchema>;
 
 interface GroupExpenseFormDialogProps {
   group?: GroupExpense | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (data: Omit<GroupExpense, 'id' | 'balance'>) => void;
+  onSave: (data: GroupExpenseSubmitData) => void;
   isSaving?: boolean;
 }
-
-const getGroupExpenseSchema = () => z.object({
-  groupName: z.string().min(1, "Group name is required."),
-  email: z.string().email(),
-  totalExpense: z.number().min(0, "Total expense must be a positive number."),
-  members: z.array(z.object({
-    name: z.string().min(1, "Member name is required."),
-    expense: z.number().min(0, "Expense cannot be negative."),
-  })).min(1, "At least one member is required."),
-});
-
-const MAX_MEMBERS = 10;
 
 export function GroupExpenseFormDialog({
   group,
@@ -55,49 +53,41 @@ export function GroupExpenseFormDialog({
   const { user } = useAuthState();
   const { selectedCurrency } = useCurrency();
   const { toast } = useToast();
-  const groupExpenseSchema = getGroupExpenseSchema();
 
   const {
     control,
     register,
     handleSubmit,
     reset,
-    watch,
-    setError,
     formState: { errors },
   } = useForm<GroupExpenseFormData>({
-    resolver: zodResolver(groupExpenseSchema),
+    resolver: zodResolver(groupExpenseFormSchema),
     defaultValues: {
       groupName: '',
-      email: user?.email || '',
-      totalExpense: 0,
       members: [],
     },
   });
 
-  const { fields, append, remove, replace } = useFieldArray({
+  const { fields, append, remove } = useFieldArray({
     control,
     name: "members",
   });
 
+  // Effect to initialize the form when it opens
   useEffect(() => {
     if (open) {
       if (group) { // EDIT MODE
-        const existingMembers = group.members.map((name, i) => ({
+        const membersFromGroup = group.members.map((name, i) => ({
           name,
           expense: group.expenses[i]
         }));
         reset({
           groupName: group.groupName,
-          email: group.email,
-          totalExpense: group.totalExpense,
-          members: existingMembers,
+          members: membersFromGroup,
         });
       } else { // CREATE MODE
         reset({
           groupName: '',
-          email: user?.email || '',
-          totalExpense: 0,
           members: [
             { name: user?.name || 'Me', expense: 0 },
             { name: '', expense: 0 }
@@ -107,42 +97,27 @@ export function GroupExpenseFormDialog({
     }
   }, [group, open, reset, user]);
 
-  const handleNumberOfPersonsChange = useCallback((value: string) => {
-    const newCount = parseInt(value, 10);
-    const currentCount = fields.length;
-    if (newCount > currentCount) {
-      const toAdd = newCount - currentCount;
-      append(Array.from({ length: toAdd }, () => ({ name: '', expense: 0 })));
-    } else if (newCount < currentCount) {
-      const toRemove = currentCount - newCount;
-      const indicesToRemove = Array.from({ length: toRemove }, (_, i) => currentCount - 1 - i);
-      remove(indicesToRemove);
-    }
-  }, [fields.length, append, remove]);
-  
+  // Handles form submission, calculates derived values, and calls the onSave prop
   const processSubmit = (data: GroupExpenseFormData) => {
-    const memberExpensesSum = data.members.reduce((sum, m) => sum + m.expense, 0);
-
-    if (Math.abs(memberExpensesSum - data.totalExpense) > 0.01) {
-      setError("totalExpense", {
-        type: "manual",
-        message: `Member expenses sum (${formatCurrency(memberExpensesSum, selectedCurrency)}) must equal Total Expense.`,
-      });
-      toast({
-        title: "Validation Error",
-        description: `Member expenses sum (${formatCurrency(memberExpensesSum, selectedCurrency)}) does not match the Total Expense (${formatCurrency(data.totalExpense, selectedCurrency)}). Please correct the amounts.`,
-        variant: "destructive",
-      });
+    if (!user || !user.email) {
+      toast({ title: "Error", description: "User not authenticated.", variant: "destructive" });
       return;
     }
 
-    const payload: Omit<GroupExpense, 'id' | 'balance'> = {
+    const totalExpense = data.members.reduce((sum, m) => sum + m.expense, 0);
+    const memberCount = data.members.length;
+    const averageExpense = memberCount > 0 ? totalExpense / memberCount : 0;
+    
+    // Create the final data structure required by the parent/API
+    const payload: GroupExpenseSubmitData = {
       groupName: data.groupName,
-      email: data.email,
+      email: user.email,
       members: data.members.map(m => m.name),
       expenses: data.members.map(m => m.expense),
-      totalExpense: data.totalExpense,
+      totalExpense: totalExpense,
+      balance: data.members.map(m => m.expense - averageExpense),
     };
+    
     onSave(payload);
   };
 
@@ -152,96 +127,84 @@ export function GroupExpenseFormDialog({
         <DialogHeader>
           <DialogTitle className="font-headline flex items-center gap-2">
             <Users />
-            {group ? "Edit Group Expense" : "Create New Group Expense"}
+            {group ? "Edit Group Expense" : "Create New Group"}
           </DialogTitle>
           <DialogDescription>
-            Enter the details for your shared group expense.
+            Enter a name for your group and add the members who are sharing the expenses.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(processSubmit)}>
-          <ScrollArea className="h-[60vh] pr-6">
-            <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="groupName">Group Name</Label>
-                <Input id="groupName" {...register("groupName")} disabled={isSaving} />
-                {errors.groupName && <p className="text-sm text-destructive">{errors.groupName.message}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="email">Your Email</Label>
-                <Input id="email" {...register("email")} readOnly className="cursor-not-allowed bg-muted/50" />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="totalExpense">Total Expense ({selectedCurrency})</Label>
-                <Input
-                    id="totalExpense"
-                    type="number"
-                    step="0.01"
-                    {...register("totalExpense", { valueAsNumber: true })}
-                    disabled={isSaving}
-                />
-                {errors.totalExpense && <p className="text-sm text-destructive">{errors.totalExpense.message}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="numberOfPersons">Number of Persons</Label>
-                <Select
-                    value={String(fields.length)}
-                    onValueChange={handleNumberOfPersonsChange}
-                    disabled={isSaving}
-                >
-                    <SelectTrigger>
-                    <SelectValue placeholder="Select number of members" />
-                    </SelectTrigger>
-                    <SelectContent>
-                    {Array.from({ length: MAX_MEMBERS }, (_, i) => i + 1).map(num => (
-                        <SelectItem key={num} value={String(num)}>{num}</SelectItem>
-                    ))}
-                    </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-4 pt-2">
-                <Label>Members and Amount Paid ({selectedCurrency})</Label>
-                {fields.map((field, index) => (
-                  <div key={field.id} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-start">
-                    <div className="space-y-1">
-                       <Input
-                        placeholder={`Member ${index + 1} Name`}
-                        {...register(`members.${index}.name` as const)}
-                        disabled={isSaving}
-                      />
-                      {errors.members?.[index]?.name && <p className="text-sm text-destructive">{errors.members[index]?.name?.message}</p>}
-                    </div>
-                     <div className="space-y-1">
-                        <Input
-                            type="number"
-                            step="0.01"
-                            placeholder={`Amount paid`}
-                            {...register(`members.${index}.expense` as const, { valueAsNumber: true })}
-                            disabled={isSaving}
-                        />
-                        {errors.members?.[index]?.expense && <p className="text-sm text-destructive">{errors.members[index]?.expense?.message}</p>}
-                    </div>
-                    <Button 
-                        type="button" 
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={() => remove(index)} 
-                        disabled={isSaving || fields.length <= 1}
-                        className="mt-1 text-destructive hover:bg-destructive/10"
-                        aria-label="Remove member"
-                    >
-                        <Trash2 className="h-4 w-4"/>
-                    </Button>
-                  </div>
-                ))}
-                 {errors.members && typeof errors.members.message === 'string' && <p className="text-sm text-destructive">{errors.members.message}</p>}
-              </div>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="groupName">Group Name</Label>
+              <Input id="groupName" {...register("groupName")} disabled={isSaving} placeholder="e.g., Trip to Goa" />
+              {errors.groupName && <p className="text-sm text-destructive">{errors.groupName.message}</p>}
             </div>
-          </ScrollArea>
-          <DialogFooter className="pt-6">
+
+            <div className="space-y-2">
+              <Label>Your Email (from session)</Label>
+              <Input value={user?.email || 'No email found'} readOnly className="cursor-not-allowed bg-muted/50" />
+            </div>
+            
+            <Separator className="my-2" />
+
+            <div className="space-y-4">
+              <Label className="font-medium">Members and Amounts Paid ({selectedCurrency})</Label>
+              <ScrollArea className="h-[25vh] pr-4">
+                <div className="space-y-3">
+                  {fields.map((field, index) => (
+                    <div key={field.id} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-start p-2 border rounded-md">
+                      <div className="space-y-1">
+                        <Label htmlFor={`members.${index}.name`} className="text-xs text-muted-foreground">Member Name</Label>
+                        <Input
+                          id={`members.${index}.name`}
+                          placeholder={`Member ${index + 1}`}
+                          {...register(`members.${index}.name` as const)}
+                          disabled={isSaving}
+                        />
+                        {errors.members?.[index]?.name && <p className="text-xs text-destructive">{errors.members[index]?.name?.message}</p>}
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor={`members.${index}.expense`} className="text-xs text-muted-foreground">Amount Paid</Label>
+                        <Input
+                          id={`members.${index}.expense`}
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          {...register(`members.${index}.expense` as const, { valueAsNumber: true })}
+                          disabled={isSaving}
+                        />
+                        {errors.members?.[index]?.expense && <p className="text-xs text-destructive">{errors.members[index]?.expense?.message}</p>}
+                      </div>
+                      <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => remove(index)} 
+                          disabled={isSaving || fields.length <= 1}
+                          className="mt-5 text-destructive hover:bg-destructive/10"
+                          aria-label="Remove member"
+                      >
+                          <Trash2 className="h-4 w-4"/>
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => append({ name: '', expense: 0 })}
+                disabled={isSaving}
+                className="w-full"
+              >
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Add Another Member
+              </Button>
+              {errors.members && typeof errors.members.message === 'string' && <p className="text-sm text-destructive">{errors.members.message}</p>}
+            </div>
+          </div>
+          <DialogFooter className="pt-6 border-t">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>Cancel</Button>
             <Button type="submit" disabled={isSaving}>
               {isSaving && <RotateCw className="mr-2 h-4 w-4 animate-spin" />}
