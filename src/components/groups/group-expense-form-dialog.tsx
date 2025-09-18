@@ -70,14 +70,14 @@ export function GroupExpenseFormDialog({
   const [groupName, setGroupName] = useState('');
   const [members, setMembers] = useState<MemberFormState[]>([]);
 
+  // This effect runs ONLY when the dialog's `open` prop changes from false to true.
+  // It safely initializes the form state for either creating or editing.
   useEffect(() => {
-    // This effect runs ONLY when the dialog's `open` prop changes from false to true.
-    // It safely initializes the form state for either creating or editing.
     if (open) {
       if (group) { // Edit mode: Populate form with existing group data.
         setGroupName(group.groupName);
         setMembers(group.members.map((name, index) => ({
-          id: `${group.id}-${index}`, // Create a stable key
+          id: `existing-${index}-${group.id}`, // Create a stable key
           name,
           expense: String(group.expenses?.[index] ?? '') // Safely access and convert to string
         })));
@@ -132,22 +132,15 @@ export function GroupExpenseFormDialog({
         return;
     }
 
-    // --- Payload Creation (Safe Calculations) ---
+    // --- Payload Creation ---
     const expenses = members.map(m => parseFloat(m.expense) || 0);
     const finalTotalExpense = expenses.reduce((sum, expense) => sum + expense, 0);
-    const averageExpense = members.length > 0 ? finalTotalExpense / members.length : 0;
-    
-    const balances = expenses.map(expense => {
-      const val = isNaN(expense) ? 0 : expense;
-      return parseFloat((val - averageExpense).toFixed(2));
-    });
 
     const payload: GroupExpenseSubmitData = {
       groupName: groupName.trim(),
       email: user.email,
       members: members.map(m => m.name.trim()),
       expenses,
-      balance: balances,
       totalExpense: finalTotalExpense,
     };
     
@@ -163,7 +156,7 @@ export function GroupExpenseFormDialog({
             {group ? "Edit Group Expense" : "Create New Group"}
           </DialogTitle>
           <DialogDescription>
-            Enter a name for your group and add members with the amounts they paid.
+            Enter a name for your group and add the amount each member paid.
           </DialogDescription>
         </DialogHeader>
         

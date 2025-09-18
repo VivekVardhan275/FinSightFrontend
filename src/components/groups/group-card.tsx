@@ -12,7 +12,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 // Icons
-import { Edit2, Trash2, Users, AlertTriangle } from 'lucide-react';
+import { Edit2, Trash2, Users } from 'lucide-react';
 
 // Contexts & Utilities
 import { useCurrency } from '@/contexts/currency-context';
@@ -36,15 +36,9 @@ interface GroupCardProps {
 
 /**
  * A card component that displays a summary of a group's shared expenses.
- * It provides details on total expenses, member breakdown, and actions to edit or delete the group.
  */
 export function GroupCard({ group, onEdit, onDelete, variants, custom }: GroupCardProps) {
   const { selectedCurrency, convertAmount } = useCurrency();
-
-  // Validate that the lengths of member-related arrays are consistent.
-  const isDataConsistent =
-    group.members.length === group.expenses.length &&
-    group.members.length === group.balance.length;
 
   return (
     <motion.div
@@ -71,35 +65,26 @@ export function GroupCard({ group, onEdit, onDelete, variants, custom }: GroupCa
         </CardHeader>
 
         <CardContent className="space-y-3 flex-grow">
-          <h4 className="text-sm font-medium text-muted-foreground">Member Breakdown</h4>
+          <h4 className="text-sm font-medium text-muted-foreground">Member Expenses</h4>
           <div className="space-y-2">
-            <div className="grid grid-cols-3 gap-2 text-xs font-semibold text-muted-foreground">
-              <div className="col-span-1">Member</div>
-              <div className="col-span-1 text-right">Paid</div>
-              <div className="col-span-1 text-right">Balance</div>
+            <div className="grid grid-cols-2 gap-2 text-xs font-semibold text-muted-foreground">
+              <div>Member</div>
+              <div className="text-right">Amount Paid</div>
             </div>
             <Separator />
             <ScrollArea className="h-28 pr-4">
-              {!isDataConsistent ? (
-                <div className="flex items-center justify-center h-24 text-sm text-destructive gap-2">
-                  <AlertTriangle className="h-4 w-4" />
-                  <p>Inconsistent group data.</p>
-                </div>
-              ) : group.members.length > 0 ? (
+              {group.members.length > 0 ? (
                 group.members.map((member, index) => (
-                  <div key={`${group.id}-member-${index}`} className="grid grid-cols-3 gap-2 items-center text-sm py-1.5">
-                    <span className="truncate col-span-1" title={member}>{member}</span>
-                    <span className="text-right col-span-1 text-muted-foreground">
-                      {formatCurrency(convertAmount(group.expenses[index], selectedCurrency), selectedCurrency)}
-                    </span>
-                    <span className={`text-right col-span-1 font-medium ${group.balance[index] >= 0 ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'}`}>
-                      {formatCurrency(convertAmount(group.balance[index], selectedCurrency), selectedCurrency)}
+                  <div key={`${group.id}-member-${index}`} className="grid grid-cols-2 gap-2 items-center text-sm py-1.5">
+                    <span className="truncate" title={member}>{member}</span>
+                    <span className="text-right text-muted-foreground">
+                      {formatCurrency(convertAmount(group.expenses?.[index] ?? 0, selectedCurrency), selectedCurrency)}
                     </span>
                   </div>
                 ))
               ) : (
                 <div className="flex items-center justify-center h-24 text-sm text-muted-foreground">
-                  <p>No members in this group yet.</p>
+                  <p>No members in this group.</p>
                 </div>
               )}
             </ScrollArea>
@@ -120,7 +105,7 @@ export function GroupCard({ group, onEdit, onDelete, variants, custom }: GroupCa
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => onDelete(group.id)} aria-label="Delete group" className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                <Button variant="ghost" size="icon" onClick={() => onDelete(group.id ?? '')} aria-label="Delete group" className="text-destructive hover:text-destructive hover:bg-destructive/10">
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>

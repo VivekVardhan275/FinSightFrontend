@@ -72,7 +72,6 @@ export interface GroupExpense {
   email: string;
   members: string[];
   expenses: number[];
-  balance: number[];
   totalExpense: number;
 }
 
@@ -82,8 +81,5 @@ export interface GroupExpenseSubmitData {
   email: string;
   members: string[];
   expenses: number[];
-  balance: number[];
   totalExpense: number;
 }
-
-    

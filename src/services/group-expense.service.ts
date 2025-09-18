@@ -1,25 +1,22 @@
-
 import type { GroupExpense, GroupExpenseSubmitData } from '@/types';
 
 // --- Mock Data Store ---
 // This acts as our in-memory "database" for the mock service.
 let MOCK_GROUPS: GroupExpense[] = [
     {
-        id: "3456wfghj3dh",
+        id: "mock_1",
         groupName: "Trip to Goa",
         email: "review-user@example.com",
         members: ["Alice", "Bob", "Charlie"],
         expenses: [2000.0, 1000.0, 0.0],
-        balance: [1000.0, 0.0, -1000.0],
         totalExpense: 3000.0
     },
     {
-        id: "9876xyzab5ef",
+        id: "mock_2",
         groupName: "Office Lunch",
         email: "review-user@example.com",
         members: ["David", "Eve"],
         expenses: [500.0, 500.0],
-        balance: [0.0, 0.0],
         totalExpense: 1000.0
     }
 ];
@@ -49,7 +46,7 @@ export const createGroupExpense = async (data: GroupExpenseSubmitData): Promise<
     
     const newGroup: GroupExpense = {
         ...data,
-        id: `mock_id_${Date.now()}`, // Generate a unique mock ID
+        id: `mock_${Date.now()}`, // Generate a unique mock ID
     };
     
     MOCK_GROUPS.push(newGroup);
