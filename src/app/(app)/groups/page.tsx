@@ -20,8 +20,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useAuthState } from '@/hooks/use-auth-state';
 
-// MOCK DATA for initial UI display. This will be replaced by context/API calls.
+// MOCK DATA for initial UI display.
 const MOCK_GROUPS: GroupExpense[] = [
     {
         id: 'group-1',
@@ -79,8 +80,9 @@ const emptyStateMotionVariants = {
 };
 
 export default function GroupsPage() {
+  const { user } = useAuthState();
   const [groups, setGroups] = useState<GroupExpense[]>(MOCK_GROUPS);
-  const [isLoading, setIsLoading] = useState(false); // Will be driven by context later
+  const [isLoading, setIsLoading] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<GroupExpense | null>(null);
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
@@ -108,30 +110,43 @@ export default function GroupsPage() {
     // MOCK: Filter out the group to delete
     setGroups(prev => prev.filter(g => g.id !== groupToDeleteId));
     addNotification({
-        title: "Group Deleted (Mock)",
-        description: `Group has been removed from the list.`,
+        title: "Group Deleted",
+        description: `The group has been successfully removed.`,
         type: 'info'
     });
     setIsConfirmDeleteDialogOpen(false);
     setGroupToDeleteId(null);
   };
 
-  const handleSaveGroup = (data: Omit<GroupExpense, 'id'>) => {
+  const handleSaveGroup = (data: Omit<GroupExpense, 'id' | 'balance'>) => {
+    // This is the safe place to calculate the balance
+    const memberCount = data.members.length;
+    const averageExpense = memberCount > 0 ? data.totalExpense / memberCount : 0;
+    const balances = data.expenses.map(expense => expense - averageExpense);
+    
     if (editingGroup) {
         // MOCK: Update existing group
-        const updatedGroup = { ...data, id: editingGroup.id };
+        const updatedGroup: GroupExpense = { 
+            ...data, 
+            id: editingGroup.id,
+            balance: balances 
+        };
         setGroups(prev => prev.map(g => g.id === editingGroup.id ? updatedGroup : g));
         addNotification({
-            title: "Group Updated (Mock)",
+            title: "Group Updated",
             description: `Data for "${data.groupName}" has been updated.`,
             type: 'success'
         });
     } else {
         // MOCK: Add new group with a unique ID
-        const newGroup = { ...data, id: uuidv4() };
+        const newGroup: GroupExpense = { 
+            ...data, 
+            id: uuidv4(),
+            balance: balances
+        };
         setGroups(prev => [...prev, newGroup]);
         addNotification({
-            title: "Group Created (Mock)",
+            title: "Group Created",
             description: `A new group "${data.groupName}" has been created.`,
             type: 'success'
         });
@@ -203,12 +218,15 @@ export default function GroupsPage() {
         </motion.div>
       )}
 
-      <GroupExpenseFormDialog
-        open={isFormOpen}
-        onOpenChange={setIsFormOpen}
-        group={editingGroup}
-        onSave={handleSaveGroup}
-      />
+      {isFormOpen && (
+        <GroupExpenseFormDialog
+            open={isFormOpen}
+            onOpenChange={setIsFormOpen}
+            group={editingGroup}
+            onSave={handleSaveGroup}
+        />
+      )}
+
 
       <AlertDialog open={isConfirmDeleteDialogOpen} onOpenChange={setIsConfirmDeleteDialogOpen}>
         <AlertDialogContent>

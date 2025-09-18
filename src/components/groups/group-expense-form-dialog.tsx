@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -17,7 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RotateCw, Users } from "lucide-react";
+import { RotateCw, Users, Trash2 } from "lucide-react";
 import { useAuthState } from '@/hooks/use-auth-state';
 import { useCurrency } from '@/contexts/currency-context';
 import { formatCurrency } from '@/lib/utils';
@@ -29,7 +29,7 @@ interface GroupExpenseFormDialogProps {
   group?: GroupExpense | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (data: Omit<GroupExpense, 'id'>) => void;
+  onSave: (data: Omit<GroupExpense, 'id' | 'balance'>) => void;
   isSaving?: boolean;
 }
 
@@ -64,7 +64,6 @@ export function GroupExpenseFormDialog({
     reset,
     watch,
     setError,
-    clearErrors,
     formState: { errors },
   } = useForm<GroupExpenseFormData>({
     resolver: zodResolver(groupExpenseSchema),
@@ -76,14 +75,13 @@ export function GroupExpenseFormDialog({
     },
   });
 
-  const { fields, append, replace } = useFieldArray({
+  const { fields, append, remove, replace } = useFieldArray({
     control,
     name: "members",
   });
 
   useEffect(() => {
     if (open) {
-      clearErrors();
       if (group) { // EDIT MODE
         const existingMembers = group.members.map((name, i) => ({
           name,
@@ -100,30 +98,27 @@ export function GroupExpenseFormDialog({
           groupName: '',
           email: user?.email || '',
           totalExpense: 0,
-          members: Array.from({ length: 2 }, (_, i) => ({
-            name: i === 0 ? (user?.name || 'Me') : '',
-            expense: 0
-          })),
+          members: [
+            { name: user?.name || 'Me', expense: 0 },
+            { name: '', expense: 0 }
+          ],
         });
       }
     }
-  }, [group, open, reset, user, clearErrors]);
+  }, [group, open, reset, user]);
 
-  const handleNumberOfPersonsChange = (value: string) => {
+  const handleNumberOfPersonsChange = useCallback((value: string) => {
     const newCount = parseInt(value, 10);
     const currentCount = fields.length;
-    
     if (newCount > currentCount) {
       const toAdd = newCount - currentCount;
-      const newMemberEntries = Array.from({ length: toAdd }, () => ({ name: '', expense: 0 }));
-      append(newMemberEntries);
+      append(Array.from({ length: toAdd }, () => ({ name: '', expense: 0 })));
     } else if (newCount < currentCount) {
-      const toRemoveCount = currentCount - newCount;
-      const currentMembers = watch('members');
-      const updatedMembers = currentMembers.slice(0, newCount);
-      replace(updatedMembers);
+      const toRemove = currentCount - newCount;
+      const indicesToRemove = Array.from({ length: toRemove }, (_, i) => currentCount - 1 - i);
+      remove(indicesToRemove);
     }
-  };
+  }, [fields.length, append, remove]);
   
   const processSubmit = (data: GroupExpenseFormData) => {
     const memberExpensesSum = data.members.reduce((sum, m) => sum + m.expense, 0);
@@ -141,17 +136,12 @@ export function GroupExpenseFormDialog({
       return;
     }
 
-    const totalExpenseValue = data.totalExpense;
-    const averageExpense = data.members.length > 0 ? totalExpenseValue / data.members.length : 0;
-    const balances = data.members.map(m => m.expense - averageExpense);
-    
-    const payload: Omit<GroupExpense, 'id'> = {
+    const payload: Omit<GroupExpense, 'id' | 'balance'> = {
       groupName: data.groupName,
       email: data.email,
       members: data.members.map(m => m.name),
       expenses: data.members.map(m => m.expense),
-      balance: balances,
-      totalExpense: totalExpenseValue,
+      totalExpense: data.totalExpense,
     };
     onSave(payload);
   };
@@ -215,7 +205,7 @@ export function GroupExpenseFormDialog({
               <div className="space-y-4 pt-2">
                 <Label>Members and Amount Paid ({selectedCurrency})</Label>
                 {fields.map((field, index) => (
-                  <div key={field.id} className="grid grid-cols-2 gap-2 items-start">
+                  <div key={field.id} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-start">
                     <div className="space-y-1">
                        <Input
                         placeholder={`Member ${index + 1} Name`}
@@ -228,12 +218,23 @@ export function GroupExpenseFormDialog({
                         <Input
                             type="number"
                             step="0.01"
-                            placeholder={`Amount paid by ${watch(`members.${index}.name`) || `Member ${index + 1}`}`}
+                            placeholder={`Amount paid`}
                             {...register(`members.${index}.expense` as const, { valueAsNumber: true })}
                             disabled={isSaving}
                         />
                         {errors.members?.[index]?.expense && <p className="text-sm text-destructive">{errors.members[index]?.expense?.message}</p>}
                     </div>
+                    <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => remove(index)} 
+                        disabled={isSaving || fields.length <= 1}
+                        className="mt-1 text-destructive hover:bg-destructive/10"
+                        aria-label="Remove member"
+                    >
+                        <Trash2 className="h-4 w-4"/>
+                    </Button>
                   </div>
                 ))}
                  {errors.members && typeof errors.members.message === 'string' && <p className="text-sm text-destructive">{errors.members.message}</p>}
