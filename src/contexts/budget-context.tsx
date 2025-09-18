@@ -121,7 +121,9 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 
 
   useEffect(() => {
-    if (contextIsLoading || isLoadingTransactions) {
+    // FIX: Only run this calculation if data is loaded and budgets exist.
+    // This prevents running setBudgets during a render cycle triggered by an API error state update.
+    if (contextIsLoading || isLoadingTransactions || budgets.length === 0) {
       return;
     }
 
