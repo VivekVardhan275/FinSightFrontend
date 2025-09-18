@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Trash2, PlusCircle, RotateCw } from "lucide-react";
-import { useForm, useFieldArray, useWatch } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Group, GroupExpenseFormData } from '@/types';
@@ -28,10 +28,8 @@ const groupExpenseSchema = z.object({
   totalExpense: z.number().min(0, "Total expense must be non-negative."),
   members: z.array(memberSchema).min(1, "At least one group member is required."),
 }).refine(data => {
-    // This validation runs on submit
-    if (data.members.length === 0) return true; // Let min(1) handle this
-    const sumOfMemberExpenses = data.members.reduce((sum, member) => sum + member.expense, 0);
-    // Use a small tolerance for floating point comparisons
+    if (data.members.length === 0) return true;
+    const sumOfMemberExpenses = data.members.reduce((sum, member) => sum + (member.expense || 0), 0);
     return Math.abs(sumOfMemberExpenses - data.totalExpense) < 0.01;
 }, {
     message: "The sum of individual expenses must equal the total expense.",
@@ -75,15 +73,6 @@ export function GroupExpenseFormDialog({
     control,
     name: "members",
   });
-
-  const watchedMembers = useWatch({ control, name: "members" });
-  const watchedTotalExpense = useWatch({ control, name: "totalExpense" });
-  const sumOfIndividualExpenses = React.useMemo(() => {
-    return watchedMembers.reduce((sum, member) => sum + (member.expense || 0), 0);
-  }, [watchedMembers]);
-  
-  const isSumMismatch = Math.abs(sumOfIndividualExpenses - watchedTotalExpense) > 0.01;
-
 
   useEffect(() => {
     if (open) {
@@ -180,7 +169,6 @@ export function GroupExpenseFormDialog({
               ))}
             </div>
           </ScrollArea>
-           {isSumMismatch && <p className="text-sm text-destructive mt-2">The sum of individual expenses ({sumOfIndividualExpenses.toFixed(2)}) does not match the total expense ({watchedTotalExpense.toFixed(2)}).</p>}
            {errors.members?.root && <p className="text-sm text-destructive mt-2">{errors.members.root.message}</p>}
            {errors.members && !errors.members.root && typeof errors.members.message === 'string' && <p className="text-sm text-destructive mt-2">{errors.members.message}</p>}
           
