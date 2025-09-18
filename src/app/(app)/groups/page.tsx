@@ -1,3 +1,4 @@
+
 // src/app/(app)/groups/page.tsx
 "use client";
 
@@ -20,7 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useNotification } from '@/contexts/notification-context';
-import { useGroupContext } from '@/contexts/group-context';
+import { GroupProvider, useGroupContext } from '@/contexts/group-context';
 import axios from 'axios';
 
 const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://localhost:8080";
@@ -53,8 +54,7 @@ const emptyStateMotionVariants = {
   animate: { opacity: 1, y: 0, transition: { duration: 0.5, delay: 0.2 } },
 };
 
-
-export default function GroupsPage() {
+function GroupsPageContent() {
   const { user } = useAuthState();
   const { addNotification } = useNotification();
   const { groups, isLoading: isLoadingGroups, addGroup, updateGroup, deleteGroup: deleteGroupFromContext } = useGroupContext();
@@ -289,4 +289,13 @@ export default function GroupsPage() {
       </AlertDialog>
     </div>
   );
+}
+
+
+export default function GroupsPage() {
+  return (
+    <GroupProvider>
+      <GroupsPageContent />
+    </GroupProvider>
+  )
 }

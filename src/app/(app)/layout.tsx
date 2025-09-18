@@ -27,7 +27,6 @@ import { BudgetProvider, useBudgetContext } from "@/contexts/budget-context";
 import { formatCurrency } from "@/lib/utils";
 import { UserSettingsLoader } from "@/components/layout/user-settings-loader";
 import type { AppNotification, Budget } from "@/types"; // Assuming Transaction might be needed if passed to calculate
-import { GroupProvider } from "@/contexts/group-context";
 
 function BudgetNotificationEffect() {
   const { budgets, getBudgetsByMonth } = useBudgetContext();
@@ -184,7 +183,6 @@ export default function AuthenticatedAppLayout({
   return (
     <TransactionProvider>
       <BudgetProvider>
-        <GroupProvider>
           <UserSettingsLoader />
           <BudgetNotificationEffect />
           <SidebarProvider defaultOpen>
@@ -228,7 +226,6 @@ export default function AuthenticatedAppLayout({
               </AnimatePresence>
             </SidebarInset>
           </SidebarProvider>
-        </GroupProvider>
       </BudgetProvider>
     </TransactionProvider>
   );
