@@ -47,9 +47,9 @@ interface GroupExpenseFormDialogProps {
 }
 
 interface MemberFormState {
-  id: number; // Use a unique ID for stable keys
+  id: string; // Use a unique ID for stable keys
   name: string;
-  expense: number | string;
+  expense: string; // Always store as string to avoid controlled/uncontrolled input warnings
 }
 
 /**
@@ -71,31 +71,32 @@ export function GroupExpenseFormDialog({
   const [groupName, setGroupName] = useState('');
   const [members, setMembers] = useState<MemberFormState[]>([]);
 
-  // FIX: This effect now ONLY runs when the dialog opens, preventing re-render loops.
+  // This effect correctly runs ONLY when the dialog opens, preventing re-render loops.
   useEffect(() => {
     if (open) {
       if (group) { // Edit mode: Populate form with existing group data.
         setGroupName(group.groupName);
+        // FIX: Safely map members and expenses, preventing crashes from mismatched array lengths.
         setMembers(group.members.map((name, index) => ({
-          id: index, // Simple ID for existing data
+          id: `${group.id}-${index}-${name}`, // Create a reasonably stable key
           name,
-          expense: group.expenses[index]
+          expense: String(group.expenses?.[index] ?? '') // Safely access and convert to string
         })));
       } else { // Create mode: Reset to a default state.
         setGroupName('');
         setMembers([
-          { id: Date.now(), name: user?.name || 'Me', expense: '' },
-          { id: Date.now() + 1, name: '', expense: '' },
+          { id: `new-${Date.now()}`, name: user?.name || 'Me', expense: '' },
+          { id: `new-${Date.now() + 1}`, name: '', expense: '' },
         ]);
       }
     }
-  }, [open, group, user]); // Dependency array is now correct and safe
+  }, [open, group, user]);
 
   const totalExpense = useMemo(() => {
-    return members.reduce((sum, member) => sum + (parseFloat(String(member.expense)) || 0), 0);
+    return members.reduce((sum, member) => sum + (parseFloat(member.expense) || 0), 0);
   }, [members]);
 
-  const handleMemberChange = (id: number, field: 'name' | 'expense', value: string) => {
+  const handleMemberChange = (id: string, field: 'name' | 'expense', value: string) => {
     setMembers(currentMembers =>
       currentMembers.map(member =>
         member.id === id ? { ...member, [field]: value } : member
@@ -104,10 +105,10 @@ export function GroupExpenseFormDialog({
   };
 
   const addMember = () => {
-    setMembers([...members, { id: Date.now(), name: '', expense: '' }]);
+    setMembers([...members, { id: `new-${Date.now()}`, name: '', expense: '' }]);
   };
 
-  const removeMember = (id: number) => {
+  const removeMember = (id: string) => {
     if (members.length > 1) {
       setMembers(members.filter(member => member.id !== id));
     }
@@ -128,12 +129,24 @@ export function GroupExpenseFormDialog({
         addNotification({ title: "Validation Error", description: "All member names must be filled out.", type: 'error' });
         return;
     }
+    const hasInvalidExpense = members.some(m => m.expense === '' || isNaN(Number(m.expense)));
+    if (hasInvalidExpense) {
+        addNotification({ title: "Validation Error", description: "All expense fields must contain a valid number.", type: 'error' });
+        return;
+    }
+
 
     // --- Payload Creation ---
-    const expenses = members.map(m => parseFloat(String(m.expense)) || 0);
+    const expenses = members.map(m => parseFloat(m.expense) || 0);
     const finalTotalExpense = expenses.reduce((sum, expense) => sum + expense, 0);
     const averageExpense = members.length > 0 ? finalTotalExpense / members.length : 0;
-    const balances = expenses.map(expense => expense - averageExpense);
+    
+    // FIX: Safely calculate balances, handling potential NaNs and rounding for precision.
+    const balances = expenses.map(expense => {
+      const val = isNaN(expense) ? 0 : expense;
+      return parseFloat((val - averageExpense).toFixed(2));
+    });
+
 
     const payload: GroupExpenseSubmitData = {
       groupName: groupName.trim(),
@@ -148,7 +161,8 @@ export function GroupExpenseFormDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={!isSubmitting ? onOpenChange : undefined}>
+    // FIX: Ensure onOpenChange is always a function to prevent dialog errors.
+    <Dialog open={open} onOpenChange={(o) => !isSubmitting && onOpenChange(o)}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="font-headline flex items-center gap-2">
@@ -181,7 +195,7 @@ export function GroupExpenseFormDialog({
                 <AnimatePresence>
                   {members.map((member) => (
                     <motion.div
-                      key={member.id} // FIX: Use stable ID for key
+                      key={member.id} // FIX: Use stable unique ID for key
                       className="grid grid-cols-[1fr_auto_auto] gap-2 items-center"
                       layout
                       initial={{ opacity: 0, y: -10 }}
