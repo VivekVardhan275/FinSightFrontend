@@ -99,7 +99,7 @@ export function GroupExpenseFormDialog({
     control,
     name: "members",
   });
-
+  
   const splitMethod = watch("splitMethod");
 
   useEffect(() => {
@@ -132,7 +132,7 @@ export function GroupExpenseFormDialog({
       calculateAndSetEqualSplit(getValues, setValue);
     }
   }, [getValues, setValue]);
-  
+
   const handleTotalExpenseChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const newTotalExpense = parseFloat(e.target.value) || 0;
     setValue('totalExpense', newTotalExpense);
