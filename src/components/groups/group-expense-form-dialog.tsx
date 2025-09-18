@@ -24,12 +24,12 @@ interface GroupExpenseFormDialogProps {
   group?: GroupExpense | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (data: GroupExpenseSubmitData) => void;
+  onSave: (data: Partial<GroupExpenseSubmitData>) => void;
 }
 
 interface MemberFormState {
   name: string;
-  expense: number | string; // Allow string for empty input
+  expense: number | string;
 }
 
 export function GroupExpenseFormDialog({
@@ -40,13 +40,14 @@ export function GroupExpenseFormDialog({
 }: GroupExpenseFormDialogProps) {
   const { user } = useAuthState();
   const { selectedCurrency } = useCurrency();
+  const [isSaving, setIsSaving] = useState(false);
 
   // Form State
   const [groupName, setGroupName] = useState('');
   const [members, setMembers] = useState<MemberFormState[]>([]);
-  const [isSaving, setIsSaving] = useState(false);
 
-  // Effect to initialize or reset the form when the dialog opens
+  // This effect now ONLY runs when the dialog opens or the group being edited changes.
+  // It is the single source of truth for initializing the form state.
   useEffect(() => {
     if (open) {
       if (group) { // Edit mode
@@ -67,11 +68,7 @@ export function GroupExpenseFormDialog({
 
   const handleMemberChange = (index: number, field: 'name' | 'expense', value: string) => {
     const updatedMembers = [...members];
-    if (field === 'expense') {
-      updatedMembers[index][field] = value; // Keep as string for controlled input
-    } else {
-      updatedMembers[index][field] = value;
-    }
+    updatedMembers[index] = { ...updatedMembers[index], [field]: value };
     setMembers(updatedMembers);
   };
 
@@ -87,26 +84,20 @@ export function GroupExpenseFormDialog({
 
   const processSubmit = () => {
     if (!user?.email || !groupName) {
-      // Basic validation, can be enhanced with react-hook-form if needed
       return;
     }
     setIsSaving(true);
 
-    const expenses = members.map(m => parseFloat(String(m.expense)) || 0);
-    const totalExpense = expenses.reduce((sum, expense) => sum + expense, 0);
-    const averageExpense = members.length > 0 ? totalExpense / members.length : 0;
-    const balances = expenses.map(expense => expense - averageExpense);
-
-    const payload: GroupExpenseSubmitData = {
+    // Prepare payload without balance/total calculations.
+    // This will be handled safely in the parent component.
+    const payload: Partial<GroupExpenseSubmitData> = {
       groupName,
       email: user.email,
       members: members.map(m => m.name),
-      expenses: expenses,
-      balance: balances,
-      totalExpense,
+      expenses: members.map(m => parseFloat(String(m.expense)) || 0),
     };
     
-    // Simulate API call delay
+    // Simulate API call delay for mock
     setTimeout(() => {
         onSave(payload);
         setIsSaving(false);
@@ -202,5 +193,3 @@ export function GroupExpenseFormDialog({
     </Dialog>
   );
 }
-
-    

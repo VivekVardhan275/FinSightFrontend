@@ -124,10 +124,24 @@ export default function GroupsPage() {
   };
 
   const handleSaveGroup = (data: GroupExpenseSubmitData) => {
+    // All balance and total calculations now happen here, safely.
+    const expenses = data.expenses.map(exp => parseFloat(String(exp)) || 0);
+    const totalExpense = expenses.reduce((sum, expense) => sum + expense, 0);
+    const averageExpense = data.members.length > 0 ? totalExpense / data.members.length : 0;
+    const balances = expenses.map(expense => expense - averageExpense);
+
+    const finalData = {
+        ...data,
+        expenses,
+        totalExpense,
+        balance: balances
+    };
+
+
     if (editingGroup) {
       // MOCK: Update existing group
       const updatedGroup: GroupExpense = {
-          ...data,
+          ...finalData,
           id: editingGroup.id,
       };
       setGroups(prev => prev.map(g => g.id === editingGroup.id ? updatedGroup : g));
@@ -139,7 +153,7 @@ export default function GroupsPage() {
     } else {
       // MOCK: Add new group with a unique ID
       const newGroup: GroupExpense = {
-          ...data,
+          ...finalData,
           id: `new_${Date.now()}`,
       };
       setGroups(prev => [...prev, newGroup]);
@@ -245,5 +259,3 @@ export default function GroupsPage() {
     </div>
   );
 }
-
-    
