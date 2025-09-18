@@ -252,17 +252,24 @@ export function GroupExpenseFormDialog({
           </ScrollArea>
            {errors.members?.root && <p className="text-sm text-destructive mt-2">{errors.members.root.message}</p>}
           
-          <Button type="button" variant="outline" size="sm" onClick={() => {
-              const timeout = setTimeout(() => {
-                append({ name: "", expense: 0, balance: 0 });
-                if (getValues('splitMethod') === 'equal') {
-                    calculateAndSetEqualSplit(getValues('totalExpense'), getValues('members'), setValue);
-                }
-              }, 0);
-              return () => clearTimeout(timeout);
-            }} disabled={isSaving}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Add Member
-          </Button>
+          <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const timeout = setTimeout(() => {
+                  append({ name: "", expense: 0, balance: 0 });
+                  if (getValues('splitMethod') === 'equal') {
+                    const currentMembers = [...getValues('members'), { name: "", expense: 0, balance: 0 }];
+                    calculateAndSetEqualSplit(getValues('totalExpense'), currentMembers, setValue);
+                  }
+                }, 0);
+                return () => clearTimeout(timeout);
+              }}
+              disabled={isSaving}
+            >
+              <PlusCircle className="mr-2 h-4 w-4" /> Add Member
+            </Button>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>Cancel</Button>
