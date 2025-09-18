@@ -1,3 +1,4 @@
+
 export type Transaction = {
   id: string;
   date: string; // ISO string date for simplicity
@@ -60,3 +61,27 @@ export interface AppNotification {
   read: boolean;
   href?: string; // Optional link for the notification
 }
+
+// --- Group Expense Types ---
+
+export interface GroupExpense {
+  id: string;
+  groupName: string;
+  email: string;
+  members: string[];
+  expenses: number[];
+  balance: number[];
+  totalExpense: number;
+}
+
+export interface MemberDetails {
+    name: string;
+    expense: number;
+}
+
+export type GroupExpenseFormData = {
+  groupName: string;
+  email: string;
+  numberOfPersons: number;
+  members: MemberDetails[];
+};
