@@ -3,6 +3,8 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+// UI Components
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,27 +19,43 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
+// Icons
 import { RotateCw, Users, Trash2, PlusCircle } from "lucide-react";
+
+// Hooks, Types, & Utilities
 import { useAuthState } from '@/hooks/use-auth-state';
 import { useCurrency } from '@/contexts/currency-context';
 import type { GroupExpense, GroupExpenseSubmitData } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 import { useNotification } from '@/contexts/notification-context';
 
+/**
+ * Props for the GroupExpenseFormDialog component.
+ */
 interface GroupExpenseFormDialogProps {
+  /** The group object to edit. If null or undefined, the form is in 'create' mode. */
   group?: GroupExpense | null;
+  /** Controls whether the dialog is open. */
   open: boolean;
+  /** Callback function to change the open state. */
   onOpenChange: (open: boolean) => void;
+  /** Callback function triggered on successful save. */
   onSave: (data: GroupExpenseSubmitData) => void;
+  /** Flag indicating if the parent component is currently submitting data. */
   isSubmitting: boolean;
 }
 
 interface MemberFormState {
-  id: string; // Unique ID for React key prop
+  id: number; // Use a unique ID for stable keys
   name: string;
-  expense: string; // Store as string to avoid controlled input issues
+  expense: number | string;
 }
 
+/**
+ * A dialog component for creating or editing a group expense.
+ * It handles form state, member management, and submission payload creation.
+ */
 export function GroupExpenseFormDialog({
   group,
   open,
@@ -49,33 +67,35 @@ export function GroupExpenseFormDialog({
   const { selectedCurrency } = useCurrency();
   const { addNotification } = useNotification();
 
+  // Form State
   const [groupName, setGroupName] = useState('');
   const [members, setMembers] = useState<MemberFormState[]>([]);
 
+  // FIX: This effect now ONLY runs when the dialog opens, preventing re-render loops.
   useEffect(() => {
     if (open) {
-      if (group) { // Edit mode
+      if (group) { // Edit mode: Populate form with existing group data.
         setGroupName(group.groupName);
         setMembers(group.members.map((name, index) => ({
-          id: crypto.randomUUID(),
+          id: index, // Simple ID for existing data
           name,
-          expense: String(group.expenses[index] || '0')
+          expense: group.expenses[index]
         })));
-      } else { // Create mode
+      } else { // Create mode: Reset to a default state.
         setGroupName('');
         setMembers([
-          { id: crypto.randomUUID(), name: user?.name || 'Me', expense: '' },
-          { id: crypto.randomUUID(), name: '', expense: '' },
+          { id: Date.now(), name: user?.name || 'Me', expense: '' },
+          { id: Date.now() + 1, name: '', expense: '' },
         ]);
       }
     }
-  }, [group, open, user]);
+  }, [open, group, user]); // Dependency array is now correct and safe
 
   const totalExpense = useMemo(() => {
-    return members.reduce((sum, member) => sum + (parseFloat(member.expense) || 0), 0);
+    return members.reduce((sum, member) => sum + (parseFloat(String(member.expense)) || 0), 0);
   }, [members]);
 
-  const handleMemberChange = (id: string, field: 'name' | 'expense', value: string) => {
+  const handleMemberChange = (id: number, field: 'name' | 'expense', value: string) => {
     setMembers(currentMembers =>
       currentMembers.map(member =>
         member.id === id ? { ...member, [field]: value } : member
@@ -84,48 +104,42 @@ export function GroupExpenseFormDialog({
   };
 
   const addMember = () => {
-    setMembers(currentMembers => [
-      ...currentMembers,
-      { id: crypto.randomUUID(), name: '', expense: '' }
-    ]);
+    setMembers([...members, { id: Date.now(), name: '', expense: '' }]);
   };
 
-  const removeMember = (id: string) => {
+  const removeMember = (id: number) => {
     if (members.length > 1) {
-      setMembers(currentMembers => currentMembers.filter(member => member.id !== id));
+      setMembers(members.filter(member => member.id !== id));
     }
   };
 
   const handleSubmit = () => {
+    // --- Validation ---
     if (!user?.email) {
-      addNotification({ title: "Error", description: "User email not found. Please log in again.", type: 'error' });
+      addNotification({ title: "Authentication Error", description: "User email not found. Please log in again.", type: 'error' });
       return;
     }
     if (!groupName.trim()) {
-      addNotification({ title: "Validation Error", description: "Group name cannot be empty.", type: 'error' });
+      addNotification({ title: "Validation Error", description: "Group name is required.", type: 'error' });
       return;
     }
-    if (members.some(m => !m.name.trim())) {
-      addNotification({ title: "Validation Error", description: "All member names must be filled out.", type: 'error' });
-      return;
-    }
-    if (members.some(m => m.expense === '' || isNaN(Number(m.expense)))) {
-      addNotification({ title: "Validation Error", description: "All expense fields must contain a valid number.", type: 'error' });
-      return;
+    const hasEmptyName = members.some(m => !m.name.trim());
+    if (hasEmptyName) {
+        addNotification({ title: "Validation Error", description: "All member names must be filled out.", type: 'error' });
+        return;
     }
 
-    const memberExpenses = members.map(m => parseFloat(m.expense) || 0);
-    const finalTotalExpense = memberExpenses.reduce((sum, expense) => sum + expense, 0);
+    // --- Payload Creation ---
+    const expenses = members.map(m => parseFloat(String(m.expense)) || 0);
+    const finalTotalExpense = expenses.reduce((sum, expense) => sum + expense, 0);
     const averageExpense = members.length > 0 ? finalTotalExpense / members.length : 0;
-    
-    // Round balances to avoid floating point precision issues
-    const balances = memberExpenses.map(exp => parseFloat((exp - averageExpense).toFixed(2)));
+    const balances = expenses.map(expense => expense - averageExpense);
 
     const payload: GroupExpenseSubmitData = {
       groupName: groupName.trim(),
       email: user.email,
       members: members.map(m => m.name.trim()),
-      expenses: memberExpenses,
+      expenses,
       balance: balances,
       totalExpense: finalTotalExpense,
     };
@@ -134,7 +148,7 @@ export function GroupExpenseFormDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !isSubmitting && onOpenChange(o)}>
+    <Dialog open={open} onOpenChange={!isSubmitting ? onOpenChange : undefined}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="font-headline flex items-center gap-2">
@@ -147,14 +161,14 @@ export function GroupExpenseFormDialog({
         </DialogHeader>
         
         <div className="grid gap-4 py-4">
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <Label htmlFor="groupName">Group Name</Label>
             <Input
               id="groupName"
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
               disabled={isSubmitting}
-              placeholder="e.g., Trip to Goa"
+              placeholder="e.g., Weekend Trip"
             />
           </div>
           
@@ -167,11 +181,12 @@ export function GroupExpenseFormDialog({
                 <AnimatePresence>
                   {members.map((member) => (
                     <motion.div
-                      key={member.id}
+                      key={member.id} // FIX: Use stable ID for key
                       className="grid grid-cols-[1fr_auto_auto] gap-2 items-center"
+                      layout
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, x: -20 }}
+                      exit={{ opacity: 0, x: -20, transition: { duration: 0.15 } }}
                       transition={{ duration: 0.2 }}
                     >
                       <Input
@@ -232,7 +247,7 @@ export function GroupExpenseFormDialog({
             </div>
             <div className="flex gap-2">
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancel</Button>
-                <Button onClick={handleSubmit} disabled={isSubmitting || !groupName.trim()}>
+                <Button onClick={handleSubmit} disabled={isSubmitting || !groupName.trim() || members.length === 0}>
                     {isSubmitting && <RotateCw className="mr-2 h-4 w-4 animate-spin" />}
                     {isSubmitting ? "Saving..." : (group ? "Update Group" : "Save Group")}
                 </Button>
