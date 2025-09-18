@@ -100,13 +100,7 @@ export function GroupExpenseFormDialog({
     name: "members",
   });
 
-  const { totalExpense, members, splitMethod } = watch();
-
-  const sumOfIndividualExpenses = useMemo(() => {
-    return members.reduce((sum, member) => sum + (member.expense || 0), 0);
-  }, [members]);
-
-  const expenseMismatch = Math.abs(sumOfIndividualExpenses - totalExpense) > 0.01;
+  const { splitMethod } = watch();
 
   const handleSplitMethodChange = useCallback((value: SplitMethod) => {
     setValue('splitMethod', value);
@@ -262,21 +256,15 @@ export function GroupExpenseFormDialog({
             </div>
           </ScrollArea>
            {errors.members?.root && <p className="text-sm text-destructive mt-2">{errors.members.root.message}</p>}
-           {(splitMethod === 'unequal' && expenseMismatch && !errors.members?.root) && (
-              <p className="text-sm text-destructive mt-2">
-                Sum of expenses ({formatCurrency(sumOfIndividualExpenses, selectedCurrency)}) does not match total expense ({formatCurrency(totalExpense, selectedCurrency)}).
-              </p>
-           )}
-
+          
           <Button type="button" variant="outline" size="sm" onClick={() => {
-              append({ name: "", expense: 0, balance: 0 });
-              if (getValues('splitMethod') === 'equal') {
-                // When adding a new member under equal split, we need to recalculate for all.
-                // We use a timeout to allow react-hook-form to process the append action first.
-                setTimeout(() => {
-                  calculateAndSetEqualSplit(getValues('totalExpense'), getValues('members'), setValue);
-                }, 0);
-              }
+              const timeout = setTimeout(() => {
+                append({ name: "", expense: 0, balance: 0 });
+                if (getValues('splitMethod') === 'equal') {
+                    calculateAndSetEqualSplit(getValues('totalExpense'), getValues('members'), setValue);
+                }
+              }, 0);
+              return () => clearTimeout(timeout);
             }} disabled={isSaving}>
             <PlusCircle className="mr-2 h-4 w-4" /> Add Member
           </Button>
