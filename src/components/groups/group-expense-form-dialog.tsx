@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RotateCw, Users } from "lucide-react";
 import { useAuthState } from '@/hooks/use-auth-state';
-import { useCurrency } from '@/contexts/currency-context';
+import { useCurrency } from '@/hooks/use-currency';
 import { formatCurrency } from '@/lib/utils';
 import type { GroupExpense, GroupExpenseFormData, MemberDetails } from '@/types';
 import { ScrollArea } from '../ui/scroll-area';
@@ -35,7 +35,6 @@ interface GroupExpenseFormDialogProps {
 const getGroupExpenseSchema = () => z.object({
   groupName: z.string().min(1, "Group name is required."),
   email: z.string().email(),
-  numberOfPersons: z.number().min(1, "At least one person is required."),
   members: z.array(z.object({
     name: z.string().min(1, "Member name is required."),
     expense: z.number().min(0, "Expense cannot be negative."),
@@ -61,13 +60,14 @@ export function GroupExpenseFormDialog({
     handleSubmit,
     reset,
     watch,
+    setError,
+    clearErrors,
     formState: { errors },
   } = useForm<GroupExpenseFormData>({
     resolver: zodResolver(groupExpenseSchema),
     defaultValues: {
       groupName: '',
       email: user?.email || '',
-      numberOfPersons: 2,
       members: [],
     },
   });
@@ -77,70 +77,58 @@ export function GroupExpenseFormDialog({
     name: "members",
   });
 
-  const numberOfPersons = watch('numberOfPersons');
   const members = watch('members');
 
-  // Single, stable effect to handle form initialization and updates
   useEffect(() => {
-    if (!open || !user?.email) return;
-
-    let defaultValues: GroupExpenseFormData;
+    if (!open) return;
 
     if (group) { // EDIT MODE
       const existingMembers = group.members.map((name, i) => ({
         name,
         expense: group.expenses[i]
       }));
-      defaultValues = {
+      reset({
         groupName: group.groupName,
-        email: user.email,
-        numberOfPersons: group.members.length,
+        email: user?.email || '',
         members: existingMembers,
-      };
+      });
     } else { // CREATE MODE
-      const initialMembers: MemberDetails[] = Array.from({ length: 2 }, (_, i) => ({
-        name: i === 0 ? (user.name || 'Me') : '',
-        expense: 0
-      }));
-      defaultValues = {
+      reset({
         groupName: '',
-        email: user.email,
-        numberOfPersons: 2,
-        members: initialMembers,
-      };
+        email: user?.email || '',
+        members: Array.from({ length: 2 }, (_, i) => ({
+          name: i === 0 ? (user?.name || 'Me') : '',
+          expense: 0
+        })),
+      });
     }
-    
-    reset(defaultValues);
-
-  }, [group, user, open, reset]);
-
-
-  // Effect to synchronize the number of member fields with the dropdown
-  useEffect(() => {
-    if (!open) return; // Only run when the dialog is open
-    
-    const currentCount = fields.length;
-    if (numberOfPersons > currentCount) {
-      const toAdd = numberOfPersons - currentCount;
-      for (let i = 0; i < toAdd; i++) {
-        append({ name: '', expense: 0 });
-      }
-    } else if (numberOfPersons < currentCount) {
-      const toRemove = currentCount - numberOfPersons;
-      for (let i = 0; i < toRemove; i++) {
-        remove(currentCount - 1 - i);
-      }
-    }
-  }, [numberOfPersons, fields.length, append, remove, open]);
-
+  }, [group, open, reset, user]);
 
   const totalExpense = useMemo(() => {
     return members.reduce((sum, member) => sum + (member.expense || 0), 0);
   }, [members]);
+  
+  const handleNumberOfPersonsChange = (value: string) => {
+    const newCount = parseInt(value, 10);
+    const currentCount = fields.length;
+
+    if (newCount > currentCount) {
+      const toAdd = newCount - currentCount;
+      for (let i = 0; i < toAdd; i++) {
+        append({ name: '', expense: 0 });
+      }
+    } else if (newCount < currentCount) {
+      const toRemove = currentCount - newCount;
+      for (let i = 0; i < toRemove; i++) {
+        remove(currentCount - 1 - i);
+      }
+    }
+  };
+
 
   const processSubmit = (data: GroupExpenseFormData) => {
     const totalExpenseValue = data.members.reduce((sum, m) => sum + m.expense, 0);
-    const averageExpense = data.numberOfPersons > 0 ? totalExpenseValue / data.numberOfPersons : 0;
+    const averageExpense = data.members.length > 0 ? totalExpenseValue / data.members.length : 0;
     const balances = data.members.map(m => m.expense - averageExpense);
     
     const payload: Omit<GroupExpense, 'id'> = {
@@ -182,22 +170,20 @@ export function GroupExpenseFormDialog({
 
               <div className="space-y-2">
                 <Label htmlFor="numberOfPersons">Number of Persons</Label>
-                <Controller
-                  name="numberOfPersons"
-                  control={control}
-                  render={({ field }) => (
-                    <Select onValueChange={(val) => field.onChange(parseInt(val, 10))} value={String(field.value)} disabled={isSaving}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select number of members" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: MAX_MEMBERS }, (_, i) => i + 1).map(num => (
-                          <SelectItem key={num} value={String(num)}>{num}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
+                <Select
+                    value={String(fields.length)}
+                    onValueChange={handleNumberOfPersonsChange}
+                    disabled={isSaving}
+                >
+                    <SelectTrigger>
+                    <SelectValue placeholder="Select number of members" />
+                    </SelectTrigger>
+                    <SelectContent>
+                    {Array.from({ length: MAX_MEMBERS }, (_, i) => i + 1).map(num => (
+                        <SelectItem key={num} value={String(num)}>{num}</SelectItem>
+                    ))}
+                    </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-4 pt-2">
@@ -210,7 +196,7 @@ export function GroupExpenseFormDialog({
                         {...register(`members.${index}.name` as const)}
                         disabled={isSaving}
                       />
-                      {errors.members?.[index]?.name && <p className="text-sm text-destructive">{errors.members?.[index]?.name?.message}</p>}
+                      {errors.members?.[index]?.name && <p className="text-sm text-destructive">{errors.members[index]?.name?.message}</p>}
                     </div>
                      <div className="space-y-1">
                         <Input
@@ -220,7 +206,7 @@ export function GroupExpenseFormDialog({
                             {...register(`members.${index}.expense` as const, { valueAsNumber: true })}
                             disabled={isSaving}
                         />
-                        {errors.members?.[index]?.expense && <p className="text-sm text-destructive">{errors.members?.[index]?.expense?.message}</p>}
+                        {errors.members?.[index]?.expense && <p className="text-sm text-destructive">{errors.members[index]?.expense?.message}</p>}
                     </div>
                   </div>
                 ))}
