@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -29,19 +30,11 @@ import type { GroupExpense, GroupExpenseSubmitData } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 import { useNotification } from '@/contexts/notification-context';
 
-/**
- * Props for the GroupExpenseFormDialog component.
- */
 interface GroupExpenseFormDialogProps {
-  /** The group object to edit. If null or undefined, the form is in 'create' mode. */
   group?: GroupExpense | null;
-  /** Controls whether the dialog is open. */
   open: boolean;
-  /** Callback function to change the open state. */
   onOpenChange: (open: boolean) => void;
-  /** Callback function triggered on successful save. */
   onSave: (data: GroupExpenseSubmitData) => void;
-  /** Flag indicating if the parent component is currently submitting data. */
   isSubmitting: boolean;
 }
 
@@ -51,10 +44,6 @@ interface MemberFormState {
   expense: string; // Always store as string to avoid controlled/uncontrolled input warnings
 }
 
-/**
- * A dialog component for creating or editing a group expense.
- * It handles form state, member management, and submission payload creation.
- */
 export function GroupExpenseFormDialog({
   group,
   open,
@@ -66,22 +55,21 @@ export function GroupExpenseFormDialog({
   const { selectedCurrency } = useCurrency();
   const { addNotification } = useNotification();
 
-  // Form State
   const [groupName, setGroupName] = useState('');
   const [members, setMembers] = useState<MemberFormState[]>([]);
 
-  // This effect runs ONLY when the dialog's `open` prop changes from false to true.
-  // It safely initializes the form state for either creating or editing.
   useEffect(() => {
+    // This effect runs ONLY when the dialog's `open` prop changes from false to true.
+    // It safely initializes the form state for either creating or editing.
     if (open) {
-      if (group) { // Edit mode: Populate form with existing group data.
+      if (group) { // Edit mode
         setGroupName(group.groupName);
         setMembers(group.members.map((name, index) => ({
-          id: `existing-${index}-${group.id}`, // Create a stable key
+          id: `existing-${index}-${group.id}`,
           name,
-          expense: String(group.expenses?.[index] ?? '') // Safely access and convert to string
+          expense: String(group.expenses?.[index] ?? '')
         })));
-      } else { // Create mode: Reset to a default state.
+      } else { // Create mode
         setGroupName('');
         setMembers([
           { id: `new-${Date.now()}`, name: user?.name || 'Me', expense: '' },
@@ -114,7 +102,6 @@ export function GroupExpenseFormDialog({
   };
 
   const handleSubmit = () => {
-    // --- Validation ---
     if (!user?.email) {
       addNotification({ title: "Authentication Error", description: "User email not found. Please log in again.", type: 'error' });
       return;
@@ -127,12 +114,11 @@ export function GroupExpenseFormDialog({
         addNotification({ title: "Validation Error", description: "All member names must be filled out.", type: 'error' });
         return;
     }
-    if (members.some(m => m.expense === '' || isNaN(Number(m.expense)))) {
+    if (members.some(m => m.expense.trim() === '' || isNaN(Number(m.expense)))) {
         addNotification({ title: "Validation Error", description: "All expense fields must contain a valid number.", type: 'error' });
         return;
     }
 
-    // --- Payload Creation ---
     const expenses = members.map(m => parseFloat(m.expense) || 0);
     const finalTotalExpense = expenses.reduce((sum, expense) => sum + expense, 0);
 

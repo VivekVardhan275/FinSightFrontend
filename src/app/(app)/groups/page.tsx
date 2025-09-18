@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -74,11 +75,6 @@ export default function GroupsPage() {
   const [groupToDeleteId, setGroupToDeleteId] = useState<string | null>(null);
   const { addNotification } = useNotification();
 
-  /**
-   * Fetches group data from the API.
-   * Wrapped in useCallback to prevent re-creation on every render,
-   * which stabilizes the useEffect dependency array.
-   */
   const getGroups = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -95,13 +91,9 @@ export default function GroupsPage() {
     }
   }, [addNotification]);
 
-  // Initial data fetch on component mount.
-  // The effect correctly depends on getGroups, which is memoized by useCallback.
   useEffect(() => {
     getGroups();
   }, [getGroups]);
-
-  // --- Handlers for UI state changes ---
 
   const handleCreateGroup = () => {
     setEditingGroup(null);
@@ -118,10 +110,6 @@ export default function GroupsPage() {
     setIsConfirmDeleteDialogOpen(true);
   };
 
-  /**
-   * Handles deleting a group after confirmation.
-   * This is an async operation with proper state management.
-   */
   const handleDeleteGroup = async () => {
     if (!groupToDeleteId) return;
 
@@ -133,8 +121,6 @@ export default function GroupsPage() {
         description: `The group has been successfully removed.`,
         type: 'info'
       });
-      // Best Practice: Re-fetch data from the server after a mutation
-      // to ensure the UI is perfectly in sync with the database.
       await getGroups();
     } catch (error) {
       addNotification({
@@ -149,10 +135,6 @@ export default function GroupsPage() {
     }
   };
 
-  /**
-   * Handles saving a new group or updating an existing one.
-   * This is an async operation with proper state management.
-   */
   const handleSaveGroup = async (data: GroupExpenseSubmitData) => {
     setIsSubmitting(true);
     try {
@@ -173,7 +155,6 @@ export default function GroupsPage() {
       }
       setIsFormOpen(false);
       setEditingGroup(null);
-      // Re-fetch data to ensure UI consistency after the mutation.
       await getGroups();
     } catch (error) {
       addNotification({
@@ -186,11 +167,8 @@ export default function GroupsPage() {
     }
   };
   
-  // --- Render Logic ---
-
   const renderContent = () => {
     if (isLoading) {
-      // Enhancement: Use skeleton loaders for a better UX during initial load.
       return (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 3 }).map((_, index) => (
@@ -240,7 +218,6 @@ export default function GroupsPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header Section */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="font-headline text-3xl font-bold tracking-tight">Group Expenses</h1>
@@ -254,10 +231,8 @@ export default function GroupsPage() {
         </motion.div>
       </div>
 
-      {/* Main Content: Loading, Empty State, or Group List */}
       {renderContent()}
 
-      {/* Dialog for Creating/Editing Groups */}
       <GroupExpenseFormDialog
         open={isFormOpen}
         onOpenChange={setIsFormOpen}
@@ -266,7 +241,6 @@ export default function GroupsPage() {
         isSubmitting={isSubmitting}
       />
 
-      {/* Dialog for Confirming Deletion */}
       <AlertDialog open={isConfirmDeleteDialogOpen} onOpenChange={setIsConfirmDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -279,7 +253,7 @@ export default function GroupsPage() {
             <AlertDialogCancel onClick={() => setGroupToDeleteId(null)}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteGroup}
-              disabled={isSubmitting} // Disable button during delete operation
+              disabled={isSubmitting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {isSubmitting && <RotateCw className="mr-2 h-4 w-4 animate-spin" />}

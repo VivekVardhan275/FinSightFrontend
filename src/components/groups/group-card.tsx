@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { GroupExpense } from '@/types';
@@ -12,33 +13,29 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 // Icons
-import { Edit2, Trash2, Users } from 'lucide-react';
+import { Edit2, Trash2, Users, AlertTriangle } from 'lucide-react';
 
 // Contexts & Utilities
 import { useCurrency } from '@/contexts/currency-context';
 import { formatCurrency } from '@/lib/utils';
 
-/**
- * Props for the GroupCard component.
- */
 interface GroupCardProps {
-  /** The group expense object to display. */
   group: GroupExpense;
-  /** Callback function triggered when the edit button is clicked. */
   onEdit: (group: GroupExpense) => void;
-  /** Callback function triggered when the delete button is clicked. */
   onDelete: (groupId: string) => void;
-  /** Framer Motion variants for animations, passed from the parent. */
   variants?: Variants;
-  /** Custom prop for Framer Motion to stagger animations. */
   custom?: number;
 }
 
-/**
- * A card component that displays a summary of a group's shared expenses.
- */
 export function GroupCard({ group, onEdit, onDelete, variants, custom }: GroupCardProps) {
   const { selectedCurrency, convertAmount } = useCurrency();
+  const currencyContext = useCurrency();
+
+  const safeConvertAmount = (amount: number) => {
+    if (!currencyContext) return amount;
+    return convertAmount(amount);
+  };
+  const safeSelectedCurrency = currencyContext?.selectedCurrency || 'INR';
 
   return (
     <motion.div
@@ -57,10 +54,10 @@ export function GroupCard({ group, onEdit, onDelete, variants, custom }: GroupCa
               <Users className="h-5 w-5 text-primary" />
               <span className="truncate" title={group.groupName}>{group.groupName}</span>
             </CardTitle>
-            <Badge variant="secondary" className="shrink-0">{group.members.length} Members</Badge>
+            <Badge variant="secondary" className="shrink-0">{group.members?.length || 0} Members</Badge>
           </div>
           <CardDescription>
-            Total Expense: {formatCurrency(convertAmount(group.totalExpense, selectedCurrency), selectedCurrency)}
+            Total Expense: {formatCurrency(safeConvertAmount(group.totalExpense), safeSelectedCurrency)}
           </CardDescription>
         </CardHeader>
 
@@ -73,18 +70,25 @@ export function GroupCard({ group, onEdit, onDelete, variants, custom }: GroupCa
             </div>
             <Separator />
             <ScrollArea className="h-28 pr-4">
-              {group.members.length > 0 ? (
-                group.members.map((member, index) => (
-                  <div key={`${group.id}-member-${index}`} className="grid grid-cols-2 gap-2 items-center text-sm py-1.5">
-                    <span className="truncate" title={member}>{member}</span>
-                    <span className="text-right text-muted-foreground">
-                      {formatCurrency(convertAmount(group.expenses?.[index] ?? 0, selectedCurrency), selectedCurrency)}
-                    </span>
-                  </div>
-                ))
+              {group.members && group.expenses && group.members.length === group.expenses.length ? (
+                 group.members.length > 0 ? (
+                    group.members.map((member, index) => (
+                        <div key={`${group.id}-member-${index}`} className="grid grid-cols-2 gap-2 items-center text-sm py-1.5">
+                            <span className="truncate" title={member}>{member}</span>
+                            <span className="text-right text-muted-foreground">
+                            {formatCurrency(safeConvertAmount(group.expenses?.[index] ?? 0), safeSelectedCurrency)}
+                            </span>
+                        </div>
+                    ))
+                 ) : (
+                    <div className="flex items-center justify-center h-24 text-sm text-muted-foreground">
+                        <p>No members in this group.</p>
+                    </div>
+                 )
               ) : (
-                <div className="flex items-center justify-center h-24 text-sm text-muted-foreground">
-                  <p>No members in this group.</p>
+                <div className="flex items-center justify-center h-24 text-sm text-destructive gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  <p>Group data is inconsistent.</p>
                 </div>
               )}
             </ScrollArea>
