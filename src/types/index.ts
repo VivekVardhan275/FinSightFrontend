@@ -80,7 +80,6 @@ export interface Group {
 export interface GroupExpenseFormData {
   groupName: string;
   totalExpense: number;
-  splitMethod: 'equal' | 'unequal';
   members: Array<{
     name: string;
     expense: number;

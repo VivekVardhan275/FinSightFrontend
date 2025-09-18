@@ -1,23 +1,20 @@
 // src/components/groups/group-expense-form-dialog.tsx
 "use client";
 
-import React, { useEffect, useCallback } from "react";
+import React, { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Trash2, PlusCircle, RotateCw } from "lucide-react";
-import { useForm, useFieldArray, type UseFormSetValue, type UseFormGetValues } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Group, GroupExpenseFormData } from '@/types';
 import { useAuthState } from "@/hooks/use-auth-state";
 import { Separator } from "../ui/separator";
 import { useCurrency } from "@/contexts/currency-context";
-import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
-
-export type SplitMethod = "equal" | "unequal";
 
 const memberSchema = z.object({
   name: z.string().min(1, "Name is required."),
@@ -28,17 +25,14 @@ const memberSchema = z.object({
 const groupExpenseSchema = z.object({
   groupName: z.string().min(1, "Group name is required."),
   totalExpense: z.number().min(0, "Total expense must be non-negative."),
-  splitMethod: z.enum(["equal", "unequal"]),
   members: z.array(memberSchema).min(1, "At least one group member is required."),
 }).refine(data => {
-    if (data.splitMethod === 'unequal') {
-        const sumOfMemberExpenses = data.members.reduce((sum, member) => sum + member.expense, 0);
-        return Math.abs(sumOfMemberExpenses - data.totalExpense) < 0.01;
-    }
-    return true;
+    const sumOfMemberExpenses = data.members.reduce((sum, member) => sum + member.expense, 0);
+    // Use a small tolerance for floating point comparisons
+    return Math.abs(sumOfMemberExpenses - data.totalExpense) < 0.01;
 }, {
     message: "The sum of individual expenses must equal the total expense.",
-    path: ["members"],
+    path: ["members"], // This will show the error message near the members section
 });
 
 
@@ -49,22 +43,6 @@ interface GroupExpenseFormDialogProps {
   group?: Group | null;
   isSaving?: boolean;
 }
-
-const calculateAndSetEqualSplit = (
-  getValues: UseFormGetValues<GroupExpenseFormData>,
-  setValue: UseFormSetValue<GroupExpenseFormData>
-) => {
-  const totalExpense = getValues('totalExpense');
-  const members = getValues('members');
-  const memberCount = members.length;
-  if (memberCount === 0) return;
-
-  const amountPerMember = totalExpense / memberCount;
-  members.forEach((_, index) => {
-    setValue(`members.${index}.expense`, parseFloat(amountPerMember.toFixed(2)), { shouldValidate: true });
-  });
-};
-
 
 export function GroupExpenseFormDialog({
   open,
@@ -81,16 +59,12 @@ export function GroupExpenseFormDialog({
     register,
     handleSubmit,
     reset,
-    watch,
-    setValue,
-    getValues,
     formState: { errors },
   } = useForm<GroupExpenseFormData>({
     resolver: zodResolver(groupExpenseSchema),
     defaultValues: {
       groupName: "",
       totalExpense: 0,
-      splitMethod: "equal",
       members: [{ name: user?.name || "", expense: 0, balance: 0 }],
     },
   });
@@ -99,8 +73,6 @@ export function GroupExpenseFormDialog({
     control,
     name: "members",
   });
-  
-  const splitMethod = watch("splitMethod");
 
   useEffect(() => {
     if (open) {
@@ -108,7 +80,6 @@ export function GroupExpenseFormDialog({
         reset({
           groupName: group.groupName,
           totalExpense: group.totalExpenses,
-          splitMethod: "unequal", // When editing, default to unequal to show stored values
           members: group.members.map((name, index) => ({
             name,
             expense: group.expenses[index] || 0,
@@ -119,38 +90,11 @@ export function GroupExpenseFormDialog({
         reset({
           groupName: "",
           totalExpense: 0,
-          splitMethod: "equal",
           members: [{ name: user?.name || "Me", expense: 0, balance: 0 }],
         });
       }
     }
   }, [open, group, reset, user]);
-
-  const handleSplitMethodChange = useCallback((value: SplitMethod) => {
-    setValue('splitMethod', value);
-    if (value === 'equal') {
-      calculateAndSetEqualSplit(getValues, setValue);
-    }
-  }, [getValues, setValue]);
-
-  const handleTotalExpenseChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const newTotalExpense = parseFloat(e.target.value) || 0;
-    setValue('totalExpense', newTotalExpense);
-    if (getValues('splitMethod') === 'equal') {
-      calculateAndSetEqualSplit(getValues, setValue);
-    }
-  }, [getValues, setValue]);
-
-  const handleAddMember = useCallback(() => {
-    append({ name: "", expense: 0, balance: 0 });
-    // Use timeout to ensure the new field is registered before calculation
-    setTimeout(() => {
-        if (getValues('splitMethod') === 'equal') {
-            calculateAndSetEqualSplit(getValues, setValue);
-        }
-    }, 0);
-  }, [append, getValues, setValue]);
-
 
   const processSubmit = (data: GroupExpenseFormData) => {
     onSave(data);
@@ -162,7 +106,7 @@ export function GroupExpenseFormDialog({
         <DialogHeader>
           <DialogTitle className="font-headline">{group ? "Edit Group Expense" : "Create Group Expense"}</DialogTitle>
           <DialogDescription>
-            {group ? "Update the details for this shared expense." : "Add members and their expenses to create a new group."}
+            {group ? "Update the details for this shared expense." : "Enter the total expense, then add members and their individual expenses."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(processSubmit)} className="space-y-4">
@@ -179,30 +123,10 @@ export function GroupExpenseFormDialog({
                 type="number"
                 step="0.01"
                 {...register("totalExpense", { valueAsNumber: true })}
-                onChange={handleTotalExpenseChange}
                 disabled={isSaving}
               />
               {errors.totalExpense && <p className="text-sm text-destructive">{errors.totalExpense.message}</p>}
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Split Method</Label>
-             <RadioGroup
-                onValueChange={(value) => handleSplitMethodChange(value as SplitMethod)}
-                value={splitMethod}
-                className="flex space-x-4 pt-1"
-                disabled={isSaving}
-              >
-                <div>
-                  <RadioGroupItem value="equal" id="split-equal" />
-                  <Label htmlFor="split-equal" className="ml-2 cursor-pointer">Split Equally</Label>
-                </div>
-                <div>
-                  <RadioGroupItem value="unequal" id="split-unequal" />
-                  <Label htmlFor="split-unequal" className="ml-2 cursor-pointer">Split Unequally</Label>
-                </div>
-              </RadioGroup>
           </div>
 
           <Separator />
@@ -230,8 +154,7 @@ export function GroupExpenseFormDialog({
                         step="0.01"
                         placeholder="Expense"
                         {...register(`members.${index}.expense`, { valueAsNumber: true })}
-                        disabled={isSaving || splitMethod === 'equal'}
-                        className={splitMethod === 'equal' ? 'bg-muted/70' : ''}
+                        disabled={isSaving}
                       />
                       {errors.members?.[index]?.expense && <p className="text-xs text-destructive">{errors.members[index]?.expense?.message}</p>}
                   </div>
@@ -256,12 +179,14 @@ export function GroupExpenseFormDialog({
             </div>
           </ScrollArea>
            {errors.members?.root && <p className="text-sm text-destructive mt-2">{errors.members.root.message}</p>}
+           {/* Fallback for when the root error doesn't catch it for some reason */}
+           {errors.members && !errors.members.root && typeof errors.members.message === 'string' && <p className="text-sm text-destructive mt-2">{errors.members.message}</p>}
           
           <Button
               type="button"
               variant="outline"
               size="sm"
-              onClick={handleAddMember}
+              onClick={() => append({ name: "", expense: 0, balance: 0 })}
               disabled={isSaving}
             >
               <PlusCircle className="mr-2 h-4 w-4" /> Add Member
