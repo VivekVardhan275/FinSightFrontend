@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Trash2, PlusCircle, RotateCw } from "lucide-react";
-import { useForm, useFieldArray, type UseFormSetValue } from "react-hook-form";
+import { useForm, useFieldArray, type UseFormSetValue, type UseFormGetValues } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Group, GroupExpenseFormData } from '@/types';
@@ -51,12 +51,14 @@ interface GroupExpenseFormDialogProps {
 }
 
 const calculateAndSetEqualSplit = (
-  totalExpense: number,
-  members: { name: string; expense: number; balance: number }[],
+  getValues: UseFormGetValues<GroupExpenseFormData>,
   setValue: UseFormSetValue<GroupExpenseFormData>
 ) => {
+  const totalExpense = getValues('totalExpense');
+  const members = getValues('members');
   const memberCount = members.length;
   if (memberCount === 0) return;
+
   const amountPerMember = totalExpense / memberCount;
   members.forEach((_, index) => {
     setValue(`members.${index}.expense`, parseFloat(amountPerMember.toFixed(2)), { shouldValidate: true });
@@ -98,23 +100,7 @@ export function GroupExpenseFormDialog({
     name: "members",
   });
 
-  const { splitMethod } = watch();
-
-  const handleSplitMethodChange = useCallback((value: SplitMethod) => {
-    setValue('splitMethod', value);
-    if (value === 'equal') {
-      calculateAndSetEqualSplit(getValues('totalExpense'), getValues('members'), setValue);
-    }
-  }, [setValue, getValues]);
-  
-  const handleTotalExpenseChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const newTotalExpense = parseFloat(e.target.value) || 0;
-    setValue('totalExpense', newTotalExpense, { shouldValidate: true });
-    if (getValues('splitMethod') === 'equal') {
-      calculateAndSetEqualSplit(newTotalExpense, getValues('members'), setValue);
-    }
-  }, [setValue, getValues]);
-
+  const splitMethod = watch("splitMethod");
 
   useEffect(() => {
     if (open) {
@@ -122,7 +108,7 @@ export function GroupExpenseFormDialog({
         reset({
           groupName: group.groupName,
           totalExpense: group.totalExpenses,
-          splitMethod: "unequal",
+          splitMethod: "unequal", // When editing, default to unequal to show stored values
           members: group.members.map((name, index) => ({
             name,
             expense: group.expenses[index] || 0,
@@ -140,14 +126,33 @@ export function GroupExpenseFormDialog({
     }
   }, [open, group, reset, user]);
 
-  const processSubmit = (data: GroupExpenseFormData) => {
-    if (data.splitMethod === 'equal') {
-        const memberCount = data.members.length;
-        const amountPerMember = memberCount > 0 ? data.totalExpense / memberCount : 0;
-        data.members.forEach((member) => {
-            member.expense = parseFloat(amountPerMember.toFixed(2));
-        });
+  const handleSplitMethodChange = useCallback((value: SplitMethod) => {
+    setValue('splitMethod', value);
+    if (value === 'equal') {
+      calculateAndSetEqualSplit(getValues, setValue);
     }
+  }, [getValues, setValue]);
+  
+  const handleTotalExpenseChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const newTotalExpense = parseFloat(e.target.value) || 0;
+    setValue('totalExpense', newTotalExpense);
+    if (getValues('splitMethod') === 'equal') {
+      calculateAndSetEqualSplit(getValues, setValue);
+    }
+  }, [getValues, setValue]);
+
+  const handleAddMember = useCallback(() => {
+    append({ name: "", expense: 0, balance: 0 });
+    // Use timeout to ensure the new field is registered before calculation
+    setTimeout(() => {
+        if (getValues('splitMethod') === 'equal') {
+            calculateAndSetEqualSplit(getValues, setValue);
+        }
+    }, 0);
+  }, [append, getValues, setValue]);
+
+
+  const processSubmit = (data: GroupExpenseFormData) => {
     onSave(data);
   };
 
@@ -256,16 +261,7 @@ export function GroupExpenseFormDialog({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => {
-                const timeout = setTimeout(() => {
-                  append({ name: "", expense: 0, balance: 0 });
-                  if (getValues('splitMethod') === 'equal') {
-                    const currentMembers = [...getValues('members'), { name: "", expense: 0, balance: 0 }];
-                    calculateAndSetEqualSplit(getValues('totalExpense'), currentMembers, setValue);
-                  }
-                }, 0);
-                return () => clearTimeout(timeout);
-              }}
+              onClick={handleAddMember}
               disabled={isSaving}
             >
               <PlusCircle className="mr-2 h-4 w-4" /> Add Member
