@@ -1,14 +1,15 @@
+
 // src/components/groups/group-expense-form-dialog.tsx
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Trash2, PlusCircle, RotateCw } from "lucide-react";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Group, GroupExpenseFormData } from '@/types';
@@ -19,7 +20,7 @@ import { useCurrency } from "@/contexts/currency-context";
 const memberSchema = z.object({
   name: z.string().min(1, "Name is required."),
   expense: z.number().min(0, "Expense must be non-negative."),
-  balance: z.number(),
+  balance: z.number(), // Balance is not directly validated in the form, but calculated on save
 });
 
 const groupExpenseSchema = z.object({
@@ -27,14 +28,15 @@ const groupExpenseSchema = z.object({
   totalExpense: z.number().min(0, "Total expense must be non-negative."),
   members: z.array(memberSchema).min(1, "At least one group member is required."),
 }).refine(data => {
+    // This validation runs on submit
+    if (data.members.length === 0) return true; // Let min(1) handle this
     const sumOfMemberExpenses = data.members.reduce((sum, member) => sum + member.expense, 0);
     // Use a small tolerance for floating point comparisons
     return Math.abs(sumOfMemberExpenses - data.totalExpense) < 0.01;
 }, {
     message: "The sum of individual expenses must equal the total expense.",
-    path: ["members"], // This will show the error message near the members section
+    path: ["members"],
 });
-
 
 interface GroupExpenseFormDialogProps {
   open: boolean;
@@ -74,6 +76,15 @@ export function GroupExpenseFormDialog({
     name: "members",
   });
 
+  const watchedMembers = useWatch({ control, name: "members" });
+  const watchedTotalExpense = useWatch({ control, name: "totalExpense" });
+  const sumOfIndividualExpenses = React.useMemo(() => {
+    return watchedMembers.reduce((sum, member) => sum + (member.expense || 0), 0);
+  }, [watchedMembers]);
+  
+  const isSumMismatch = Math.abs(sumOfIndividualExpenses - watchedTotalExpense) > 0.01;
+
+
   useEffect(() => {
     if (open) {
       if (group) {
@@ -96,9 +107,9 @@ export function GroupExpenseFormDialog({
     }
   }, [open, group, reset, user]);
 
-  const processSubmit = (data: GroupExpenseFormData) => {
+  const processSubmit = useCallback((data: GroupExpenseFormData) => {
     onSave(data);
-  };
+  }, [onSave]);
 
   return (
     <Dialog open={open} onOpenChange={!isSaving ? onOpenChange : undefined}>
@@ -106,7 +117,7 @@ export function GroupExpenseFormDialog({
         <DialogHeader>
           <DialogTitle className="font-headline">{group ? "Edit Group Expense" : "Create Group Expense"}</DialogTitle>
           <DialogDescription>
-            {group ? "Update the details for this shared expense." : "Enter the total expense, then add members and their individual expenses."}
+            {group ? "Update the details for this shared expense." : "Enter the total expense, then add members and their individual amounts."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(processSubmit)} className="space-y-4">
@@ -133,14 +144,14 @@ export function GroupExpenseFormDialog({
 
           <div>
              <Label>Group Members</Label>
-             <p className="text-xs text-muted-foreground mb-2">Add members and their respective expenses and balances.</p>
+             <p className="text-xs text-muted-foreground mb-2">Add members and enter the amount each person contributed.</p>
           </div>
 
           <ScrollArea className="h-[200px] pr-4">
             <div className="space-y-3">
               {fields.map((field, index) => (
                 <div key={field.id} className="grid grid-cols-12 gap-2 items-start">
-                  <div className="col-span-4 space-y-1">
+                  <div className="col-span-6 space-y-1">
                     <Input
                       placeholder="Member Name"
                       {...register(`members.${index}.name`)}
@@ -148,7 +159,7 @@ export function GroupExpenseFormDialog({
                     />
                     {errors.members?.[index]?.name && <p className="text-xs text-destructive">{errors.members[index]?.name?.message}</p>}
                   </div>
-                  <div className="col-span-4 space-y-1">
+                  <div className="col-span-5 space-y-1">
                      <Input
                         type="number"
                         step="0.01"
@@ -157,15 +168,6 @@ export function GroupExpenseFormDialog({
                         disabled={isSaving}
                       />
                       {errors.members?.[index]?.expense && <p className="text-xs text-destructive">{errors.members[index]?.expense?.message}</p>}
-                  </div>
-                  <div className="col-span-3 space-y-1">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder="Balance"
-                      {...register(`members.${index}.balance`, { valueAsNumber: true })}
-                      disabled={isSaving}
-                    />
                   </div>
                   <div className="col-span-1 flex justify-end items-center h-10">
                     {fields.length > 1 && (
@@ -178,8 +180,8 @@ export function GroupExpenseFormDialog({
               ))}
             </div>
           </ScrollArea>
+           {isSumMismatch && <p className="text-sm text-destructive mt-2">The sum of individual expenses ({sumOfIndividualExpenses.toFixed(2)}) does not match the total expense ({watchedTotalExpense.toFixed(2)}).</p>}
            {errors.members?.root && <p className="text-sm text-destructive mt-2">{errors.members.root.message}</p>}
-           {/* Fallback for when the root error doesn't catch it for some reason */}
            {errors.members && !errors.members.root && typeof errors.members.message === 'string' && <p className="text-sm text-destructive mt-2">{errors.members.message}</p>}
           
           <Button
