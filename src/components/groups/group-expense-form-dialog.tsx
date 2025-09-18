@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useCallback } from 'react';
-import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
+import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from "@/components/ui/button";
@@ -52,7 +52,7 @@ export function GroupExpenseFormDialog({
   isSaving = false,
 }: GroupExpenseFormDialogProps) {
   const { user } = useAuthState();
-  const { selectedCurrency, conversionRates } = useCurrency();
+  const { selectedCurrency } = useCurrency();
   const groupExpenseSchema = getGroupExpenseSchema();
 
   const {
@@ -68,11 +68,11 @@ export function GroupExpenseFormDialog({
       groupName: '',
       email: user?.email || '',
       numberOfPersons: 2,
-      members: [], // Initialize as empty
+      members: [],
     },
   });
 
-  const { fields, append, remove, replace } = useFieldArray({
+  const { fields, append, remove } = useFieldArray({
     control,
     name: "members",
   });
@@ -80,37 +80,41 @@ export function GroupExpenseFormDialog({
   const numberOfPersons = watch('numberOfPersons');
   const members = watch('members');
 
-  // Effect to populate initial fields when dialog opens or user/group changes
+  // Single, stable effect to handle form initialization and updates
   useEffect(() => {
-    if (open && user?.email) {
-      if (group) {
-        // Editing an existing group
-        const existingMembers = group.members.map((name, i) => ({
-          name,
-          expense: group.expenses[i]
-        }));
-        reset({
-          groupName: group.groupName,
-          email: user.email,
-          numberOfPersons: group.members.length,
-          members: existingMembers,
-        });
-      } else {
-        // Creating a new group
-        const initialMembers: MemberDetails[] = [
-          { name: user.name || 'Me', expense: 0 },
-          { name: '', expense: 0 }
-        ];
-        reset({
-          groupName: '',
-          email: user.email,
-          numberOfPersons: 2,
-          members: initialMembers,
-        });
-      }
+    if (!open || !user?.email) return;
+
+    let defaultValues: GroupExpenseFormData;
+
+    if (group) { // EDIT MODE
+      const existingMembers = group.members.map((name, i) => ({
+        name,
+        expense: group.expenses[i]
+      }));
+      defaultValues = {
+        groupName: group.groupName,
+        email: user.email,
+        numberOfPersons: group.members.length,
+        members: existingMembers,
+      };
+    } else { // CREATE MODE
+      const initialMembers: MemberDetails[] = Array.from({ length: 2 }, (_, i) => ({
+        name: i === 0 ? (user.name || 'Me') : '',
+        expense: 0
+      }));
+      defaultValues = {
+        groupName: '',
+        email: user.email,
+        numberOfPersons: 2,
+        members: initialMembers,
+      };
     }
+    
+    reset(defaultValues);
+
   }, [group, user, open, reset]);
-  
+
+
   // Effect to synchronize the number of member fields with the dropdown
   useEffect(() => {
     if (!open) return; // Only run when the dialog is open
@@ -137,11 +141,7 @@ export function GroupExpenseFormDialog({
   const processSubmit = (data: GroupExpenseFormData) => {
     const totalExpenseValue = data.members.reduce((sum, m) => sum + m.expense, 0);
     const averageExpense = data.numberOfPersons > 0 ? totalExpenseValue / data.numberOfPersons : 0;
-
     const balances = data.members.map(m => m.expense - averageExpense);
-    
-    // In a real scenario, you'd convert to a base currency like INR here.
-    // For this mock implementation, we'll keep the amounts as is.
     
     const payload: Omit<GroupExpense, 'id'> = {
       groupName: data.groupName,

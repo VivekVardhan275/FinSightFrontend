@@ -10,6 +10,16 @@ import { GroupCard } from '@/components/groups/group-card';
 import { GroupExpenseFormDialog } from '@/components/groups/group-expense-form-dialog';
 import { useNotification } from '@/contexts/notification-context';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // MOCK DATA for initial UI display. This will be replaced by context/API calls.
 const MOCK_GROUPS: GroupExpense[] = [
@@ -73,6 +83,8 @@ export default function GroupsPage() {
   const [isLoading, setIsLoading] = useState(false); // Will be driven by context later
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<GroupExpense | null>(null);
+  const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
+  const [groupToDeleteId, setGroupToDeleteId] = useState<string | null>(null);
   const { addNotification } = useNotification();
 
   const handleCreateGroup = () => {
@@ -85,14 +97,23 @@ export default function GroupsPage() {
     setIsFormOpen(true);
   };
   
-  const handleDeleteGroup = (groupId: string) => {
+  const confirmDeleteGroup = (groupId: string) => {
+    setGroupToDeleteId(groupId);
+    setIsConfirmDeleteDialogOpen(true);
+  };
+  
+  const handleDeleteGroup = () => {
+    if (!groupToDeleteId) return;
+
     // MOCK: Filter out the group to delete
-    setGroups(prev => prev.filter(g => g.id !== groupId));
+    setGroups(prev => prev.filter(g => g.id !== groupToDeleteId));
     addNotification({
         title: "Group Deleted (Mock)",
-        description: `Group with ID ${groupId} has been removed from the list.`,
+        description: `Group has been removed from the list.`,
         type: 'info'
     });
+    setIsConfirmDeleteDialogOpen(false);
+    setGroupToDeleteId(null);
   };
 
   const handleSaveGroup = (data: Omit<GroupExpense, 'id'>) => {
@@ -111,13 +132,13 @@ export default function GroupsPage() {
         setGroups(prev => [...prev, newGroup]);
         addNotification({
             title: "Group Created (Mock)",
-            description: `Data for "${data.groupName}" has been created.`,
+            description: `A new group "${data.groupName}" has been created.`,
             type: 'success'
         });
     }
     
-    console.log("Data to be sent to API:", data);
     setIsFormOpen(false);
+    setEditingGroup(null);
   };
 
   return (
@@ -157,7 +178,7 @@ export default function GroupsPage() {
               key={group.id}
               group={group}
               onEdit={handleEditGroup}
-              onDelete={handleDeleteGroup}
+              onDelete={confirmDeleteGroup}
               variants={groupCardVariants}
               custom={index}
             />
@@ -188,6 +209,26 @@ export default function GroupsPage() {
         group={editingGroup}
         onSave={handleSaveGroup}
       />
+
+      <AlertDialog open={isConfirmDeleteDialogOpen} onOpenChange={setIsConfirmDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete this group expense.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setGroupToDeleteId(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+                onClick={handleDeleteGroup}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
