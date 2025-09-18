@@ -1,3 +1,4 @@
+
 // src/components/groups/group-expense-form-dialog.tsx
 "use client";
 
@@ -8,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Trash2, PlusCircle, RotateCw } from "lucide-react";
-import { useForm, useFieldArray, useWatch } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Group, GroupExpenseFormData } from '@/types';
@@ -22,18 +23,14 @@ const memberSchema = z.object({
   balance: z.number(), // Balance is not directly validated in the form, but calculated on save
 });
 
+// Simplified schema without the complex `.refine` that caused render loops.
+// Validation will be handled in the submit function instead.
 const groupExpenseSchema = z.object({
   groupName: z.string().min(1, "Group name is required."),
   totalExpense: z.number().min(0, "Total expense must be non-negative."),
   members: z.array(memberSchema).min(1, "At least one group member is required."),
-}).refine(data => {
-    if (data.members.length === 0) return true;
-    const sumOfMemberExpenses = data.members.reduce((sum, member) => sum + (member.expense || 0), 0);
-    return Math.abs(sumOfMemberExpenses - data.totalExpense) < 0.01;
-}, {
-    message: "The sum of individual expenses must equal the total expense.",
-    path: ["members"],
 });
+
 
 interface GroupExpenseFormDialogProps {
   open: boolean;
@@ -58,6 +55,7 @@ export function GroupExpenseFormDialog({
     register,
     handleSubmit,
     reset,
+    setError,
     formState: { errors },
   } = useForm<GroupExpenseFormData>({
     resolver: zodResolver(groupExpenseSchema),
@@ -96,8 +94,17 @@ export function GroupExpenseFormDialog({
   }, [open, group, reset, user]);
 
   const processSubmit = useCallback((data: GroupExpenseFormData) => {
+    // Manual validation before calling onSave
+    const sumOfMemberExpenses = data.members.reduce((sum, member) => sum + (member.expense || 0), 0);
+    if (Math.abs(sumOfMemberExpenses - data.totalExpense) > 0.01) {
+      setError("members", {
+        type: "manual",
+        message: "The sum of individual expenses must equal the total expense.",
+      });
+      return; // Stop submission if validation fails
+    }
     onSave(data);
-  }, [onSave]);
+  }, [onSave, setError]);
 
   return (
     <Dialog open={open} onOpenChange={!isSaving ? onOpenChange : undefined}>
