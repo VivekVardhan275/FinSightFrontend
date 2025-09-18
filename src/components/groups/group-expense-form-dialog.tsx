@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -71,14 +70,14 @@ export function GroupExpenseFormDialog({
   const [groupName, setGroupName] = useState('');
   const [members, setMembers] = useState<MemberFormState[]>([]);
 
-  // This effect correctly runs ONLY when the dialog opens, preventing re-render loops.
   useEffect(() => {
+    // This effect runs ONLY when the dialog's `open` prop changes from false to true.
+    // It safely initializes the form state for either creating or editing.
     if (open) {
       if (group) { // Edit mode: Populate form with existing group data.
         setGroupName(group.groupName);
-        // FIX: Safely map members and expenses, preventing crashes from mismatched array lengths.
         setMembers(group.members.map((name, index) => ({
-          id: `${group.id}-${index}-${name}`, // Create a reasonably stable key
+          id: `${group.id}-${index}`, // Create a stable key
           name,
           expense: String(group.expenses?.[index] ?? '') // Safely access and convert to string
         })));
@@ -124,29 +123,24 @@ export function GroupExpenseFormDialog({
       addNotification({ title: "Validation Error", description: "Group name is required.", type: 'error' });
       return;
     }
-    const hasEmptyName = members.some(m => !m.name.trim());
-    if (hasEmptyName) {
+    if (members.some(m => !m.name.trim())) {
         addNotification({ title: "Validation Error", description: "All member names must be filled out.", type: 'error' });
         return;
     }
-    const hasInvalidExpense = members.some(m => m.expense === '' || isNaN(Number(m.expense)));
-    if (hasInvalidExpense) {
+    if (members.some(m => m.expense === '' || isNaN(Number(m.expense)))) {
         addNotification({ title: "Validation Error", description: "All expense fields must contain a valid number.", type: 'error' });
         return;
     }
 
-
-    // --- Payload Creation ---
+    // --- Payload Creation (Safe Calculations) ---
     const expenses = members.map(m => parseFloat(m.expense) || 0);
     const finalTotalExpense = expenses.reduce((sum, expense) => sum + expense, 0);
     const averageExpense = members.length > 0 ? finalTotalExpense / members.length : 0;
     
-    // FIX: Safely calculate balances, handling potential NaNs and rounding for precision.
     const balances = expenses.map(expense => {
       const val = isNaN(expense) ? 0 : expense;
       return parseFloat((val - averageExpense).toFixed(2));
     });
-
 
     const payload: GroupExpenseSubmitData = {
       groupName: groupName.trim(),
@@ -161,7 +155,6 @@ export function GroupExpenseFormDialog({
   };
 
   return (
-    // FIX: Ensure onOpenChange is always a function to prevent dialog errors.
     <Dialog open={open} onOpenChange={(o) => !isSubmitting && onOpenChange(o)}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
@@ -195,7 +188,7 @@ export function GroupExpenseFormDialog({
                 <AnimatePresence>
                   {members.map((member) => (
                     <motion.div
-                      key={member.id} // FIX: Use stable unique ID for key
+                      key={member.id}
                       className="grid grid-cols-[1fr_auto_auto] gap-2 items-center"
                       layout
                       initial={{ opacity: 0, y: -10 }}

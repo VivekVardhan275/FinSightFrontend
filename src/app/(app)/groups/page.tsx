@@ -19,7 +19,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useAuthState } from '@/hooks/use-auth-state';
 import {
   fetchGroupExpenses,
   createGroupExpense,
@@ -66,7 +65,6 @@ const emptyStateMotionVariants = {
 // --- Main Component ---
 
 export default function GroupsPage() {
-  const { user } = useAuthState();
   const [groups, setGroups] = useState<GroupExpense[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
