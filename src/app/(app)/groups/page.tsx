@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -7,6 +6,7 @@ import { PlusCircle, Users, RotateCw } from "lucide-react";
 import { motion } from "framer-motion";
 import type { GroupExpense, GroupExpenseSubmitData } from '@/types';
 import { GroupCard } from '@/components/groups/group-card';
+import { GroupCardSkeleton } from '@/components/groups/group-card-skeleton';
 import { GroupExpenseFormDialog } from '@/components/groups/group-expense-form-dialog';
 import { useNotification } from '@/contexts/notification-context';
 import {
@@ -77,7 +77,9 @@ export default function GroupsPage() {
   const { addNotification } = useNotification();
 
   /**
-   * Fetches group data from the API and updates the component's state.
+   * Fetches group data from the API.
+   * Wrapped in useCallback to prevent re-creation on every render,
+   * which stabilizes the useEffect dependency array.
    */
   const getGroups = useCallback(async () => {
     setIsLoading(true);
@@ -96,9 +98,12 @@ export default function GroupsPage() {
   }, [addNotification]);
 
   // Initial data fetch on component mount.
+  // The effect correctly depends on getGroups, which is memoized by useCallback.
   useEffect(() => {
     getGroups();
   }, [getGroups]);
+
+  // --- Handlers for UI state changes ---
 
   const handleCreateGroup = () => {
     setEditingGroup(null);
@@ -116,11 +121,13 @@ export default function GroupsPage() {
   };
 
   /**
-   * Handles the deletion of a group after confirmation.
+   * Handles deleting a group after confirmation.
+   * This is an async operation with proper state management.
    */
   const handleDeleteGroup = async () => {
     if (!groupToDeleteId) return;
 
+    setIsSubmitting(true); 
     try {
       await deleteGroupExpense(groupToDeleteId);
       addNotification({
@@ -128,7 +135,8 @@ export default function GroupsPage() {
         description: `The group has been successfully removed.`,
         type: 'info'
       });
-      // Refresh the data from the server to reflect the deletion.
+      // Best Practice: Re-fetch data from the server after a mutation
+      // to ensure the UI is perfectly in sync with the database.
       await getGroups();
     } catch (error) {
       addNotification({
@@ -139,11 +147,13 @@ export default function GroupsPage() {
     } finally {
       setIsConfirmDeleteDialogOpen(false);
       setGroupToDeleteId(null);
+      setIsSubmitting(false);
     }
   };
 
   /**
    * Handles saving a new group or updating an existing one.
+   * This is an async operation with proper state management.
    */
   const handleSaveGroup = async (data: GroupExpenseSubmitData) => {
     setIsSubmitting(true);
@@ -165,7 +175,7 @@ export default function GroupsPage() {
       }
       setIsFormOpen(false);
       setEditingGroup(null);
-      // Refresh data to show the new or updated group.
+      // Re-fetch data to ensure UI consistency after the mutation.
       await getGroups();
     } catch (error) {
       addNotification({
@@ -176,6 +186,58 @@ export default function GroupsPage() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+  
+  // --- Render Logic ---
+
+  const renderContent = () => {
+    if (isLoading) {
+      // Enhancement: Use skeleton loaders for a better UX during initial load.
+      return (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <GroupCardSkeleton key={index} />
+          ))}
+        </div>
+      );
+    }
+
+    if (groups.length > 0) {
+      return (
+        <motion.div
+          className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
+          variants={gridContainerMotionVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          {groups.map((group) => (
+            <GroupCard
+              key={group.id}
+              group={group}
+              onEdit={handleEditGroup}
+              onDelete={confirmDeleteGroup}
+              variants={groupCardVariants}
+            />
+          ))}
+        </motion.div>
+      );
+    }
+
+    return (
+      <motion.div
+        className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/30 p-12 text-center"
+        variants={emptyStateMotionVariants}
+        initial="initial"
+        animate="animate"
+      >
+        <Users className="mx-auto h-12 w-12 text-muted-foreground" />
+        <h3 className="mt-4 text-xl font-semibold">No groups yet</h3>
+        <p className="mb-4 mt-2 text-sm text-muted-foreground">Get started by creating a new group to share expenses.</p>
+        <Button onClick={handleCreateGroup}>
+          <PlusCircle className="mr-2 h-4 w-4" /> Create Group
+        </Button>
+      </motion.div>
+    );
   };
 
   return (
@@ -195,43 +257,7 @@ export default function GroupsPage() {
       </div>
 
       {/* Main Content: Loading, Empty State, or Group List */}
-      {isLoading ? (
-        <div className="flex items-center justify-center p-10">
-          <RotateCw className="mr-2 h-6 w-6 animate-spin text-primary" />
-          <p className="text-muted-foreground">Loading groups...</p>
-        </div>
-      ) : groups.length > 0 ? (
-        <motion.div
-          className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
-          variants={gridContainerMotionVariants}
-          initial="hidden"
-          animate="visible"
-        >
-          {groups.map((group) => (
-            <GroupCard
-              key={group.id}
-              group={group}
-              onEdit={handleEditGroup}
-              onDelete={confirmDeleteGroup}
-              variants={groupCardVariants}
-            />
-          ))}
-        </motion.div>
-      ) : (
-        <motion.div
-          className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/30 p-12 text-center"
-          variants={emptyStateMotionVariants}
-          initial="initial"
-          animate="animate"
-        >
-          <Users className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h3 className="mt-4 text-xl font-semibold">No groups yet</h3>
-          <p className="mb-4 mt-2 text-sm text-muted-foreground">Get started by creating a new group to share expenses.</p>
-          <Button onClick={handleCreateGroup}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Create Group
-          </Button>
-        </motion.div>
-      )}
+      {renderContent()}
 
       {/* Dialog for Creating/Editing Groups */}
       <GroupExpenseFormDialog
@@ -255,8 +281,10 @@ export default function GroupsPage() {
             <AlertDialogCancel onClick={() => setGroupToDeleteId(null)}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteGroup}
+              disabled={isSubmitting} // Disable button during delete operation
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
+              {isSubmitting && <RotateCw className="mr-2 h-4 w-4 animate-spin" />}
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
