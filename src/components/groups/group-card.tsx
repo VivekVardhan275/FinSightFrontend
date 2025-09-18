@@ -13,7 +13,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 // Icons
-import { Edit2, Trash2, Users } from 'lucide-react';
+import { Edit2, Trash2, Users, AlertTriangle } from 'lucide-react';
 
 // Contexts & Utilities
 import { useCurrency } from '@/contexts/currency-context';
@@ -41,6 +41,11 @@ interface GroupCardProps {
  */
 export function GroupCard({ group, onEdit, onDelete, variants, custom }: GroupCardProps) {
   const { selectedCurrency, convertAmount } = useCurrency();
+
+  // FIX: Validate that the lengths of member-related arrays are consistent.
+  const isDataConsistent =
+    group.members.length === group.expenses.length &&
+    group.members.length === group.balance.length;
 
   return (
     <motion.div
@@ -76,9 +81,16 @@ export function GroupCard({ group, onEdit, onDelete, variants, custom }: GroupCa
             </div>
             <Separator />
             <ScrollArea className="h-28 pr-4">
-              {group.members.length > 0 ? (
+              {!isDataConsistent ? (
+                <div className="flex items-center justify-center h-24 text-sm text-destructive gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  <p>Inconsistent group data.</p>
+                </div>
+              ) : group.members.length > 0 ? (
                 group.members.map((member, index) => (
-                  <div key={`${member}-${index}`} className="grid grid-cols-3 gap-2 items-center text-sm py-1.5">
+                  // Improvement: Using index as a key is acceptable here since the list is static per render.
+                  // However, if members could be reordered, a unique ID from the data would be better.
+                  <div key={`${group.id}-member-${index}`} className="grid grid-cols-3 gap-2 items-center text-sm py-1.5">
                     <span className="truncate col-span-1" title={member}>{member}</span>
                     <span className="text-right col-span-1 text-muted-foreground">
                       {formatCurrency(convertAmount(group.expenses[index], selectedCurrency), selectedCurrency)}
