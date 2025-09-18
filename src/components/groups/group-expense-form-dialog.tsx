@@ -1,8 +1,8 @@
 
 "use client";
 
-import React, { useEffect, useMemo, useCallback } from 'react';
-import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import React, { useEffect, useMemo } from 'react';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from "@/components/ui/button";
@@ -17,12 +17,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RotateCw, Users } from "lucide-react";
+import { RotateCw, Users, Trash2 } from "lucide-react";
 import { useAuthState } from '@/hooks/use-auth-state';
-import { useCurrency } from '@/hooks/use-currency';
+import { useCurrency } from '@/contexts/currency-context';
 import { formatCurrency } from '@/lib/utils';
-import type { GroupExpense, GroupExpenseFormData, MemberDetails } from '@/types';
+import type { GroupExpense, GroupExpenseFormData } from '@/types';
 import { ScrollArea } from '../ui/scroll-area';
+import { useToast } from '@/hooks/use-toast';
 
 interface GroupExpenseFormDialogProps {
   group?: GroupExpense | null;
@@ -35,10 +36,11 @@ interface GroupExpenseFormDialogProps {
 const getGroupExpenseSchema = () => z.object({
   groupName: z.string().min(1, "Group name is required."),
   email: z.string().email(),
+  totalExpense: z.number().min(0, "Total expense must be a positive number."),
   members: z.array(z.object({
     name: z.string().min(1, "Member name is required."),
     expense: z.number().min(0, "Expense cannot be negative."),
-  })).min(1),
+  })).min(1, "At least one member is required."),
 });
 
 const MAX_MEMBERS = 10;
@@ -52,6 +54,7 @@ export function GroupExpenseFormDialog({
 }: GroupExpenseFormDialogProps) {
   const { user } = useAuthState();
   const { selectedCurrency } = useCurrency();
+  const { toast } = useToast();
   const groupExpenseSchema = getGroupExpenseSchema();
 
   const {
@@ -68,11 +71,12 @@ export function GroupExpenseFormDialog({
     defaultValues: {
       groupName: '',
       email: user?.email || '',
+      totalExpense: 0,
       members: [],
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, replace } = useFieldArray({
     control,
     name: "members",
   });
@@ -80,54 +84,66 @@ export function GroupExpenseFormDialog({
   const members = watch('members');
 
   useEffect(() => {
-    if (!open) return;
-
-    if (group) { // EDIT MODE
-      const existingMembers = group.members.map((name, i) => ({
-        name,
-        expense: group.expenses[i]
-      }));
-      reset({
-        groupName: group.groupName,
-        email: user?.email || '',
-        members: existingMembers,
-      });
-    } else { // CREATE MODE
-      reset({
-        groupName: '',
-        email: user?.email || '',
-        members: Array.from({ length: 2 }, (_, i) => ({
-          name: i === 0 ? (user?.name || 'Me') : '',
-          expense: 0
-        })),
-      });
+    if (open) {
+      clearErrors();
+      if (group) { // EDIT MODE
+        const existingMembers = group.members.map((name, i) => ({
+          name,
+          expense: group.expenses[i]
+        }));
+        reset({
+          groupName: group.groupName,
+          email: group.email,
+          totalExpense: group.totalExpense,
+          members: existingMembers,
+        });
+      } else { // CREATE MODE
+        reset({
+          groupName: '',
+          email: user?.email || '',
+          totalExpense: 0,
+          members: Array.from({ length: 2 }, (_, i) => ({
+            name: i === 0 ? (user?.name || 'Me') : '',
+            expense: 0
+          })),
+        });
+      }
     }
-  }, [group, open, reset, user]);
+  }, [group, open, reset, user, clearErrors]);
 
-  const totalExpense = useMemo(() => {
-    return members.reduce((sum, member) => sum + (member.expense || 0), 0);
-  }, [members]);
-  
   const handleNumberOfPersonsChange = (value: string) => {
     const newCount = parseInt(value, 10);
     const currentCount = fields.length;
+    const currentMembers = watch('members');
 
     if (newCount > currentCount) {
       const toAdd = newCount - currentCount;
-      for (let i = 0; i < toAdd; i++) {
-        append({ name: '', expense: 0 });
-      }
+      const newMemberEntries = Array.from({ length: toAdd }, () => ({ name: '', expense: 0 }));
+      append(newMemberEntries);
     } else if (newCount < currentCount) {
-      const toRemove = currentCount - newCount;
-      for (let i = 0; i < toRemove; i++) {
-        remove(currentCount - 1 - i);
-      }
+      const toRemoveCount = currentCount - newCount;
+      const updatedMembers = currentMembers.slice(0, newCount);
+      replace(updatedMembers);
     }
   };
-
-
+  
   const processSubmit = (data: GroupExpenseFormData) => {
-    const totalExpenseValue = data.members.reduce((sum, m) => sum + m.expense, 0);
+    const memberExpensesSum = data.members.reduce((sum, m) => sum + m.expense, 0);
+
+    if (Math.abs(memberExpensesSum - data.totalExpense) > 0.01) {
+      setError("totalExpense", {
+        type: "manual",
+        message: `Member expenses sum (${formatCurrency(memberExpensesSum, selectedCurrency)}) must equal Total Expense.`,
+      });
+      toast({
+        title: "Validation Error",
+        description: `Member expenses sum (${formatCurrency(memberExpensesSum, selectedCurrency)}) does not match the Total Expense (${formatCurrency(data.totalExpense, selectedCurrency)}). Please correct the amounts.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const totalExpenseValue = data.totalExpense;
     const averageExpense = data.members.length > 0 ? totalExpenseValue / data.members.length : 0;
     const balances = data.members.map(m => m.expense - averageExpense);
     
@@ -169,6 +185,18 @@ export function GroupExpenseFormDialog({
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="totalExpense">Total Expense ({selectedCurrency})</Label>
+                <Input
+                    id="totalExpense"
+                    type="number"
+                    step="0.01"
+                    {...register("totalExpense", { valueAsNumber: true })}
+                    disabled={isSaving}
+                />
+                {errors.totalExpense && <p className="text-sm text-destructive">{errors.totalExpense.message}</p>}
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="numberOfPersons">Number of Persons</Label>
                 <Select
                     value={String(fields.length)}
@@ -187,7 +215,7 @@ export function GroupExpenseFormDialog({
               </div>
 
               <div className="space-y-4 pt-2">
-                <Label>Members and Expenses ({selectedCurrency})</Label>
+                <Label>Members and Their Share ({selectedCurrency})</Label>
                 {fields.map((field, index) => (
                   <div key={field.id} className="grid grid-cols-2 gap-2 items-start">
                     <div className="space-y-1">
@@ -202,7 +230,7 @@ export function GroupExpenseFormDialog({
                         <Input
                             type="number"
                             step="0.01"
-                            placeholder={`Expense for ${watch(`members.${index}.name`) || `Member ${index + 1}`}`}
+                            placeholder={`Share for ${watch(`members.${index}.name`) || `Member ${index + 1}`}`}
                             {...register(`members.${index}.expense` as const, { valueAsNumber: true })}
                             disabled={isSaving}
                         />
@@ -210,14 +238,8 @@ export function GroupExpenseFormDialog({
                     </div>
                   </div>
                 ))}
+                 {errors.members && typeof errors.members.message === 'string' && <p className="text-sm text-destructive">{errors.members.message}</p>}
               </div>
-
-              <div className="pt-4 text-right">
-                <p className="text-lg font-bold">
-                    Total Expense: {formatCurrency(totalExpense, selectedCurrency)}
-                </p>
-              </div>
-
             </div>
           </ScrollArea>
           <DialogFooter className="pt-6">
