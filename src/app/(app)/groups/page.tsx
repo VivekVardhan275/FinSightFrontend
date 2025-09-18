@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Users, RotateCw } from "lucide-react";
 import { motion } from "framer-motion";
@@ -29,8 +29,8 @@ const MOCK_GROUPS: GroupExpense[] = [
         groupName: 'Trip to Goa',
         email: 'user@example.com',
         members: ['Alice', 'Bob', 'Charlie'],
-        expenses: [3000.0, 1500.0, 0.0], // Alice paid 3000, Bob 1500, Charlie 0
-        balance: [1500.0, 0.0, -1500.0], // Total: 4500, Avg: 1500. Alice gets 1500 back, Charlie owes 1500.
+        expenses: [3000.0, 1500.0, 0.0], 
+        balance: [1500.0, 0.0, -1500.0], 
         totalExpense: 4500.0,
     },
     {
@@ -38,8 +38,8 @@ const MOCK_GROUPS: GroupExpense[] = [
         groupName: 'Dinner Party',
         email: 'user@example.com',
         members: ['David', 'Eve'],
-        expenses: [500.0, 1500.0], // David paid 500, Eve 1500
-        balance: [-500.0, 500.0], // Total: 2000, Avg: 1000. David owes 500, Eve gets 500 back.
+        expenses: [500.0, 1500.0],
+        balance: [-500.0, 500.0], 
         totalExpense: 2000.0,
     },
 ];
@@ -118,7 +118,6 @@ export default function GroupsPage() {
     setGroupToDeleteId(null);
   };
 
-  // The onSave function now receives the fully calculated data structure from the form
   const handleSaveGroup = (data: GroupExpenseSubmitData) => {
     if (editingGroup) {
         // MOCK: Update existing group

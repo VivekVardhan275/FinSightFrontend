@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useEffect } from 'react';
-import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from "@/components/ui/button";
@@ -19,12 +19,11 @@ import { Label } from "@/components/ui/label";
 import { RotateCw, Users, Trash2, PlusCircle } from "lucide-react";
 import { useAuthState } from '@/hooks/use-auth-state';
 import { useCurrency } from '@/contexts/currency-context';
-import type { GroupExpense, GroupExpenseSubmitData, MemberDetails } from '@/types';
+import type { GroupExpense, GroupExpenseSubmitData, GroupExpenseFormData } from '@/types';
 import { ScrollArea } from '../ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '../ui/separator';
 
-// Zod schema for the form's data structure
 const groupExpenseFormSchema = z.object({
   groupName: z.string().min(1, "Group name is required."),
   members: z.array(z.object({
@@ -33,7 +32,6 @@ const groupExpenseFormSchema = z.object({
   })).min(1, "At least one member is required."),
 });
 
-type GroupExpenseFormData = z.infer<typeof groupExpenseFormSchema>;
 
 interface GroupExpenseFormDialogProps {
   group?: GroupExpense | null;
@@ -73,7 +71,6 @@ export function GroupExpenseFormDialog({
     name: "members",
   });
 
-  // Effect to initialize the form when it opens
   useEffect(() => {
     if (open) {
       if (group) { // EDIT MODE
@@ -97,7 +94,6 @@ export function GroupExpenseFormDialog({
     }
   }, [group, open, reset, user]);
 
-  // Handles form submission, calculates derived values, and calls the onSave prop
   const processSubmit = (data: GroupExpenseFormData) => {
     if (!user || !user.email) {
       toast({ title: "Error", description: "User not authenticated.", variant: "destructive" });
@@ -108,7 +104,6 @@ export function GroupExpenseFormDialog({
     const memberCount = data.members.length;
     const averageExpense = memberCount > 0 ? totalExpense / memberCount : 0;
     
-    // Create the final data structure required by the parent/API
     const payload: GroupExpenseSubmitData = {
       groupName: data.groupName,
       email: user.email,
