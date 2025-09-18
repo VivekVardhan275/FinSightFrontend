@@ -28,17 +28,17 @@ const MOCK_GROUPS: GroupExpense[] = [
         groupName: 'Trip to Goa',
         email: 'user@example.com',
         members: ['Alice', 'Bob', 'Charlie'],
-        expenses: [2000.0, 1000.0, 0.0],
-        balance: [1000.0, 0.0, -1000.0],
-        totalExpense: 3000.0,
+        expenses: [3000.0, 1500.0, 0.0], // Alice paid 3000, Bob 1500, Charlie 0
+        balance: [1500.0, 0.0, -1500.0], // Total: 4500, Avg: 1500. Alice gets 1500 back, Charlie owes 1500.
+        totalExpense: 4500.0,
     },
     {
         id: 'group-2',
         groupName: 'Dinner Party',
         email: 'user@example.com',
         members: ['David', 'Eve'],
-        expenses: [500.0, 1500.0],
-        balance: [-500.0, 500.0],
+        expenses: [500.0, 1500.0], // David paid 500, Eve 1500
+        balance: [-500.0, 500.0], // Total: 2000, Avg: 1000. David owes 500, Eve gets 500 back.
         totalExpense: 2000.0,
     },
 ];
