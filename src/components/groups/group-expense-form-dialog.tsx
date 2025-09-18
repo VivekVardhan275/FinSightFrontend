@@ -138,7 +138,7 @@ export function GroupExpenseFormDialog({
     if (data.splitMethod === 'equal') {
         const memberCount = data.members.length;
         const amountPerMember = memberCount > 0 ? data.totalExpense / memberCount : 0;
-        data.members.forEach((member, index) => {
+        data.members.forEach((member) => { // No index needed here
             member.expense = parseFloat(amountPerMember.toFixed(2));
         });
     }
