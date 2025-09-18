@@ -3,8 +3,6 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-
-// UI Components
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,44 +17,27 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-
-
-// Icons
 import { RotateCw, Users, Trash2, PlusCircle } from "lucide-react";
-
-// Hooks, Types, & Utilities
 import { useAuthState } from '@/hooks/use-auth-state';
 import { useCurrency } from '@/contexts/currency-context';
 import type { GroupExpense, GroupExpenseSubmitData } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 import { useNotification } from '@/contexts/notification-context';
 
-
-/**
- * Props for the GroupExpenseFormDialog component.
- */
 interface GroupExpenseFormDialogProps {
-  /** The group object to edit. If null or undefined, the form is in 'create' mode. */
   group?: GroupExpense | null;
-  /** Controls whether the dialog is open. */
   open: boolean;
-  /** Callback function to change the open state. */
   onOpenChange: (open: boolean) => void;
-  /** Callback function triggered on successful save. */
   onSave: (data: GroupExpenseSubmitData) => void;
-  /** Flag indicating if the parent component is currently submitting data. */
   isSubmitting: boolean;
 }
 
 interface MemberFormState {
+  id: string; // Unique ID for React key prop
   name: string;
-  expense: number | string; // Allow string for empty input field
+  expense: string; // Store as string to avoid controlled input issues
 }
 
-/**
- * A dialog component for creating or editing a group expense.
- * It handles form state, member management, and submission payload creation.
- */
 export function GroupExpenseFormDialog({
   group,
   open,
@@ -68,56 +49,54 @@ export function GroupExpenseFormDialog({
   const { selectedCurrency } = useCurrency();
   const { addNotification } = useNotification();
 
-  // Form State
   const [groupName, setGroupName] = useState('');
   const [members, setMembers] = useState<MemberFormState[]>([]);
 
-  // Effect to initialize or reset the form state ONLY when the dialog opens.
   useEffect(() => {
     if (open) {
-      if (group) { // Edit mode: Populate form with existing group data.
+      if (group) { // Edit mode
         setGroupName(group.groupName);
         setMembers(group.members.map((name, index) => ({
+          id: crypto.randomUUID(),
           name,
-          expense: group.expenses[index]
+          expense: String(group.expenses[index] || '0')
         })));
-      } else { // Create mode: Reset to a default state.
+      } else { // Create mode
         setGroupName('');
         setMembers([
-          { name: user?.name || 'Me', expense: '' },
-          { name: '', expense: '' },
+          { id: crypto.randomUUID(), name: user?.name || 'Me', expense: '' },
+          { id: crypto.randomUUID(), name: '', expense: '' },
         ]);
       }
     }
   }, [group, open, user]);
 
-  /**
-   * Calculate total expense in real-time for display.
-   * useMemo ensures this only recalculates when member expenses change.
-   */
   const totalExpense = useMemo(() => {
-    return members.reduce((sum, member) => sum + (parseFloat(String(member.expense)) || 0), 0);
+    return members.reduce((sum, member) => sum + (parseFloat(member.expense) || 0), 0);
   }, [members]);
 
-  const handleMemberChange = (index: number, field: 'name' | 'expense', value: string) => {
-    const updatedMembers = members.map((member, i) =>
-      i === index ? { ...member, [field]: value } : member
+  const handleMemberChange = (id: string, field: 'name' | 'expense', value: string) => {
+    setMembers(currentMembers =>
+      currentMembers.map(member =>
+        member.id === id ? { ...member, [field]: value } : member
+      )
     );
-    setMembers(updatedMembers);
   };
 
   const addMember = () => {
-    setMembers([...members, { name: '', expense: '' }]);
+    setMembers(currentMembers => [
+      ...currentMembers,
+      { id: crypto.randomUUID(), name: '', expense: '' }
+    ]);
   };
 
-  const removeMember = (index: number) => {
-    if (members.length > 1) { // Ensure at least one member remains
-      setMembers(members.filter((_, i) => i !== index));
+  const removeMember = (id: string) => {
+    if (members.length > 1) {
+      setMembers(currentMembers => currentMembers.filter(member => member.id !== id));
     }
   };
 
   const handleSubmit = () => {
-    // --- Validation ---
     if (!user?.email) {
       addNotification({ title: "Error", description: "User email not found. Please log in again.", type: 'error' });
       return;
@@ -126,23 +105,27 @@ export function GroupExpenseFormDialog({
       addNotification({ title: "Validation Error", description: "Group name cannot be empty.", type: 'error' });
       return;
     }
-    const hasEmptyName = members.some(m => !m.name.trim());
-    if (hasEmptyName) {
-        addNotification({ title: "Validation Error", description: "All member names must be filled out.", type: 'error' });
-        return;
+    if (members.some(m => !m.name.trim())) {
+      addNotification({ title: "Validation Error", description: "All member names must be filled out.", type: 'error' });
+      return;
+    }
+    if (members.some(m => m.expense === '' || isNaN(Number(m.expense)))) {
+      addNotification({ title: "Validation Error", description: "All expense fields must contain a valid number.", type: 'error' });
+      return;
     }
 
-    // --- Payload Creation ---
-    const expenses = members.map(m => parseFloat(String(m.expense)) || 0);
-    const finalTotalExpense = expenses.reduce((sum, expense) => sum + expense, 0);
+    const memberExpenses = members.map(m => parseFloat(m.expense) || 0);
+    const finalTotalExpense = memberExpenses.reduce((sum, expense) => sum + expense, 0);
     const averageExpense = members.length > 0 ? finalTotalExpense / members.length : 0;
-    const balances = expenses.map(expense => expense - averageExpense);
+    
+    // Round balances to avoid floating point precision issues
+    const balances = memberExpenses.map(exp => parseFloat((exp - averageExpense).toFixed(2)));
 
     const payload: GroupExpenseSubmitData = {
       groupName: groupName.trim(),
       email: user.email,
       members: members.map(m => m.name.trim()),
-      expenses,
+      expenses: memberExpenses,
       balance: balances,
       totalExpense: finalTotalExpense,
     };
@@ -151,7 +134,7 @@ export function GroupExpenseFormDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={!isSubmitting ? onOpenChange : undefined}>
+    <Dialog open={open} onOpenChange={(o) => !isSubmitting && onOpenChange(o)}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="font-headline flex items-center gap-2">
@@ -182,9 +165,9 @@ export function GroupExpenseFormDialog({
             <ScrollArea className="h-[200px] pr-4">
               <div className="space-y-3">
                 <AnimatePresence>
-                  {members.map((member, index) => (
+                  {members.map((member) => (
                     <motion.div
-                      key={index}
+                      key={member.id}
                       className="grid grid-cols-[1fr_auto_auto] gap-2 items-center"
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -192,16 +175,16 @@ export function GroupExpenseFormDialog({
                       transition={{ duration: 0.2 }}
                     >
                       <Input
-                        placeholder={`Member ${index + 1} Name`}
+                        placeholder={`Member Name`}
                         value={member.name}
-                        onChange={(e) => handleMemberChange(index, 'name', e.target.value)}
+                        onChange={(e) => handleMemberChange(member.id, 'name', e.target.value)}
                         disabled={isSubmitting}
                       />
                       <Input
                         type="number"
                         placeholder="Amount"
                         value={member.expense}
-                        onChange={(e) => handleMemberChange(index, 'expense', e.target.value)}
+                        onChange={(e) => handleMemberChange(member.id, 'expense', e.target.value)}
                         className="w-32"
                         disabled={isSubmitting}
                       />
@@ -212,7 +195,7 @@ export function GroupExpenseFormDialog({
                               type="button"
                               variant="ghost"
                               size="icon"
-                              onClick={() => removeMember(index)}
+                              onClick={() => removeMember(member.id)}
                               disabled={isSubmitting || members.length <= 1}
                               className="text-destructive hover:bg-destructive/10"
                               aria-label="Remove member"
