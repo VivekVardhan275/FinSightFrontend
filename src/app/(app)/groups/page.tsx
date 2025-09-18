@@ -157,7 +157,7 @@ function GroupsPageContent() {
     try {
         let savedGroupFromApi: Group;
 
-        if (isEditing) {
+        if (isEditing && editingGroup) {
             const apiUrl = `${GROUP_API_BASE_URL}/set-group-expense?id=${editingGroup.groupId}&email=${encodeURIComponent(user.email)}`;
             const response = await axios.put<Group>(addRandomQueryParam(apiUrl), dataForApi);
             savedGroupFromApi = response.data;
